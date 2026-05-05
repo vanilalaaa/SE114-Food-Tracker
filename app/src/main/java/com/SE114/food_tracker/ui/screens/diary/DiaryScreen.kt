@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.ui.screens.diary
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.EditNote
@@ -99,7 +101,7 @@ fun DiaryHeader() {
 @Composable
 fun OptionMenuSection() {
     var isMenuExpanded by remember { mutableStateOf(false) }
-
+    var selectedSubMenu by remember { mutableIntStateOf(0) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -116,7 +118,10 @@ fun OptionMenuSection() {
         )
 
         IconButton(
-            onClick = { isMenuExpanded = !isMenuExpanded },
+            onClick = {
+                isMenuExpanded = !isMenuExpanded
+                if (!isMenuExpanded) selectedSubMenu = 0
+            },
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(8.dp)
@@ -125,19 +130,39 @@ fun OptionMenuSection() {
         }
 
         if (isMenuExpanded) {
-            Surface(
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 48.dp, end = 16.dp)
-                    .width(150.dp),
-                shape = RoundedCornerShape(16.dp),
-                shadowElevation = 8.dp,
-                color = Color.White
+                    .padding(top = 48.dp, end = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    OptionMenuItem(Icons.Default.FilterList, "Lọc loại")
-                    OptionMenuItem(Icons.Default.ColorLens, "Đổi skin")
-                    OptionMenuItem(Icons.Default.Straighten, "Kích thước")
+                when (selectedSubMenu) {
+                    1 -> SubMenuContent(listOf("Tất cả", "Cơm (1)", "Mì & Phở (1)"))
+                    2 -> SubMenuContent(listOf("Đơn giản", "Nước"))
+                    3 -> SubMenuContent(listOf("Trang tập", "Trang ghi"))
+                }
+
+
+                Surface(
+                    modifier = Modifier.width(150.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 8.dp,
+                    color = Color.White
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        OptionMenuItem(
+                            Icons.Default.FilterList,
+                            "Lọc loại",
+                            onClick = { selectedSubMenu = 1 })
+                        OptionMenuItem(
+                            Icons.Default.ColorLens,
+                            "Đổi skin",
+                            onClick = { selectedSubMenu = 2 })
+                        OptionMenuItem(
+                            Icons.Default.Straighten,
+                            "Kích thước",
+                            onClick = { selectedSubMenu = 3 })
+                    }
                 }
             }
         }
@@ -145,10 +170,11 @@ fun OptionMenuSection() {
 }
 
 @Composable
-fun OptionMenuItem(icon: ImageVector, text: String) {
+fun OptionMenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -159,6 +185,39 @@ fun OptionMenuItem(icon: ImageVector, text: String) {
             Text(text, fontSize = 12.sp)
         }
         Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(14.dp))
+    }
+}
+
+@Composable
+fun SubMenuContent(items: List<String>) {
+    Surface(
+        modifier = Modifier.width(130.dp),
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 8.dp,
+        color = Color.White
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            items.forEach { text ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text, fontSize = 12.sp)
+
+                    if (text == "Nước" || text == "Đơn giản") {
+                        Icon(
+                            Icons.Default.Check,
+                            null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MainGreen
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
