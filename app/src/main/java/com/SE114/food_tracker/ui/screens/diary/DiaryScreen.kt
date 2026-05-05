@@ -8,10 +8,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarToday
@@ -34,22 +37,36 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.IconButton
+import com.SE114.food_tracker.ui.theme.BottomBarBG
+import com.SE114.food_tracker.ui.theme.CalendarHighlight
+import com.SE114.food_tracker.ui.theme.DarkGreen
 import com.SE114.food_tracker.ui.theme.FoodTrackerTheme
+import com.SE114.food_tracker.ui.theme.LightGreenBG
+import com.SE114.food_tracker.ui.theme.MainGreen
+import com.SE114.food_tracker.ui.theme.LightGrayBG
 
 @Composable
 fun DiaryHeader() {
@@ -61,23 +78,19 @@ fun DiaryHeader() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Nhật ký",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Nhật ký", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(8.dp))
-            Icon(Icons.Default.Whatshot, contentDescription = null, tint = Color.Red)
-            Text("1", fontWeight = FontWeight.Bold)
+            Icon(Icons.Default.Whatshot, contentDescription = null, tint = MainGreen)
+            Text("1", color = MainGreen, fontWeight = FontWeight.Bold, fontSize = 24.sp)
         }
-        Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFE0E0E0)) {
-            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 2.dp) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
                 Text("thg 4 2026", fontSize = 14.sp)
-                Icon(
-                    Icons.Default.CalendarToday,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
             }
         }
     }
@@ -85,25 +98,47 @@ fun DiaryHeader() {
 
 @Composable
 fun OptionMenuSection() {
+    var isMenuExpanded by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .height(180.dp)
-            .background(Color(0xFFEBEBEB), RoundedCornerShape(24.dp))
+            .background(LightGrayBG, RoundedCornerShape(24.dp))
     ) {
-        Surface(
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp)
+                .size(100.dp)
+                .background(Color.LightGray, CircleShape)
+        )
+
+        IconButton(
+            onClick = { isMenuExpanded = !isMenuExpanded },
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .width(160.dp),
-            shape = RoundedCornerShape(16.dp),
-            shadowElevation = 4.dp
+                .padding(8.dp)
         ) {
-            Column(modifier = Modifier.padding(8.dp)) {
-                OptionMenuItem(Icons.Default.FilterList, "Lọc loại")
-                OptionMenuItem(Icons.Default.ColorLens, "Đổi skin")
-                OptionMenuItem(Icons.Default.Straighten, "Kích thước")
+            Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.Gray)
+        }
+
+        if (isMenuExpanded) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 48.dp, end = 16.dp)
+                    .width(150.dp),
+                shape = RoundedCornerShape(16.dp),
+                shadowElevation = 8.dp,
+                color = Color.White
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    OptionMenuItem(Icons.Default.FilterList, "Lọc loại")
+                    OptionMenuItem(Icons.Default.ColorLens, "Đổi skin")
+                    OptionMenuItem(Icons.Default.Straighten, "Kích thước")
+                }
             }
         }
     }
@@ -114,16 +149,16 @@ fun OptionMenuItem(icon: ImageVector, text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(icon, null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(text, fontSize = 12.sp)
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(14.dp))
+        Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(14.dp))
     }
 }
 
@@ -134,47 +169,56 @@ fun CalendarSection() {
 
     Surface(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(28.dp),
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(32.dp),
         color = Color.White,
         shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
             ) {
-                days.forEach { day ->
-                    Text(day, color = Color.Gray, fontSize = 12.sp)
+                days.forEach {
+                    Text(
+                        it,
+                        color = LightGreenBG,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
-
             Spacer(Modifier.height(16.dp))
-
             LazyVerticalGrid(
                 columns = GridCells.Fixed(7),
-                modifier = Modifier.height(250.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceEvenly,
+                userScrollEnabled = false
             ) {
                 items(dates) { date ->
-                    Box(contentAlignment = Alignment.Center) {
-                        if (date == 3) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (date == 23) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color.Black,
-                                modifier = Modifier.size(32.dp)
+                                color = CalendarHighlight,
+                                modifier = Modifier.size(28.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        date.toString(),
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Text(date.toString(), color = Color.White, fontSize = 16.sp)
                                 }
                             }
                         } else {
-                            Text(date.toString(), color = Color.DarkGray)
+                            Text(date.toString(), color = Color.DarkGray, fontSize = 16.sp)
+                        }
+
+                        if (date == 3 || date == 4) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.LightGray)
+                            )
                         }
                     }
                 }
@@ -185,67 +229,96 @@ fun CalendarSection() {
 
 @Composable
 fun DiaryScreen() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF7F7F7)) // Màu nền hơi xám nhẹ
-            .verticalScroll(rememberScrollState())
-    ) {
-        DiaryHeader()
-        OptionMenuSection()
-        CalendarSection()
+    Scaffold(
+        bottomBar = { FoodTrackerBottomBar() },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {},
+                containerColor = LightGreenBG,
+                shape = CircleShape,
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = DarkGreen)
+            }
+        }
+    ) { padding ->
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = { /* TODO */ },
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
-            shape = RoundedCornerShape(16.dp)
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color.White)
         ) {
-            Icon(Icons.Default.AddCircleOutline, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("THÊM MÓN", fontWeight = FontWeight.Bold)
+            DiaryHeader()
+
+            OptionMenuSection()
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(bottom = 16.dp)
+            ) {
+                CalendarSection()
+            }
         }
     }
 }
 
 @Composable
 fun FoodTrackerBottomBar() {
-    NavigationBar(
-        containerColor = Color(0xFFF1F1F1),
-        contentColor = Color.Black
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 22.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(BottomBarBG)
     ) {
-        NavigationBarItem(
-            selected = true,
-            onClick = { /* Chuyển màn hình */ },
-            label = { Text("Nhật ký", fontSize = 10.sp) },
-            icon = { Icon(Icons.Default.EditNote, contentDescription = null) },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = Color(0xFFD0D0D0)
+        NavigationBar(
+            containerColor = BottomBarBG,
+            tonalElevation = 0.dp,
+            windowInsets = WindowInsets(0, 0, 0, 0),
+            modifier = Modifier.height(70.dp)
+        ) {
+            val items = listOf("Nhật ký", "Thống kê", "Dinh dưỡng", "Chi tiêu", "Cài đặt")
+            val icons = listOf(
+                Icons.Default.MenuBook,
+                Icons.Default.BarChart,
+                Icons.Default.Eco,
+                Icons.Default.Payments,
+                Icons.Default.Settings
             )
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { /* TODO */ },
-            label = { Text("Thống kê", fontSize = 10.sp) },
-            icon = { Icon(Icons.Default.BarChart, contentDescription = null) }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { /* TODO */ },
-            label = { Text("Chi tiêu", fontSize = 10.sp) },
-            icon = { Icon(Icons.Default.Payments, contentDescription = null) }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { /* TODO */ },
-            label = { Text("Cài đặt", fontSize = 10.sp) },
-            icon = { Icon(Icons.Default.Settings, contentDescription = null) }
-        )
+
+            items.forEachIndexed { index, item ->
+                NavigationBarItem(
+                    selected = index == 0,
+                    onClick = { },
+                    label = {
+                        Text(
+                            item,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                    },
+                    icon = {
+                        Icon(
+                            icons[index],
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = DarkGreen,
+                        indicatorColor = LightGreenBG,
+                        unselectedIconColor = DarkGreen,
+                        selectedTextColor = DarkGreen
+                    )
+                )
+            }
+        }
     }
 }
 
