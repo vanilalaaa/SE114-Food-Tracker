@@ -24,16 +24,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -205,7 +212,44 @@ fun DiaryScreen() {
         }
     }
 }
-@Preview(showBackground = true, device = "spec:width=411dp,height=891dp")
+
+@Composable
+fun FoodTrackerBottomBar() {
+    NavigationBar(
+        containerColor = Color(0xFFF1F1F1),
+        contentColor = Color.Black
+    ) {
+        NavigationBarItem(
+            selected = true,
+            onClick = { /* Chuyển màn hình */ },
+            label = { Text("Nhật ký", fontSize = 10.sp) },
+            icon = { Icon(Icons.Default.EditNote, contentDescription = null) },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = Color(0xFFD0D0D0)
+            )
+        )
+        NavigationBarItem(
+            selected = false,
+            onClick = { /* TODO */ },
+            label = { Text("Thống kê", fontSize = 10.sp) },
+            icon = { Icon(Icons.Default.BarChart, contentDescription = null) }
+        )
+        NavigationBarItem(
+            selected = false,
+            onClick = { /* TODO */ },
+            label = { Text("Chi tiêu", fontSize = 10.sp) },
+            icon = { Icon(Icons.Default.Payments, contentDescription = null) }
+        )
+        NavigationBarItem(
+            selected = false,
+            onClick = { /* TODO */ },
+            label = { Text("Cài đặt", fontSize = 10.sp) },
+            icon = { Icon(Icons.Default.Settings, contentDescription = null) }
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, device = "spec:width=411dp,height=891dp")
 @Composable
 fun DiaryScreenPreview() {
     FoodTrackerTheme {
