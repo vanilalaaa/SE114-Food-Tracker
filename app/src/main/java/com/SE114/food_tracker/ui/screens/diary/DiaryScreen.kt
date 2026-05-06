@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.BarChart
@@ -65,10 +67,12 @@ import androidx.compose.material3.IconButton
 import com.SE114.food_tracker.ui.theme.BottomBarBG
 import com.SE114.food_tracker.ui.theme.CalendarHighlight
 import com.SE114.food_tracker.ui.theme.DarkGreen
+import com.SE114.food_tracker.ui.theme.DarkPink
 import com.SE114.food_tracker.ui.theme.FoodTrackerTheme
-import com.SE114.food_tracker.ui.theme.LightGreenBG
-import com.SE114.food_tracker.ui.theme.MainGreen
-import com.SE114.food_tracker.ui.theme.LightGrayBG
+import com.SE114.food_tracker.ui.theme.LightGreen
+import com.SE114.food_tracker.ui.theme.MintGreen
+import com.SE114.food_tracker.ui.theme.LightPinkBG
+import com.SE114.food_tracker.ui.theme.Orange
 
 @Composable
 fun DiaryHeader() {
@@ -82,8 +86,8 @@ fun DiaryHeader() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Nhật ký", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(8.dp))
-            Icon(Icons.Default.Whatshot, contentDescription = null, tint = MainGreen)
-            Text("1", color = MainGreen, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Icon(Icons.Default.Whatshot, contentDescription = null, tint = Orange)
+            Text("1", color = Orange, fontWeight = FontWeight.Bold, fontSize = 24.sp)
         }
         Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 2.dp) {
             Row(
@@ -92,7 +96,7 @@ fun DiaryHeader() {
             ) {
                 Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("thg 4 2026", fontSize = 14.sp)
+                Text("thg 4 2026", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -102,66 +106,63 @@ fun DiaryHeader() {
 fun OptionMenuSection() {
     var isMenuExpanded by remember { mutableStateOf(false) }
     var selectedSubMenu by remember { mutableIntStateOf(0) }
-    Box(
+
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(180.dp)
-            .background(LightGrayBG, RoundedCornerShape(24.dp))
+            .padding(horizontal = 24.dp)
+            .height(180.dp),
+        shape = RoundedCornerShape(32.dp),
+        color = LightPinkBG,
+        shadowElevation = 4.dp
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp)
-                .size(100.dp)
-                .background(Color.LightGray, CircleShape)
-        )
+        Box(modifier = Modifier.fillMaxSize()) {
 
-        IconButton(
-            onClick = {
-                isMenuExpanded = !isMenuExpanded
-                if (!isMenuExpanded) selectedSubMenu = 0
-            },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-        ) {
-            Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.Gray)
-        }
-
-        if (isMenuExpanded) {
-            Row(
+            IconButton(
+                onClick = {
+                    isMenuExpanded = !isMenuExpanded
+                    if (!isMenuExpanded) selectedSubMenu = 0
+                },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 48.dp, end = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(8.dp)
             ) {
-                when (selectedSubMenu) {
-                    1 -> SubMenuContent(listOf("Tất cả", "Cơm (1)", "Mì & Phở (1)"))
-                    2 -> SubMenuContent(listOf("Đơn giản", "Nước"))
-                    3 -> SubMenuContent(listOf("Trang tập", "Trang ghi"))
-                }
+                Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.Black)
+            }
 
-
-                Surface(
-                    modifier = Modifier.width(150.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 8.dp,
-                    color = Color.White
+            if (isMenuExpanded) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 48.dp, end = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        OptionMenuItem(
-                            Icons.Default.FilterList,
-                            "Lọc loại",
-                            onClick = { selectedSubMenu = 1 })
-                        OptionMenuItem(
-                            Icons.Default.ColorLens,
-                            "Đổi skin",
-                            onClick = { selectedSubMenu = 2 })
-                        OptionMenuItem(
-                            Icons.Default.Straighten,
-                            "Kích thước",
-                            onClick = { selectedSubMenu = 3 })
+                    when (selectedSubMenu) {
+                        1 -> SubMenuContent(listOf("Tất cả", "Cơm (1)", "Mì & Phở (1)"))
+                        2 -> SubMenuContent(listOf("Đơn giản", "Nước"))
+                        3 -> SubMenuContent(listOf("Trang tập", "Trang ghi"))
+                    }
+
+                    Surface(
+                        modifier = Modifier.width(150.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 8.dp,
+                        color = Color.White
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            OptionMenuItem(
+                                Icons.Default.FilterList,
+                                "Lọc loại",
+                                onClick = { selectedSubMenu = 1 })
+                            OptionMenuItem(
+                                Icons.Default.ColorLens,
+                                "Đổi skin",
+                                onClick = { selectedSubMenu = 2 })
+                            OptionMenuItem(
+                                Icons.Default.Straighten,
+                                "Kích thước",
+                                onClick = { selectedSubMenu = 3 })
+                        }
                     }
                 }
             }
@@ -177,8 +178,7 @@ fun OptionMenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
             .clickable { onClick() }
             .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
+        horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -212,7 +212,7 @@ fun SubMenuContent(items: List<String>) {
                             Icons.Default.Check,
                             null,
                             modifier = Modifier.size(14.dp),
-                            tint = MainGreen
+                            tint = Color.Black
                         )
                     }
                 }
@@ -231,20 +231,16 @@ fun CalendarSection() {
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(32.dp),
-        color = Color.White,
+        color = CalendarHighlight,
         shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround
+                modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround
             ) {
                 days.forEach {
                     Text(
-                        it,
-                        color = LightGreenBG,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                        it, color = DarkPink, fontSize = 16.sp, fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -260,7 +256,7 @@ fun CalendarSection() {
                         if (date == 23) {
                             Surface(
                                 shape = CircleShape,
-                                color = CalendarHighlight,
+                                color = LightGreen,
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -268,15 +264,13 @@ fun CalendarSection() {
                                 }
                             }
                         } else {
-                            Text(date.toString(), color = Color.DarkGray, fontSize = 16.sp)
-                        }
+                            Text(date.toString(), color = Color.DarkGray, fontSize = 14.sp)
+                            Spacer(Modifier.height(4.dp))
 
-                        if (date == 3 || date == 4) {
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.LightGray)
+                                    .size(32.dp)
+                                    .background(Color.White, CircleShape)
                             )
                         }
                     }
@@ -288,19 +282,16 @@ fun CalendarSection() {
 
 @Composable
 fun DiaryScreen() {
-    Scaffold(
-        bottomBar = { FoodTrackerBottomBar() },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {},
-                containerColor = LightGreenBG,
-                shape = CircleShape,
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = DarkGreen)
-            }
+    Scaffold(bottomBar = { FoodTrackerBottomBar() }, floatingActionButton = {
+        FloatingActionButton(
+            onClick = {},
+            containerColor = MintGreen,
+            shape = CircleShape,
+            modifier = Modifier.padding(bottom = 5.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
         }
-    ) { padding ->
+    }) { padding ->
 
         Column(
             modifier = Modifier
@@ -309,74 +300,40 @@ fun DiaryScreen() {
                 .background(Color.White)
         ) {
             DiaryHeader()
-
             OptionMenuSection()
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(bottom = 16.dp)
-            ) {
-                CalendarSection()
-            }
+            CalendarSection()
         }
     }
 }
 
 @Composable
 fun FoodTrackerBottomBar() {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 22.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(BottomBarBG)
+    NavigationBar(
+        containerColor = Color.Transparent,
+        tonalElevation = 0.dp,
+        modifier = Modifier.height(80.dp)
     ) {
-        NavigationBar(
-            containerColor = BottomBarBG,
-            tonalElevation = 0.dp,
-            windowInsets = WindowInsets(0, 0, 0, 0),
-            modifier = Modifier.height(70.dp)
-        ) {
-            val items = listOf("Nhật ký", "Thống kê", "Dinh dưỡng", "Chi tiêu", "Cài đặt")
-            val icons = listOf(
-                Icons.Default.MenuBook,
-                Icons.Default.BarChart,
-                Icons.Default.Eco,
-                Icons.Default.Payments,
-                Icons.Default.Settings
-            )
+        val icons = listOf(
+            Icons.Filled.MenuBook,
+            Icons.Outlined.BarChart,
+            Icons.Outlined.Payments,
+            Icons.Outlined.Settings
+        )
 
-            items.forEachIndexed { index, item ->
-                NavigationBarItem(
-                    selected = index == 0,
-                    onClick = { },
-                    label = {
-                        Text(
-                            item,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1
-                        )
-                    },
-                    icon = {
-                        Icon(
-                            icons[index],
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = DarkGreen,
-                        indicatorColor = LightGreenBG,
-                        unselectedIconColor = DarkGreen,
-                        selectedTextColor = DarkGreen
-                    )
+        icons.forEachIndexed { index, icon ->
+            NavigationBarItem(
+                selected = index == 0,
+                onClick = { },
+                icon = {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(28.dp))
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.Black,
+                    unselectedIconColor = Color.Gray,
+                    indicatorColor = Color.Transparent
                 )
-            }
+            )
         }
     }
 }
