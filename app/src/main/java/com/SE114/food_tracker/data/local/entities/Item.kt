@@ -33,7 +33,7 @@ data class Item(
     var imagePath: String? = null,
 
     @ColumnInfo(name = "is_synced")
-    var isSynced: String? = null,
+    var isSynced: Boolean = false,
 
     @ColumnInfo(name = "entry_date")
     var entryDate: Long,
