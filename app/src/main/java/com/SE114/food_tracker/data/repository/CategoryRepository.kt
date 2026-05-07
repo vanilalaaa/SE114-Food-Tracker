@@ -1,40 +1,16 @@
-package com.SE114.food_tracker.data.repository;
-import android.app.Application;
+package com.SE114.food_tracker.data.repository
 
-import androidx.lifecycle.LiveData;
+import com.SE114.food_tracker.data.local.dao.CategoryDAO
+import com.SE114.food_tracker.data.local.entities.Category
+import kotlinx.coroutines.flow.Flow
 
-import com.SE114.food_tracker.data.local.AppDatabase;
-import com.SE114.food_tracker.data.local.dao.CategoryDAO;
-import com.SE114.food_tracker.data.local.entities.Category;
+class CategoryRepository(private val categoryDAO: CategoryDAO) {
 
-import java.util.List;
+    fun getAllCategories(): Flow<List<Category>> = categoryDAO.getAllCategories()
 
-public class CategoryRepository {
-    private final CategoryDAO categoryDAO;
+    suspend fun insert(category: Category) = categoryDAO.insert(category)
 
-    public CategoryRepository(Application application) {
-        AppDatabase database = AppDatabase.getInstance(application);
-        categoryDAO = database.categoryDAO();
-    }
+    suspend fun update(category: Category) = categoryDAO.update(category)
 
-    // Read
-    public LiveData<List<Category>> getAllCategories() {
-        return categoryDAO.getAllCategories();
-    }
-    // Write
-    public void insert(Category category) {
-        AppDatabase.databaseWriteExecutor.execute(() -> {
-            categoryDAO.insert(category);
-        });
-    }
-    public void update(Category category) {
-        AppDatabase.databaseWriteExecutor.execute(() -> {
-            categoryDAO.update(category);
-        });
-    }
-    public void delete(Category category) {
-        AppDatabase.databaseWriteExecutor.execute(() -> {
-            categoryDAO.delete(category);
-        });
-    }
+    suspend fun delete(category: Category) = categoryDAO.delete(category)
 }

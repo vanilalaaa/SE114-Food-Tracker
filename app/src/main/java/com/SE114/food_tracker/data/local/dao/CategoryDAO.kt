@@ -1,28 +1,20 @@
-package com.SE114.food_tracker.data.local.dao;
+package com.SE114.food_tracker.data.local.dao
 
-import androidx.lifecycle.LiveData;
-import androidx.room.Dao;
-import androidx.room.Delete;
-import androidx.room.Insert;
-import androidx.room.OnConflictStrategy;
-import androidx.room.Query;
-import androidx.room.Update;
-
-import com.SE114.food_tracker.data.local.entities.Category;
-
-import java.util.List;
+import androidx.room.*
+import com.SE114.food_tracker.data.local.entities.Category
+import kotlinx.coroutines.flow.Flow
 
 @Dao
-public interface CategoryDAO {
+interface CategoryDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void insert(Category category);
+    suspend fun insert(category: Category)
 
     @Update
-    void update(Category category);
+    suspend fun update(category: Category)
 
     @Delete
-    void delete(Category category);
+    suspend fun delete(category: Category)
 
     @Query("SELECT * FROM category")
-    LiveData<List<Category>> getAllCategories();
+    fun getAllCategories(): Flow<List<Category>>
 }

@@ -1,53 +1,41 @@
-package com.SE114.food_tracker.data.local.dao;
+package com.SE114.food_tracker.data.local.dao
 
-import androidx.lifecycle.LiveData;
-import androidx.room.Dao;
-import androidx.room.Delete;
-import androidx.room.Insert;
-import androidx.room.OnConflictStrategy;
-import androidx.room.Query;
-import androidx.room.Update;
-
-import com.SE114.food_tracker.data.local.entities.Item;
-
-import java.util.List;
+import androidx.room.*
+import com.SE114.food_tracker.data.local.entities.Item
+import kotlinx.coroutines.flow.Flow
 
 @Dao
-public interface ItemDAO {
+interface ItemDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void insertItem(Item item);
+    suspend fun insertItem(item: Item)
 
     @Update
-    void updateItem(Item item);
+    suspend fun updateItem(item: Item)
 
     @Delete
-    void deleteItem(Item item);
+    suspend fun deleteItem(item: Item)
 
     @Query("SELECT * FROM item ORDER BY created_at DESC")
-    LiveData<List<Item>> getAllItems();
+    fun getAllItems(): Flow<List<Item>>
 
     @Query("SELECT * FROM item WHERE category_id = :catId")
-    LiveData<List<Item>> getItemsByCategory(int catId);
+    fun getItemsByCategory(catId: Int): Flow<List<Item>>
 
     @Query("SELECT * FROM item WHERE item_id = :id")
-    LiveData<Item> getItemById(long id);
+    fun getItemById(id: Long): Flow<Item>
 
-    // Diary: get all items for a specific day (click a day on calendar)
-    @Query("SELECT * FROM item WHERE entry_date >= :startOfDay AND entry_date < :endOfDay ORDER BY entry_date DESC")
-    LiveData<List<Item>> getItemsByDay(long startOfDay, long endOfDay);
-
-    // Statistics / Spending: flexible date range query
     @Query("SELECT * FROM item WHERE entry_date >= :startDate AND entry_date < :endDate ORDER BY entry_date DESC")
-    LiveData<List<Item>> getItemsByDateRange(long startDate, long endDate);
+    fun getItemsByDay(startDate: Long, endDate: Long): Flow<List<Item>>
 
-    // Statistics / Spending: same but also filtered by category
+    @Query("SELECT * FROM item WHERE entry_date >= :startDate AND entry_date < :endDate ORDER BY entry_date DESC")
+    fun getItemsByDateRange(startDate: Long, endDate: Long): Flow<List<Item>>
+
     @Query("SELECT * FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND category_id = :categoryId ORDER BY entry_date DESC")
-    LiveData<List<Item>> getItemsByDateRangeAndCategory(long startDate, long endDate, int categoryId);
+    fun getItemsByCategoryAndDay(categoryId: Int, startDate: Long, endDate: Long): Flow<List<Item>>
 
-    // Diary: count items + sum price for a specific day (calendar highlight)
-    @Query("SELECT COUNT(*) FROM item WHERE entry_date >= :startOfDay AND entry_date < :endOfDay")
-    LiveData<Integer> getItemCountForDay(long startOfDay, long endOfDay);
+    @Query("SELECT COUNT(*) FROM item WHERE entry_date >= :startDate AND entry_date < :endDate")
+    fun getItemCountForDay(startDate: Long, endDate: Long): Flow<Int>
 
-    @Query("SELECT SUM(price) FROM item WHERE entry_date >= :startOfDay AND entry_date < :endOfDay")
-    LiveData<Double> getTotalExpenseForDay(long startOfDay, long endOfDay);
+    @Query("SELECT SUM(price) FROM item WHERE entry_date >= :startDate AND entry_date < :endDate")
+    fun getTotalExpenseForDay(startDate: Long, endDate: Long): Flow<Double>
 }
