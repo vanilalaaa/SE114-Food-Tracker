@@ -100,7 +100,7 @@ chore: update compose bom version
 Dự án áp dụng kiến trúc **MVVM (Model-View-ViewModel)**.
 
 ```text
-app/src/main/java/com/yourteam/nomsclone/
+app/src/main/java/com/SE114/Food_tracker/
 ├── data/               # Tầng xử lý Data
 │   ├── local/          # Room DB (Entities, DAOs, Database class)
 │   └── repository/     # Logic lấy/lưu data (nối Room & Firebase)
