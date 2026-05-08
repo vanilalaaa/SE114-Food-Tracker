@@ -23,6 +23,30 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.ui.theme.*
+import com.SE114.food_tracker.data.local.entities.Category
+import com.SE114.food_tracker.data.local.entities.Item
+
+object DiaryMockData {
+    val categories = listOf(
+        Category(categoryId = 1, name = "Cơm", iconUrl = ""),
+        Category(categoryId = 2, name = "Mì & Phở", iconUrl = ""),
+        Category(categoryId = 3, name = "Đồ uống", iconUrl = "")
+    )
+
+    val items = listOf(
+        Item(
+            itemId = 1,
+            categoryId = 2,
+            name = "Phở Hà Nội",
+            timeType = 1,
+            price = 30000.0,
+            entryDate = 1713830400000L
+        )
+    )
+
+    const val STREAK = "1"
+    const val DISPLAY_MONTH = "thg 4 2026"
+}
 
 @Composable
 fun DiaryHeader() {
@@ -37,7 +61,9 @@ fun DiaryHeader() {
             Text("Nhật ký", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(8.dp))
             Icon(Icons.Default.Whatshot, contentDescription = null, tint = Orange)
-            Text("1", color = Orange, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Text(
+                DiaryMockData.STREAK, color = Orange, fontWeight = FontWeight.Bold, fontSize = 24.sp
+            )
         }
         Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 2.dp) {
             Row(
@@ -46,7 +72,7 @@ fun DiaryHeader() {
             ) {
                 Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("thg 4 2026", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(DiaryMockData.DISPLAY_MONTH, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -71,8 +97,7 @@ fun OptionMenuSection() {
                 onClick = {
                     isMenuExpanded = !isMenuExpanded
                     if (!isMenuExpanded) selectedSubMenu = 0
-                },
-                modifier = Modifier
+                }, modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
             ) {
@@ -87,7 +112,7 @@ fun OptionMenuSection() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     when (selectedSubMenu) {
-                        1 -> SubMenuContent(listOf("Tất cả", "Cơm (1)", "Mì & Phở (1)"))
+                        1 -> SubMenuContent(DiaryMockData.categories.map { "${it.name} (1)" })
                         2 -> SubMenuContent(listOf("Đơn giản", "Nước"))
                         3 -> SubMenuContent(listOf("Trong hộp", "Trong lịch"))
                     }
@@ -121,14 +146,12 @@ fun OptionMenuSection() {
 
 @Composable
 fun OptionMenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 6.dp, horizontal = 4.dp),
+    Row(modifier = Modifier
+        .fillMaxWidth()
+        .clickable { onClick() }
+        .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
+        horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -192,10 +215,7 @@ fun SizeSliderItem(label: String, value: Float, onValueChange: (Float) -> Unit) 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.EditNote,
-                    null,
-                    modifier = Modifier.size(14.dp),
-                    tint = Color.Gray
+                    Icons.Default.EditNote, null, modifier = Modifier.size(14.dp), tint = Color.Gray
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(label, fontSize = 11.sp, color = Color.Gray)
@@ -203,23 +223,20 @@ fun SizeSliderItem(label: String, value: Float, onValueChange: (Float) -> Unit) 
             Text("${(value * 100).toInt()}%", fontSize = 11.sp, color = Color.Gray)
         }
         Slider(
-            value = value,
-            onValueChange = onValueChange,
-            colors = SliderDefaults.colors(
+            value = value, onValueChange = onValueChange, colors = SliderDefaults.colors(
                 thumbColor = Color.DarkGray,
                 activeTrackColor = Color.DarkGray,
                 inactiveTrackColor = Color.LightGray
-            ),
-            modifier = Modifier.height(24.dp)
+            ), modifier = Modifier.height(24.dp)
         )
     }
 }
 
 @Composable
-fun CalendarSection() {
+fun CalendarSection(onDateClick: () -> Unit) {
     val days = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
     val dates = (1..30).toList()
-
+    val activeDates = DiaryMockData.items.map { 23 }
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -230,15 +247,11 @@ fun CalendarSection() {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround
+                modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround
             ) {
                 days.forEach {
                     Text(
-                        it,
-                        color = DarkPink,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                        it, color = DarkPink, fontSize = 16.sp, fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -271,10 +284,11 @@ fun CalendarSection() {
 
                         Spacer(Modifier.height(4.dp))
 
+                        val hasData = activeDates.contains(date)
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .background(Color.White, CircleShape)
+                                .background(if (hasData) Color.White else Color.Transparent, CircleShape)
                         )
                     }
                 }
@@ -285,27 +299,34 @@ fun CalendarSection() {
 
 @Composable
 fun DiaryScreen() {
-    Scaffold(
-        bottomBar = { FoodTrackerBottomBar() },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {},
-                containerColor = MintGreen,
-                shape = CircleShape,
-                modifier = Modifier.offset(y = 5.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
-            }
+    var showDetailSheet by remember { mutableStateOf(false) }
+    Scaffold(bottomBar = { FoodTrackerBottomBar() }, floatingActionButton = {
+        FloatingActionButton(
+            onClick = {},
+            containerColor = MintGreen,
+            shape = CircleShape,
+            modifier = Modifier.offset(y = 5.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
         }
-    ) { padding ->
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .background(Color.White)) {
+    }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color.White)
+        ) {
             DiaryHeader()
             OptionMenuSection()
             Spacer(modifier = Modifier.height(16.dp))
-            CalendarSection()
+            CalendarSection(onDateClick = { showDetailSheet = true })
+        }
+        if (showDetailSheet) {
+            DayDetailBottomSheet(
+                onDismiss = { showDetailSheet = false },
+                items = DiaryMockData.items,
+                categories = DiaryMockData.categories
+            )
         }
     }
 }
@@ -313,9 +334,7 @@ fun DiaryScreen() {
 @Composable
 fun FoodTrackerBottomBar() {
     NavigationBar(
-        containerColor = Color.Transparent,
-        tonalElevation = 0.dp,
-        modifier = Modifier.height(80.dp)
+        containerColor = Color.Transparent, tonalElevation = 0.dp, modifier = Modifier.height(80.dp)
     ) {
         val icons = listOf(
             Icons.Filled.MenuBook,
