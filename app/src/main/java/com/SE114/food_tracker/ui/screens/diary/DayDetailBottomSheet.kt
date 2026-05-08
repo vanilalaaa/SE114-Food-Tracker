@@ -28,8 +28,7 @@ fun DayDetailBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.LightGray) }
-    ) {
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.LightGray) }) {
         DayDetailBottomSheetContent(items, categories)
     }
 }
@@ -88,7 +87,11 @@ fun FoodItemCard(item: Item, categoryName: String) {
                     }
                 }
             }
-            Text("${(item.price / 1000).toInt()}k đ", color = Color(0xFFBE744D), fontWeight = FontWeight.Bold)
+            Text(
+                "${(item.price / 1000).toInt()}k đ",
+                color = Color(0xFFBE744D),
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -108,8 +111,7 @@ fun DayDetailBottomSheetContent(items: List<Item>, categories: List<Category>) {
         Spacer(Modifier.height(20.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             StatCard(label = "Món", value = "${items.size}", modifier = Modifier.weight(1f))
             val totalEntry = items.sumOf { it.price }.toInt()
@@ -148,13 +150,9 @@ fun DayDetailBottomSheetContent(items: List<Item>, categories: List<Category>) {
 @Composable
 fun DayDetailPreview() {
 
-    ModalBottomSheet(
-        onDismissRequest = {},
-        dragHandle = { BottomSheetDefaults.DragHandle() }
-    ) {
+    ModalBottomSheet(onDismissRequest = {}, dragHandle = { BottomSheetDefaults.DragHandle() }) {
         DayDetailBottomSheetContent(
-            items = DiaryMockData.items,
-            categories = DiaryMockData.categories
+            items = DiaryMockData.items, categories = DiaryMockData.categories
         )
     }
 }
