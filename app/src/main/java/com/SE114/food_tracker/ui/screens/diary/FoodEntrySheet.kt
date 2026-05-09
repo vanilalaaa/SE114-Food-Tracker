@@ -70,7 +70,7 @@ fun FoodEntryContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 20.dp, bottom = 4.dp),
+                .padding(top = 35.dp, bottom = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             IconButton(
@@ -78,7 +78,7 @@ fun FoodEntryContent(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .size(32.dp)
-                    .background(Color(0xFFF2F2F2), CircleShape)
+                    .background(Color.Transparent, CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -189,7 +189,7 @@ fun FoodEntryContent(
                     .padding(start = 4.dp)
             )
             Spacer(Modifier.weight(1f))
-            RatingBarWithSpacing(rating = rating, onRatingChange = { rating = it })
+            RatingBar(rating = rating, onRatingChange = { rating = it })
         }
 
         // GHI CHÚ
@@ -226,13 +226,12 @@ fun FoodEntryContent(
         )
 
         // NÚT LƯU
-        // NÚT LƯU / THÊM MÓN
         Spacer(Modifier.height(10.dp))
         Button(
             onClick = { /* onSave */ },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp),
+                .height(40.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA9CFB8).copy(alpha = 0.8f)),
             shape = RoundedCornerShape(25.dp)
         ) {
@@ -337,7 +336,7 @@ fun CategorySquareSelector(
 }
 
 @Composable
-fun RatingBarWithSpacing(rating: Int, onRatingChange: (Int) -> Unit) {
+fun RatingBar(rating: Int, onRatingChange: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         for (i in 1..5) {
             Icon(
