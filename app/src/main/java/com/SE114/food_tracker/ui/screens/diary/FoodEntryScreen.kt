@@ -26,7 +26,7 @@ import com.SE114.food_tracker.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FoodEntrySheet(
+fun FoodEntryScreen(
     item: Item? = null, categories: List<Category>, onDismiss: () -> Unit, onSave: (Item) -> Unit
 ) {
     ModalBottomSheet(
@@ -353,7 +353,7 @@ fun RatingBar(rating: Int, onRatingChange: (Int) -> Unit) {
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun FoodEntrySheetPreview() {
+fun FoodEntryScreenPreview() {
     val mockCategories = listOf(
         Category(1, "Cơm", ""),
         Category(2, "Mì & Phở", ""),

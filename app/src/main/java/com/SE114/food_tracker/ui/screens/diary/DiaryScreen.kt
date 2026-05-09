@@ -328,7 +328,7 @@ fun CalendarSection(
 @Composable
 fun DiaryScreen() {
     var showDetailSheet by remember { mutableStateOf(false) }
-    var showEntrySheet by remember { mutableStateOf(false) }
+    var showEntryScreen by remember { mutableStateOf(false) }
     var selectedItemForEdit by remember { mutableStateOf<Item?>(null) }
 
     Scaffold(
@@ -337,7 +337,7 @@ fun DiaryScreen() {
             FloatingActionButton(
                 onClick = {
                     selectedItemForEdit = null
-                    showEntrySheet = true
+                    showEntryScreen = true
                 },
                 containerColor = MintGreen,
                 shape = CircleShape
@@ -363,7 +363,7 @@ fun DiaryScreen() {
                 onDateClick = {},
                 onItemClick = { item ->
                     selectedItemForEdit = item
-                    showEntrySheet = true
+                    showEntryScreen = true
                 }
             )
         }
@@ -376,17 +376,17 @@ fun DiaryScreen() {
                 onEditItem = { item ->
                     selectedItemForEdit = item
                     showDetailSheet = false
-                    showEntrySheet = true
+                    showEntryScreen = true
                 }
             )
         }
 
-        if (showEntrySheet) {
-            FoodEntrySheet(
+        if (showEntryScreen) {
+            FoodEntryScreen(
                 item = selectedItemForEdit,
                 categories = DiaryMockData.categories,
-                onDismiss = { showEntrySheet = false },
-                onSave = { showEntrySheet = false }
+                onDismiss = { showEntryScreen = false },
+                onSave = { showEntryScreen = false }
             )
         }
     }
