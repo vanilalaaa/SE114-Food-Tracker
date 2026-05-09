@@ -329,6 +329,7 @@ fun CalendarSection(
 fun DiaryScreen() {
     var showDetailSheet by remember { mutableStateOf(false) }
     var showEntryScreen by remember { mutableStateOf(false) }
+    var showSourceScreen by remember { mutableStateOf(false) }
     var selectedItemForEdit by remember { mutableStateOf<Item?>(null) }
 
     Scaffold(
@@ -337,7 +338,7 @@ fun DiaryScreen() {
             FloatingActionButton(
                 onClick = {
                     selectedItemForEdit = null
-                    showEntryScreen = true
+                    showSourceScreen = true
                 },
                 containerColor = MintGreen,
                 shape = CircleShape
@@ -376,6 +377,16 @@ fun DiaryScreen() {
                 onEditItem = { item ->
                     selectedItemForEdit = item
                     showDetailSheet = false
+                    showEntryScreen = true
+                }
+            )
+        }
+
+        if (showSourceScreen) {
+            AddFoodSourceScreen(
+                onBack = { showSourceScreen = false },
+                onSourceSelected = {
+                    showSourceScreen = false
                     showEntryScreen = true
                 }
             )

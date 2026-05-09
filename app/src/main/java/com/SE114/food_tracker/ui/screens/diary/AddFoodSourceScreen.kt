@@ -26,8 +26,7 @@ import androidx.compose.ui.unit.sp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFoodSourceScreen(
-    onBack: () -> Unit,
-    onSourceSelected: () -> Unit
+    onBack: () -> Unit, onSourceSelected: () -> Unit
 ) {
     Scaffold(
         containerColor = Color(0xFFFCDFCF).copy(alpha = 0.4f)
@@ -50,15 +49,14 @@ fun AddFoodSourceScreen(
                     color = Color.Black
                 )
                 IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.background(Color.Transparent, CircleShape)
+                    onClick = onBack, modifier = Modifier.background(Color.Transparent, CircleShape)
                 ) {
                     Icon(Icons.Default.Close, contentDescription = null)
                 }
             }
 
             Spacer(Modifier.height(32.dp))
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -80,12 +78,10 @@ fun AddFoodSourceScreen(
             Spacer(Modifier.height(40.dp))
 
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()
             ) {
                 HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = Color.LightGray.copy(alpha = 0.4f)
+                    modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f)
                 )
                 Text(
                     "HOẶC CHỌN NHANH",
@@ -95,8 +91,7 @@ fun AddFoodSourceScreen(
                     color = Color.Gray.copy(alpha = 0.8f)
                 )
                 HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = Color.LightGray.copy(alpha = 0.4f)
+                    modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f)
                 )
             }
 
@@ -156,8 +151,7 @@ fun QuickActionItem(title: String, subtitle: String, icon: ImageVector, iconBgCo
         shadowElevation = 1.dp
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
@@ -180,8 +174,5 @@ fun QuickActionItem(title: String, subtitle: String, icon: ImageVector, iconBgCo
 @Preview(showBackground = true, showSystemUi = true, device = "spec:width=411dp,height=891dp")
 @Composable
 fun AddFoodSourcePreview() {
-    AddFoodSourceScreen(
-        onBack = {},
-        onSourceSelected = {}
-    )
+    AddFoodSourceScreen(onBack = {}, onSourceSelected = {})
 }
