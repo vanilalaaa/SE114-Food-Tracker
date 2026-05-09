@@ -19,17 +19,26 @@ import com.SE114.food_tracker.data.local.entities.Category
 import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.ui.theme.MintGreen
 import com.SE114.food_tracker.ui.theme.Orange
+import androidx.compose.foundation.clickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DayDetailBottomSheet(
-    onDismiss: () -> Unit, items: List<Item>, categories: List<Category>
+    onDismiss: () -> Unit,
+    items: List<Item>,
+    categories: List<Category>,
+    onEditItem: (Item) -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.LightGray) }) {
-        DayDetailBottomSheetContent(items, categories)
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.LightGray) }
+    ) {
+        DayDetailBottomSheetContent(
+            items = items,
+            categories = categories,
+            onEditItemClick = onEditItem
+        )
     }
 }
 
@@ -50,9 +59,11 @@ fun StatCard(label: String, value: String, modifier: Modifier) {
 }
 
 @Composable
-fun FoodItemCard(item: Item, categoryName: String) {
+fun FoodItemCard(item: Item, categoryName: String, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
     ) {
@@ -97,7 +108,7 @@ fun FoodItemCard(item: Item, categoryName: String) {
 }
 
 @Composable
-fun DayDetailBottomSheetContent(items: List<Item>, categories: List<Category>) {
+fun DayDetailBottomSheetContent(items: List<Item>, categories: List<Category>, onEditItemClick: (Item) -> Unit) {
     val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
@@ -139,7 +150,11 @@ fun DayDetailBottomSheetContent(items: List<Item>, categories: List<Category>) {
 
         items.forEach { item ->
             val categoryName = categories.find { it.categoryId == item.categoryId }?.name ?: "Khác"
-            FoodItemCard(item, categoryName)
+            FoodItemCard(
+                item = item,
+                categoryName = categoryName,
+                onClick = { onEditItemClick(item) }
+            )
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -152,7 +167,7 @@ fun DayDetailPreview() {
 
     ModalBottomSheet(onDismissRequest = {}, dragHandle = { BottomSheetDefaults.DragHandle() }) {
         DayDetailBottomSheetContent(
-            items = DiaryMockData.items, categories = DiaryMockData.categories
+            items = DiaryMockData.items, categories = DiaryMockData.categories, onEditItemClick = {}
         )
     }
 }

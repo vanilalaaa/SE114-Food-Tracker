@@ -49,7 +49,7 @@ object DiaryMockData {
 }
 
 @Composable
-fun DiaryHeader() {
+fun DiaryHeader(onMonthClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -65,7 +65,12 @@ fun DiaryHeader() {
                 DiaryMockData.STREAK, color = Orange, fontWeight = FontWeight.Bold, fontSize = 24.sp
             )
         }
-        Surface(shape = RoundedCornerShape(20.dp), color = Color.White, shadowElevation = 2.dp) {
+        Surface(
+            modifier = Modifier.clickable { onMonthClick() },
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            shadowElevation = 2.dp
+        ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -146,10 +151,11 @@ fun OptionMenuSection() {
 
 @Composable
 fun OptionMenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
-    Row(modifier = Modifier
-        .fillMaxWidth()
-        .clickable { onClick() }
-        .padding(vertical = 6.dp, horizontal = 4.dp),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -233,10 +239,14 @@ fun SizeSliderItem(label: String, value: Float, onValueChange: (Float) -> Unit) 
 }
 
 @Composable
-fun CalendarSection(onDateClick: () -> Unit) {
+fun CalendarSection(
+    onDateClick: () -> Unit,
+    onItemClick: (Item) -> Unit
+) {
     val days = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
     val dates = (1..30).toList()
-    val activeDates = DiaryMockData.items.map { 23 }
+    val itemOnDay23 = DiaryMockData.items.firstOrNull()
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -247,49 +257,67 @@ fun CalendarSection(onDateClick: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
             ) {
                 days.forEach {
                     Text(
-                        it, color = DarkPink, fontSize = 16.sp, fontWeight = FontWeight.Bold
+                        it,
+                        color = DarkPink,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
             Spacer(Modifier.height(16.dp))
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(7),
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.SpaceEvenly,
-                userScrollEnabled = false
-            ) {
+            LazyVerticalGrid(columns = GridCells.Fixed(7), modifier = Modifier.fillMaxSize()) {
                 items(dates) { date ->
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (date == 23) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .background(LightGreen, CircleShape)
-                            ) {
-                                Text(
-                                    date.toString(),
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            if (date == 23) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .background(LightGreen, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        date.toString(),
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            } else {
+                                Text(date.toString(), color = Color.DarkGray, fontSize = 14.sp)
                             }
-                        } else {
-                            Text(date.toString(), color = Color.DarkGray, fontSize = 14.sp)
                         }
 
                         Spacer(Modifier.height(4.dp))
-
-                        val hasData = activeDates.contains(date)
+                        val hasData = (date == 23)
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .background(if (hasData) Color.White else Color.Transparent, CircleShape)
-                        )
+                                .background(
+                                    if (hasData) Color.White else Color.Transparent,
+                                    CircleShape
+                                )
+                                .clip(CircleShape)
+                                .clickable(enabled = hasData) { itemOnDay23?.let { onItemClick(it) } },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (hasData) {
+                                Icon(
+                                    Icons.Default.Restaurant,
+                                    null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Orange
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -300,32 +328,65 @@ fun CalendarSection(onDateClick: () -> Unit) {
 @Composable
 fun DiaryScreen() {
     var showDetailSheet by remember { mutableStateOf(false) }
-    Scaffold(bottomBar = { FoodTrackerBottomBar() }, floatingActionButton = {
-        FloatingActionButton(
-            onClick = {},
-            containerColor = MintGreen,
-            shape = CircleShape,
-            modifier = Modifier.offset(y = 5.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+    var showEntrySheet by remember { mutableStateOf(false) }
+    var selectedItemForEdit by remember { mutableStateOf<Item?>(null) }
+
+    Scaffold(
+        bottomBar = { FoodTrackerBottomBar() },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    selectedItemForEdit = null
+                    showEntrySheet = true
+                },
+                containerColor = MintGreen,
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+            }
         }
-    }) { padding ->
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .background(Color.White)
         ) {
-            DiaryHeader()
+            DiaryHeader(onMonthClick = {
+                showDetailSheet = true
+            })
+
             OptionMenuSection()
             Spacer(modifier = Modifier.height(16.dp))
-            CalendarSection(onDateClick = { showDetailSheet = true })
+
+            CalendarSection(
+                onDateClick = {},
+                onItemClick = { item ->
+                    selectedItemForEdit = item
+                    showEntrySheet = true
+                }
+            )
         }
+
         if (showDetailSheet) {
             DayDetailBottomSheet(
                 onDismiss = { showDetailSheet = false },
                 items = DiaryMockData.items,
-                categories = DiaryMockData.categories
+                categories = DiaryMockData.categories,
+                onEditItem = { item ->
+                    selectedItemForEdit = item
+                    showDetailSheet = false
+                    showEntrySheet = true
+                }
+            )
+        }
+
+        if (showEntrySheet) {
+            FoodEntrySheet(
+                item = selectedItemForEdit,
+                categories = DiaryMockData.categories,
+                onDismiss = { showEntrySheet = false },
+                onSave = { showEntrySheet = false }
             )
         }
     }
