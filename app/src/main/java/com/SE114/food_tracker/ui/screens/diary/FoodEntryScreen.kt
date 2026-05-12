@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -133,6 +134,7 @@ fun FoodEntryContent(
             Text(
                 "QUẢN LÝ",
                 fontSize = 10.sp,
+                fontWeight = FontWeight(400),
                 color = Color(0xFFC98989),
                 modifier = Modifier.clickable {})
         }
@@ -226,14 +228,15 @@ fun FoodEntryContent(
         )
 
         // NÚT LƯU
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         Button(
             onClick = { /* onSave */ },
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(bottom = 4.dp)
                 .height(40.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA9CFB8).copy(alpha = 0.8f)),
-            shape = RoundedCornerShape(25.dp)
+            shape = RoundedCornerShape(9999.dp)
         ) {
             Text(
                 // Nếu item null (chưa có món) thì hiện "Thêm món", ngược lại hiện "Lưu thay đổi"
@@ -316,6 +319,7 @@ fun CategorySquareSelector(
         Box(
             modifier = Modifier
                 .size(54.dp)
+                .shadow(elevation = 10.dp, shape = RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
                 .background(if (isSelected) Color(0xFFFFE9DD) else Color.White)
                 .border(
@@ -331,7 +335,7 @@ fun CategorySquareSelector(
                 tint = if (isSelected) Orange else Color.Gray
             )
         }
-        Text(name, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+        Text(name, fontSize = 10.sp, fontWeight = FontWeight(500), modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -364,7 +368,7 @@ fun FoodEntryScreenPreview() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFCDFCF).copy(alpha = 0.4f))
+            .background(Color(0xFFFFF5E4))
     ) {
         FoodEntryContent(item = null, categories = mockCategories, onDismiss = {}, onSave = {})
     }
