@@ -20,6 +20,8 @@ import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.ui.theme.MintGreen
 import com.SE114.food_tracker.ui.theme.Orange
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,14 +48,15 @@ fun DayDetailBottomSheet(
 fun StatCard(label: String, value: String, modifier: Modifier) {
     Surface(
         modifier = modifier,
-        color = Color(0xFFFDE3D6).copy(alpha = 0.7f),
-        shape = RoundedCornerShape(16.dp)
+        color = Color(0xFFFCDFCF),
+        shape = RoundedCornerShape(24.dp),
+        shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(16.dp, 24.dp, 16.dp, 22.dp), horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC98989))
-            Text(label, fontSize = 12.sp, color = Color.Gray)
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC98989))
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF777777))
         }
     }
 }
@@ -65,10 +68,11 @@ fun FoodItemCard(item: Item, categoryName: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f)),
+        shadowElevation = 5.dp
     ) {
         Row(
-            modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
@@ -85,10 +89,10 @@ fun FoodItemCard(item: Item, categoryName: String, onClick: () -> Unit) {
                 Text(item.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(categoryName, fontSize = 12.sp, color = Color.Gray)
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(15.dp))
                     val session = if (item.timeType == 1) "Chiều" else "Sáng"
                     Surface(
-                        color = Color.LightGray.copy(alpha = 0.3f), shape = RoundedCornerShape(4.dp)
+                        color = Color(0xFFE2E2E2), shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             session,
@@ -136,16 +140,16 @@ fun DayDetailBottomSheetContent(items: List<Item>, categories: List<Category>, o
             onClick = { },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
+                .height(45.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA9CFB8)),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(9999.dp)
         ) {
             Text("Thêm món", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(22.dp))
         Text("Danh sách", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text("← Vuốt để xóa . Nhấn để sửa", fontSize = 12.sp, color = Color.Gray)
+        Text("← Vuốt để xóa . Nhấn để sửa", fontSize = 12.sp, color = Color(0xFF777777), modifier = Modifier.align(Alignment.CenterHorizontally))
         Spacer(Modifier.height(12.dp))
 
         items.forEach { item ->
