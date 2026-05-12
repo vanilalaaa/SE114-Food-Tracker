@@ -67,7 +67,7 @@ fun DiaryHeader(onMonthClick: () -> Unit) {
         }
         Surface(
             modifier = Modifier.clickable { onMonthClick() },
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(9999.dp),
             color = Color.White,
             shadowElevation = 2.dp
         ) {
@@ -77,7 +77,7 @@ fun DiaryHeader(onMonthClick: () -> Unit) {
             ) {
                 Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(DiaryMockData.DISPLAY_MONTH, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(DiaryMockData.DISPLAY_MONTH, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -91,11 +91,11 @@ fun OptionMenuSection() {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .height(180.dp),
-        shape = RoundedCornerShape(32.dp),
+            .padding(26.dp,20.dp,26.dp,5.dp)
+            .height(200.dp),
+        shape = RoundedCornerShape(30.dp),
         color = LightPinkBG,
-        shadowElevation = 4.dp
+        shadowElevation = 20.dp
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             IconButton(
@@ -250,10 +250,10 @@ fun CalendarSection(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(32.dp),
+            .padding(26.dp, 15.dp, 26.dp, 35.dp),
+        shape = RoundedCornerShape(25.dp),
         color = CalendarHighlight,
-        shadowElevation = 2.dp
+        shadowElevation = 10.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -270,24 +270,24 @@ fun CalendarSection(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            LazyVerticalGrid(columns = GridCells.Fixed(7), modifier = Modifier.fillMaxSize()) {
+            LazyVerticalGrid(columns = GridCells.Fixed(7), modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp),) {
                 items(dates) { date ->
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             if (date == 23) {
                                 Box(
                                     modifier = Modifier
-                                        .size(28.dp)
+                                        .size(32.dp)
                                         .background(LightGreen, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         date.toString(),
                                         color = Color.White,
-                                        fontSize = 14.sp,
+                                        fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -406,7 +406,7 @@ fun DiaryScreen() {
 @Composable
 fun FoodTrackerBottomBar() {
     NavigationBar(
-        containerColor = Color.Transparent, tonalElevation = 0.dp, modifier = Modifier.height(80.dp)
+        containerColor = Color.Transparent, tonalElevation = 0.dp, modifier = Modifier.height(80.dp) .padding(bottom = 8.dp)
     ) {
         val icons = listOf(
             Icons.Filled.MenuBook,
@@ -418,7 +418,7 @@ fun FoodTrackerBottomBar() {
             NavigationBarItem(
                 selected = index == 0,
                 onClick = { },
-                icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(30.dp)) },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.Black,
                     unselectedIconColor = Color.Gray,
