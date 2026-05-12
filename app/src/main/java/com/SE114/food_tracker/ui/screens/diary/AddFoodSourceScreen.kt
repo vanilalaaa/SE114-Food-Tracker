@@ -29,7 +29,7 @@ fun AddFoodSourceScreen(
     onBack: () -> Unit, onSourceSelected: () -> Unit
 ) {
     Scaffold(
-        containerColor = Color(0xFFFCDFCF).copy(alpha = 0.4f)
+        containerColor = Color(0xFFFFF5E4)
     ) { padding ->
         Column(
             modifier = Modifier
@@ -87,8 +87,8 @@ fun AddFoodSourceScreen(
                     "HOẶC CHỌN NHANH",
                     modifier = Modifier.padding(horizontal = 16.dp),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.Gray.copy(alpha = 0.8f)
+                    fontWeight = FontWeight(400),
+                    color = Color(0xFF000000)
                 )
                 HorizontalDivider(
                     modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f)
@@ -118,10 +118,11 @@ fun AddFoodSourceScreen(
 fun SourceCard(label: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
     Surface(
         modifier = modifier
-            .height(140.dp)
+            .height(163.dp)
             .clickable { onClick() },
         color = Color(0xFFFCDFCF),
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(24.dp),
+        shadowElevation = 4.dp
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -137,7 +138,7 @@ fun SourceCard(label: String, icon: ImageVector, modifier: Modifier, onClick: ()
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text(label, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(label, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }
@@ -145,10 +146,12 @@ fun SourceCard(label: String, icon: ImageVector, modifier: Modifier, onClick: ()
 @Composable
 fun QuickActionItem(title: String, subtitle: String, icon: ImageVector, iconBgColor: Color) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(88.dp),
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
-        shadowElevation = 1.dp
+        shadowElevation = 10.dp
     ) {
         Row(
             modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically
@@ -164,7 +167,7 @@ fun QuickActionItem(title: String, subtitle: String, icon: ImageVector, iconBgCo
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(subtitle, color = Color.Gray, fontSize = 12.sp)
+                Text(subtitle, color = Color.Gray, fontSize = 14.sp)
             }
             Icon(Icons.Default.ChevronRight, null, tint = Color.LightGray)
         }

@@ -53,7 +53,8 @@ fun StatCard(label: String, value: String, modifier: Modifier) {
         shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(16.dp, 24.dp, 16.dp, 22.dp), horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(16.dp, 24.dp, 16.dp, 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC98989))
             Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF777777))
@@ -112,7 +113,11 @@ fun FoodItemCard(item: Item, categoryName: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun DayDetailBottomSheetContent(items: List<Item>, categories: List<Category>, onEditItemClick: (Item) -> Unit) {
+fun DayDetailBottomSheetContent(
+    items: List<Item>,
+    categories: List<Category>,
+    onEditItemClick: (Item) -> Unit
+) {
     val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
@@ -149,7 +154,12 @@ fun DayDetailBottomSheetContent(items: List<Item>, categories: List<Category>, o
 
         Spacer(Modifier.height(22.dp))
         Text("Danh sách", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text("← Vuốt để xóa . Nhấn để sửa", fontSize = 12.sp, color = Color(0xFF777777), modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text(
+            "← Vuốt để xóa . Nhấn để sửa",
+            fontSize = 12.sp,
+            color = Color(0xFF777777),
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
         Spacer(Modifier.height(12.dp))
 
         items.forEach { item ->

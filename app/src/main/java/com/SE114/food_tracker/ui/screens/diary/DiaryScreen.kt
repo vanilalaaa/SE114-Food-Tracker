@@ -91,7 +91,7 @@ fun OptionMenuSection() {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(26.dp,20.dp,26.dp,5.dp)
+            .padding(26.dp, 20.dp, 26.dp, 5.dp)
             .height(200.dp),
         shape = RoundedCornerShape(30.dp),
         color = LightPinkBG,
@@ -270,7 +270,12 @@ fun CalendarSection(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            LazyVerticalGrid(columns = GridCells.Fixed(7), modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp),) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(7),
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 items(dates) { date ->
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
@@ -406,7 +411,11 @@ fun DiaryScreen() {
 @Composable
 fun FoodTrackerBottomBar() {
     NavigationBar(
-        containerColor = Color(0xFFFFF5E4), tonalElevation = 0.dp, modifier = Modifier.height(80.dp) .padding(bottom = 8.dp)
+        containerColor = Color(0xFFFFF5E4),
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .height(80.dp)
+            .padding(bottom = 8.dp)
     ) {
         val icons = listOf(
             Icons.Filled.MenuBook,

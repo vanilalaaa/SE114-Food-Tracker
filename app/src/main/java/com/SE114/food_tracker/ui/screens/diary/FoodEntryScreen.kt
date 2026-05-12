@@ -335,7 +335,12 @@ fun CategorySquareSelector(
                 tint = if (isSelected) Orange else Color.Gray
             )
         }
-        Text(name, fontSize = 10.sp, fontWeight = FontWeight(500), modifier = Modifier.padding(top = 4.dp))
+        Text(
+            name,
+            fontSize = 10.sp,
+            fontWeight = FontWeight(500),
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }
 
