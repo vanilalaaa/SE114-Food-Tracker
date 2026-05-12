@@ -351,7 +351,7 @@ fun DiaryScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color.White)
+                .background(Color(0xFFFFF5E4))
         ) {
             DiaryHeader(onMonthClick = {
                 showDetailSheet = true
@@ -406,7 +406,7 @@ fun DiaryScreen() {
 @Composable
 fun FoodTrackerBottomBar() {
     NavigationBar(
-        containerColor = Color.Transparent, tonalElevation = 0.dp, modifier = Modifier.height(80.dp) .padding(bottom = 8.dp)
+        containerColor = Color(0xFFFFF5E4), tonalElevation = 0.dp, modifier = Modifier.height(80.dp) .padding(bottom = 8.dp)
     ) {
         val icons = listOf(
             Icons.Filled.MenuBook,
