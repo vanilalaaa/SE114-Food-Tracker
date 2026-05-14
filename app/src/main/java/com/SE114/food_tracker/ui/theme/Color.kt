@@ -2,18 +2,28 @@ package com.SE114.food_tracker.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
-val Orange = Color(0xFFEF9463)
-val LightGreen = Color(0xFF81CAA7)
-val MintGreen = Color(0xFFA9CFB8)
-val DarkGreen = Color(0xFF34462B)
-val BottomBarBG = Color(0xFFC6C6C6)
-val DarkPink = Color(0xFFAA7171)
-val CalendarHighlight = Color(0xFFFCDFCF)
+// --- 1. MÀU NỀN ---
+val MainBackground = Color(0xFFFFF5E4)
 val LightPinkBG = Color(0xFFFBF9ED)
+val CardWhite = Color(0xFFFFFFFF)
+
+// --- 2. NHẬN DIỆN THƯƠNG HIỆU ---
+val OrangeMain = Color(0xFFEF9463)
+val MintGreen = Color(0xFFA9CFB8)
+val LightGreen = Color(0xFF81CAA7)
+
+// --- 3. TRANG TRÍ & LỊCH ---
+val CalendarHighlight = Color(0xFFFCDFCF)
+val DarkPink = Color(0xFFAA7171)
+val StatRed = Color(0xFFC98989)
+val LightPeach = Color(0xFFFFE9DD)
+
+// --- 4. CHỮ & TRUNG TÍNH ---
+val TextPrimary = Color(0xFF171717)
+val TextSecondary = Color(0xFF34322F)
+val HintGray = Color(0xFFB7B6B6)
+
+// --- 5. MÀU ALPHA ---
+val TextSecondary50 = Color(0x8034322F)
+val DividerGray20 = Color(0x33C6C6C6)
+val ShadowBlack30 = Color(0x4D1A1C1C)
