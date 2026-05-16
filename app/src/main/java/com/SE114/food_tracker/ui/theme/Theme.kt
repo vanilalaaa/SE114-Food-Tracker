@@ -8,7 +8,9 @@ private val FoodTrackerColorScheme = lightColorScheme(
     primary = MintGreen,
     secondary = OrangeMain,
     background = MainBackground,
-    surface = CardWhite
+    surface = CardWhite,
+    onBackground = TextPrimary,
+    onSurface = TextSecondary
 )
 
 @Composable
