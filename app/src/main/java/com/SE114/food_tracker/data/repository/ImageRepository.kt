@@ -1,32 +1,31 @@
 package com.SE114.food_tracker.data.repository
 
-import android.net.Uri
-import com.google.firebase.storage.FirebaseStorage
-import kotlinx.coroutines.tasks.await
-import java.util.UUID
+import com.SE114.food_tracker.data.remote.SupabaseClient
+import io.github.jan.supabase.storage.storage
 
 class ImageRepository {
-    private val storage = FirebaseStorage.getInstance()
-    private val imagesRef = storage.reference.child("images")
 
-    // Tải ảnh lên và trả về Result (thành công chứa URL, thất bại chứa lỗi)
-    suspend fun uploadImage(imageBytes: ByteArray): Result<String> {
+    suspend fun uploadItemImage(userId: String, itemId: String, bytes: ByteArray): Result<String> {
         return try {
-            val fileName = UUID.randomUUID().toString()
-            val fileRef = imagesRef.child("$fileName.jpg")
-            fileRef.putBytes(imageBytes).await()
-            val downloadUrl = fileRef.downloadUrl.await().toString()
-            Result.success(downloadUrl)
+            val path = "$userId/$itemId.jpg"
+
+            // Tiến hành upload đè (upsert = true) lên bucket "items"
+            SupabaseClient.client.storage.from("items").upload(path, bytes) {
+                upsert = true
+            }
+
+            // Lấy URL công khai (Public URL) để lưu vào database local/remote
+            val publicUrl = SupabaseClient.client.storage.from("items").publicUrl(path)
+            Result.success(publicUrl)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-
-    // Xóa ảnh trên Firebase bằng URL
-    suspend fun deleteImage(imageUrl: String?): Result<Unit> {
-        if (imageUrl.isNullOrBlank()) return Result.success(Unit)
+    // Xóa ảnh món ăn trên Supabase Storage thông qua đường dẫn cấu trúc <user_id>/<item_id>.jpg
+    suspend fun deleteItemImage(userId: String, itemId: String): Result<Unit> {
         return try {
-            storage.getReferenceFromUrl(imageUrl).delete().await()
+            val path = "$userId/$itemId.jpg"
+            SupabaseClient.client.storage.from("items").delete(listOf(path))
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
