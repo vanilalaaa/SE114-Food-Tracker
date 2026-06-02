@@ -59,9 +59,3 @@ data class Item(
     @ColumnInfo(name = "created_at")
     var createdAt: Long = System.currentTimeMillis()
 )
-
-enum class SyncStatus {
-    PENDING,
-    SYNCED,
-    FAILED
-}

@@ -59,9 +59,3 @@ interface ItemDAO {
     @Query("SELECT category_id, SUM(price) as total FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL GROUP BY category_id ORDER BY total DESC")
     fun getPersonalExpenseByCategory(startDate: Long, endDate: Long): Flow<List<CategoryExpense>>
 }
-
-// Data class bổ trợ nhận kết quả thống kê
-data class CategoryExpense(
-    @ColumnInfo(name = "category_id") val categoryId: Int,
-    val total: Double
-)
