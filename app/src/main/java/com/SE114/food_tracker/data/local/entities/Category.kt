@@ -2,9 +2,13 @@ package com.SE114.food_tracker.data.local.entities
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "category")
+@Entity(
+    tableName = "category",
+    indices = [Index("is_system"), Index("is_hidden")]
+)
 data class Category(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "category_id")
