@@ -1,4 +1,4 @@
-package com.SE114.food_tracker.ui.screens.statistics
+package com.SE114.food_tracker.feature.stats
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
