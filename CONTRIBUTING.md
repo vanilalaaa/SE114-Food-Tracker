@@ -44,13 +44,6 @@ feature/tv{N}-{tên}    ← Tính năng mới (TV1/TV2/TV3/TV4)
 bugfix/tv{N}-{tên}     ← Sửa lỗi
 hotfix/{tên}           ← Sửa lỗi gấp trên main
 ```
-
-**Quy ước branch theo thành viên:**
-- **TV1 (Lead):** `feature/tv1-auth`, `feature/tv1-sync-framework`, `feature/tv1-admin-web`, ...
-- **TV2 (DB):** `feature/tv2-diary-logic`, `feature/tv2-stats`, ...
-- **TV3 (UI):** `feature/tv3-friendship`, `feature/tv3-newsfeed`, `feature/ui-diary-base` (UI Nhật ký kế thừa), ...
-- **TV4:** `feature/tv4-chat`, `feature/tv4-wallet`, `feature/ui-stats-base` (UI Thống kê kế thừa), ...
-
 ### Quy trình làm việc
 
 ```bash
