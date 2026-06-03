@@ -14,7 +14,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.*
-import com.SE114.food_tracker.ui.components.*
+import com.SE114.food_tracker.feature.diary.components.*
 import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.data.local.entities.Category
 

@@ -1,4 +1,4 @@
-package com.SE114.food_tracker.ui.components
+package com.SE114.food_tracker.feature.stats.components
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*

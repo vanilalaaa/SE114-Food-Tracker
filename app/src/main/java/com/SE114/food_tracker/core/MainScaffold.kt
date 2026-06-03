@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.SE114.food_tracker.core.navigation.AppDestinations
 import com.SE114.food_tracker.core.navigation.AppNavGraph
-import com.SE114.food_tracker.ui.components.BottomBar
+import com.SE114.food_tracker.core.designsystem.components.BottomBar
 
 @Composable
 fun MainScaffold() {

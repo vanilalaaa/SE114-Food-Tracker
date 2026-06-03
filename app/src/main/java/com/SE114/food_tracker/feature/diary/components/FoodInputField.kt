@@ -1,4 +1,4 @@
-package com.SE114.food_tracker.ui.components
+package com.SE114.food_tracker.feature.diary.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
