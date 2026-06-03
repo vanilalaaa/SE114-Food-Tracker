@@ -23,7 +23,7 @@ data class Item(
     var itemId: String = UUID.randomUUID().toString(), // Chuyển sang UUID String để sync không bị đè id chéo thiết bị
 
     @ColumnInfo(name = "category_id")
-    var categoryId: Int,
+    var categoryId: String,
 
     var name: String,
 

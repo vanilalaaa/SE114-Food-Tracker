@@ -19,23 +19,23 @@ import com.SE114.food_tracker.ui.theme.FoodTrackerTheme
 @Composable
 fun CategorySelector(
     categories: List<Category>,
-    selectedCategoryId: Int,
-    onCategorySelected: (Int) -> Unit,
+    selectedCategoryId: String,
+    onCategorySelected: (String) -> Unit,
     onManageClick: () -> Unit = {},
     onAddClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Dữ liệu mặc định khớp với Model: categoryId, name, iconUrl, isHidden, isSystem
     val defaultCategories = listOf(
-        Category(1, "Cơm", "🍚", isHidden = false, isSystem = true),
-        Category(2, "Mì & Phở", "🍜", isHidden = false, isSystem = true),
-        Category(3, "Bánh mì", "🥖", isHidden = false, isSystem = true),
-        Category(4, "Đồ uống", "🥤", isHidden = false, isSystem = true),
-        Category(5, "Tráng miệng", "🍰", isHidden = false, isSystem = true),
-        Category(6, "Ăn vặt", "🍡", isHidden = false, isSystem = true),
-        Category(7, "Hải sản", "🦪", isHidden = false, isSystem = true),
-        Category(8, "Thịt", "🥩", isHidden = false, isSystem = true),
-        Category(9, "Đồ dùng", "🍴", isHidden = false, isSystem = true)
+        Category("1", "Cơm", "🍚", isHidden = false, isSystem = true),
+        Category("2", "Mì & Phở", "🍜", isHidden = false, isSystem = true),
+        Category("3", "Bánh mì", "🥖", isHidden = false, isSystem = true),
+        Category("4", "Đồ uống", "🥤", isHidden = false, isSystem = true),
+        Category("5", "Tráng miệng", "🍰", isHidden = false, isSystem = true),
+        Category("6", "Ăn vặt", "🍡", isHidden = false, isSystem = true),
+        Category("7", "Hải sản", "🦪", isHidden = false, isSystem = true),
+        Category("8", "Thịt", "🥩", isHidden = false, isSystem = true),
+        Category("9", "Đồ dùng", "🍴", isHidden = false, isSystem = true)
     )
 
     // Gộp danh sách mặc định và danh sách người dùng tự thêm
@@ -82,7 +82,7 @@ fun CategorySelector(
             // Nút "Thêm" thủ công luôn nằm cuối lưới
             item {
                 CategorySquareItem(
-                    category = Category(0, "Thêm", "➕", isHidden = false, isSystem = true),
+                    category = Category("0", "Thêm", "➕", isHidden = false, isSystem = true),
                     isSelected = false,
                     onClick = onAddClick
                 )
@@ -98,7 +98,7 @@ fun CategorySelectorPreview() {
         Box(modifier = Modifier.padding(16.dp)) {
             CategorySelector(
                 categories = emptyList(),
-                selectedCategoryId = 2,
+                selectedCategoryId = "2",
                 onCategorySelected = {}
             )
         }

@@ -17,11 +17,11 @@ import com.SE114.food_tracker.data.local.entities.Item
 // --- MOCK DATA ---
 object DiaryMockData {
     val categories = listOf(
-        Category(categoryId = 1, name = "Cơm", iconUrl = ""),
-        Category(categoryId = 2, name = "Mì & Phở", iconUrl = "")
+        Category(categoryId = "1", name = "Cơm", iconUrl = ""),
+        Category(categoryId = "2", name = "Mì & Phở", iconUrl = "")
     )
     val items = listOf(
-        Item(itemId = 1, categoryId = 2, name = "Phở Hà Nội", timeType = 1, price = 30000.0, entryDate = 1713830400000L)
+        Item(itemId = "1", categoryId = "2", name = "Phở Hà Nội", timeType = 1, price = 30000.0, entryDate = 1713830400000L)
     )
     const val STREAK = "1"
     const val DISPLAY_MONTH = "thg 4 2026"

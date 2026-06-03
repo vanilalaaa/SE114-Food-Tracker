@@ -24,12 +24,12 @@ import com.SE114.food_tracker.ui.theme.*
 @Composable
 fun FoodEntryScreen(
     onDismiss: () -> Unit,
-    onSave: (String, String, Int, Int, String) -> Unit
+    onSave: (String, String, String, Int, String) -> Unit
 ) {
     var foodName by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableIntStateOf(2) }
+    var selectedCategoryId by remember { mutableStateOf("2") }
     var rating by remember { mutableIntStateOf(0) }
 
     Column(
