@@ -5,25 +5,23 @@ import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.data.local.entities.SyncStatus
 import com.SE114.food_tracker.data.remote.dto.BudgetDTO
 import com.SE114.food_tracker.data.remote.dto.ItemDTO
-import org.threeten.bp.Instant
-import org.threeten.bp.LocalDate
-import org.threeten.bp.ZoneOffset
-import org.threeten.bp.format.DateTimeFormatter
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 
 object DataMapper {
 
-    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
-
     // MAPPERS CHO MÓN ĂN (ITEM)
     fun ItemDTO.toEntity(): Item {
-        // Chuyển "2026-06-03" -> Epoch Millis (UTC 00:00:00)
-        val entryDateMillis = LocalDate.parse(this.entryDate, dateFormatter)
-            .atStartOfDay(ZoneOffset.UTC)
-            .toInstant()
-            .toEpochMilli()
+        // entry_date là ngày thuần (không giờ); chuẩn hoá về mốc 00:00 UTC để Last-Write-Wins so sánh nhất quán
+        val entryDateMillis = LocalDate.parse(this.entryDate)
+            .atStartOfDayIn(TimeZone.UTC)
+            .toEpochMilliseconds()
 
-        val createdAtMillis = Instant.parse(this.createdAt).toEpochMilli()
-        val updatedAtMillis = Instant.parse(this.updatedAt).toEpochMilli()
+        val createdAtMillis = Instant.parse(this.createdAt).toEpochMilliseconds()
+        val updatedAtMillis = Instant.parse(this.updatedAt).toEpochMilliseconds()
 
         return Item(
             itemId = this.id,
@@ -45,14 +43,13 @@ object DataMapper {
     }
 
     fun Item.toDto(ownerId: String): ItemDTO {
-        // Chuyển Millis -> "YYYY-MM-DD"
-        val entryDateStr = Instant.ofEpochMilli(this.entryDate)
-            .atZone(ZoneOffset.UTC)
-            .toLocalDate()
-            .format(dateFormatter)
+        val entryDateStr = Instant.fromEpochMilliseconds(this.entryDate)
+            .toLocalDateTime(TimeZone.UTC)
+            .date
+            .toString()
 
-        val createdAtStr = Instant.ofEpochMilli(this.createdAt).toString()
-        val updatedAtStr = Instant.ofEpochMilli(this.updatedAt).toString()
+        val createdAtStr = Instant.fromEpochMilliseconds(this.createdAt).toString()
+        val updatedAtStr = Instant.fromEpochMilliseconds(this.updatedAt).toString()
 
         return ItemDTO(
             id = this.itemId,
@@ -74,11 +71,8 @@ object DataMapper {
     }
 
     // MAPPERS CHO NGÂN SÁCH (BUDGET)
-    /**
-     * Chuyển đổi từ BudgetDTO (Mạng) sang Budget (Room Entity)
-     */
     fun BudgetDTO.toEntity(): Budget {
-        val updatedAtMillis = Instant.parse(this.updatedAt).toEpochMilli()
+        val updatedAtMillis = Instant.parse(this.updatedAt).toEpochMilliseconds()
         return Budget(
             userId = this.userId,
             daily = this.daily,
@@ -89,11 +83,8 @@ object DataMapper {
         )
     }
 
-    /**
-     * Chuyển đổi từ Budget (Room Entity) sang BudgetDTO (Mạng) để đẩy lên server
-     */
     fun Budget.toDto(): BudgetDTO {
-        val updatedAtStr = Instant.ofEpochMilli(this.updatedAt).toString()
+        val updatedAtStr = Instant.fromEpochMilliseconds(this.updatedAt).toString()
         return BudgetDTO(
             userId = this.userId,
             daily = this.daily,

@@ -98,8 +98,6 @@ dependencies {
     implementation(libs.supabase.storage)
     implementation(libs.ktor.client.android)
 
-    implementation("com.jakewharton.threetenabp:threetenabp:1.4.7")
-
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
