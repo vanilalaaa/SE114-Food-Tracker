@@ -15,6 +15,11 @@ interface CategoryDAO {
     @Delete
     suspend fun delete(category: Category)
 
-    @Query("SELECT * FROM category")
+    // Lấy tất cả danh mục (bao gồm cả danh mục đã ẩn - dùng cho trang quản lý)
+    @Query("SELECT * FROM category ORDER BY is_system DESC, name ASC")
     fun getAllCategories(): Flow<List<Category>>
+
+    // CHỈ lấy các danh mục đang hiển thị (Dùng hiển thị lên List cho user chọn khi add món ăn)
+    @Query("SELECT * FROM category WHERE is_hidden = 0 ORDER BY is_system DESC, name ASC")
+    fun getVisibleCategories(): Flow<List<Category>>
 }

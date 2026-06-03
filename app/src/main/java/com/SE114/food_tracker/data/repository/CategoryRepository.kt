@@ -6,7 +6,11 @@ import kotlinx.coroutines.flow.Flow
 
 class CategoryRepository(private val categoryDAO: CategoryDAO) {
 
+    // Lấy toàn bộ (Dùng cho trang cấu hình quản lý danh mục)
     fun getAllCategories(): Flow<List<Category>> = categoryDAO.getAllCategories()
+
+    // CHỈ lấy danh mục đang hiển thị (Dùng cho List/Spinner để user chọn khi add món ăn)
+    fun getVisibleCategories(): Flow<List<Category>> = categoryDAO.getVisibleCategories()
 
     suspend fun insert(category: Category) = categoryDAO.insert(category)
 
