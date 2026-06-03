@@ -4,8 +4,9 @@ import com.SE114.food_tracker.data.local.dao.CategoryExpense
 import com.SE114.food_tracker.data.local.dao.ItemDAO
 import com.SE114.food_tracker.data.local.entities.Item
 import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
 
-class ItemRepository(private val itemDAO: ItemDAO) {
+class ItemRepository @Inject constructor(private val itemDAO: ItemDAO) {
 
     // --- Các hàm cơ bản phục vụ UI Nhật ký ---
     fun getAllItems(): Flow<List<Item>> = itemDAO.getAllItems()
