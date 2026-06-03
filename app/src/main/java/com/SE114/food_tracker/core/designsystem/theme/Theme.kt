@@ -1,4 +1,4 @@
-package com.SE114.food_tracker.ui.theme
+package com.SE114.food_tracker.core.designsystem.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme

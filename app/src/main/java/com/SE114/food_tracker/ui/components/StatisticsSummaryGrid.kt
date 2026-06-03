@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.SE114.food_tracker.ui.theme.*
+import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
 fun SummaryItem(

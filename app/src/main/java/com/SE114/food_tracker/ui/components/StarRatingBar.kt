@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
-import com.SE114.food_tracker.ui.theme.FoodTrackerTheme
+import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
 @Composable
 fun StarRatingBar(

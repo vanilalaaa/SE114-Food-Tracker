@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.SE114.food_tracker.core.MainScaffold
-import com.SE114.food_tracker.ui.theme.FoodTrackerTheme
+import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint

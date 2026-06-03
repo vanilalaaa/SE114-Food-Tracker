@@ -7,8 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
-import com.SE114.food_tracker.ui.theme.FoodTrackerTheme
-import com.SE114.food_tracker.ui.theme.MintGreen
+import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
+import com.SE114.food_tracker.core.designsystem.theme.MintGreen
 
 @Composable
 fun AddActionButton(onClick: () -> Unit) {

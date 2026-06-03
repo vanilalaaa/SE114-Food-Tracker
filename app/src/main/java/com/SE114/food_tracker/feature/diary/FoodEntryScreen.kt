@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.data.local.entities.Category
 import com.SE114.food_tracker.ui.components.*
-import com.SE114.food_tracker.ui.theme.*
+import com.SE114.food_tracker.core.designsystem.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

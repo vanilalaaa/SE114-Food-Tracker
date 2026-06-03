@@ -10,7 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.SE114.food_tracker.ui.theme.*
+import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
 fun PrimaryButton(

@@ -14,7 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.SE114.food_tracker.ui.theme.*
+import com.SE114.food_tracker.core.designsystem.theme.*
 import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
