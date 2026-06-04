@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 data class ItemDTO(
     @SerialName("id") val id: String,
     @SerialName("owner_id") val ownerId: String,
-    @SerialName("category_id") val categoryId: Int,
+    @SerialName("category_id") val categoryId: String,
     @SerialName("name") val name: String,
     @SerialName("price") val price: Double,
     @SerialName("currency_code") val currencyCode: String,

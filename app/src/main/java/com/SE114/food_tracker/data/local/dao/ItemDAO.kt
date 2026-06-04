@@ -23,7 +23,7 @@ interface ItemDAO {
     fun getAllItems(): Flow<List<Item>>
 
     @Query("SELECT * FROM item WHERE category_id = :catId")
-    fun getItemsByCategory(catId: Int): Flow<List<Item>>
+    fun getItemsByCategory(catId: String): Flow<List<Item>>
 
     // Lọc dữ liệu theo Ngày/Buổi cho màn hình Nhật ký
     @Query("SELECT * FROM item WHERE entry_date >= :startDate AND entry_date < :endDate ORDER BY time_type ASC, created_at DESC")
@@ -33,7 +33,7 @@ interface ItemDAO {
     fun getItemsByDateRange(startDate: Long, endDate: Long): Flow<List<Item>>
 
     @Query("SELECT * FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND category_id = :categoryId ORDER BY entry_date DESC")
-    fun getItemsByCategoryAndDay(categoryId: Int, startDate: Long, endDate: Long): Flow<List<Item>>
+    fun getItemsByCategoryAndDay(categoryId: String, startDate: Long, endDate: Long): Flow<List<Item>>
 
     // Phục vụ cơ chế Đồng bộ Local-First
     @Query("SELECT * FROM item WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")

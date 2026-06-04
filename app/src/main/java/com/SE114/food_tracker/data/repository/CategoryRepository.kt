@@ -3,8 +3,9 @@ package com.SE114.food_tracker.data.repository
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.entities.Category
 import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
 
-class CategoryRepository(private val categoryDAO: CategoryDAO) {
+class CategoryRepository @Inject constructor(private val categoryDAO: CategoryDAO) {
 
     // Lấy toàn bộ (Dùng cho trang cấu hình quản lý danh mục)
     fun getAllCategories(): Flow<List<Category>> = categoryDAO.getAllCategories()

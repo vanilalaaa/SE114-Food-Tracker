@@ -4,15 +4,16 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "category",
     indices = [Index("is_system"), Index("is_hidden")]
 )
 data class Category(
-    @PrimaryKey(autoGenerate = true)
+    @PrimaryKey
     @ColumnInfo(name = "category_id")
-    var categoryId: Int = 0,
+    var categoryId: String = UUID.randomUUID().toString(), // UUID khớp schema Supabase, tránh đè id chéo thiết bị khi sync
 
     var name: String,
 
