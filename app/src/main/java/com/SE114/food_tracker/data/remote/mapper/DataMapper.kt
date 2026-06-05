@@ -38,7 +38,8 @@ object DataMapper {
             syncStatus = SyncStatus.SYNCED.name,
             entryDate = entryDateMillis,
             createdAt = createdAtMillis,
-            updatedAt = updatedAtMillis
+            updatedAt = updatedAtMillis,
+            isDeleted = this.isDeleted
         )
     }
 
@@ -66,7 +67,8 @@ object DataMapper {
             isShared = this.isShared,
             walletId = this.walletId,
             createdAt = createdAtStr,
-            updatedAt = updatedAtStr
+            updatedAt = updatedAtStr,
+            isDeleted = this.isDeleted
         )
     }
 
@@ -79,7 +81,8 @@ object DataMapper {
             weekly = this.weekly,
             monthly = this.monthly,
             yearly = this.yearly,
-            updatedAt = updatedAtMillis
+            updatedAt = updatedAtMillis,
+            isDeleted = this.isDeleted
         )
     }
 
@@ -91,7 +94,8 @@ object DataMapper {
             weekly = this.weekly,
             monthly = this.monthly,
             yearly = this.yearly,
-            updatedAt = updatedAtStr
+            updatedAt = updatedAtStr,
+            isDeleted = this.isDeleted
         )
     }
 }
