@@ -11,7 +11,7 @@ import com.SE114.food_tracker.data.local.entities.Item
 
 @Database(
     entities = [Category::class, Item::class, Budget::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -16,5 +16,8 @@ data class Budget(
     val yearly: Double? = null,
 
     @ColumnInfo(name = "updated_at")
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "is_deleted")
+    val isDeleted: Boolean = false
 )
