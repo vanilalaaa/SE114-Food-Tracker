@@ -19,5 +19,6 @@ data class ItemDTO(
     @SerialName("is_shared") val isShared: Boolean = false,
     @SerialName("wallet_id") val walletId: String? = null, // UUID nhóm quỹ nếu có
     @SerialName("created_at") val createdAt: String, // Chuỗi ISO timestamp
-    @SerialName("updated_at") val updatedAt: String  // Chuỗi ISO timestamp
+    @SerialName("updated_at") val updatedAt: String,  // Chuỗi ISO timestamp
+    @SerialName("is_deleted") val isDeleted: Boolean = false
 )
