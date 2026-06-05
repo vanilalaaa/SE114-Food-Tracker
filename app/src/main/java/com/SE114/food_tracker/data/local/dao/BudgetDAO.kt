@@ -12,6 +12,18 @@ interface BudgetDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertBudget(budget: Budget)
 
-    @Query("SELECT * FROM budget WHERE user_id = :userId")
+    @Query("SELECT * FROM budget WHERE user_id = :userId AND is_deleted = 0")
     fun getBudgetByUserId(userId: String): Flow<Budget?>
+
+    @Query("UPDATE budget SET is_deleted = 1, sync_status = 'PENDING', updated_at = :updatedAt WHERE user_id = :userId")
+    suspend fun softDeleteBudget(userId: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("SELECT * FROM budget WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
+    suspend fun getPendingBudgets(): List<Budget>
+
+    @Query("UPDATE budget SET sync_status = 'SYNCED' WHERE user_id = :userId")
+    suspend fun markSynced(userId: String)
+
+    @Query("UPDATE budget SET sync_status = 'FAILED' WHERE user_id = :userId")
+    suspend fun markFailed(userId: String)
 }
