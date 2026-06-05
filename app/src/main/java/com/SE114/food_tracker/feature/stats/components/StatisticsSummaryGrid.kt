@@ -33,7 +33,7 @@ fun SummaryItem(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -54,9 +54,12 @@ fun SummaryItem(
 
 @Composable
 fun StatisticsSummaryGrid(
-    totalMeals: String,
-    totalSpending: String,
-    averagePerMeal: String,
+    totalMeals: String,     // Đại diện cho giá trị của Ngân sách
+    totalSpending: String,  // Đại diện cho giá trị của Đã chi
+    averagePerMeal: String, // Đại diện cho giá trị của Còn lại
+    label1: String = "NGÂN SÁCH",
+    label2: String = "ĐÃ CHI",
+    label3: String = "CÒN LẠI",
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -64,19 +67,19 @@ fun StatisticsSummaryGrid(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         SummaryItem(
-            label = "TỔNG MÓN",
+            label = label1,
             value = totalMeals,
             isHighlighted = false,
             modifier = Modifier.weight(1f)
         )
         SummaryItem(
-            label = "TỔNG CHI",
+            label = label2,
             value = totalSpending,
             isHighlighted = true,
             modifier = Modifier.weight(1.1f)
         )
         SummaryItem(
-            label = "TB / MÓN",
+            label = label3,
             value = averagePerMeal,
             isHighlighted = false,
             modifier = Modifier.weight(1f)
@@ -95,9 +98,9 @@ fun StatisticsSummaryGridPreview() {
                 .padding(16.dp)
         ) {
             StatisticsSummaryGrid(
-                totalMeals = "1",
-                totalSpending = "30K Đ",
-                averagePerMeal = "30K Đ"
+                totalMeals = "100K",
+                totalSpending = "120K",
+                averagePerMeal = "-20K"
             )
         }
     }
