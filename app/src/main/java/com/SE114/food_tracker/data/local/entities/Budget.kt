@@ -15,6 +15,9 @@ data class Budget(
     val monthly: Double? = null,
     val yearly: Double? = null,
 
+    @ColumnInfo(name = "sync_status")
+    var syncStatus: String = SyncStatus.PENDING.name,
+
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long = System.currentTimeMillis(),
 

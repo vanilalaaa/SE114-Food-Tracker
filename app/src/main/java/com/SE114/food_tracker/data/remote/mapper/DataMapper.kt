@@ -81,6 +81,7 @@ object DataMapper {
             weekly = this.weekly,
             monthly = this.monthly,
             yearly = this.yearly,
+            syncStatus = SyncStatus.SYNCED.name,
             updatedAt = updatedAtMillis,
             isDeleted = this.isDeleted
         )
