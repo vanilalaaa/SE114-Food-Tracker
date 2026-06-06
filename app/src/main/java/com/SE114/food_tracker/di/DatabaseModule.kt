@@ -26,32 +26,28 @@ object DatabaseModule {
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                     super.onCreate(db)
-
                     val now = System.currentTimeMillis()
 
                     db.execSQL("""
                         INSERT INTO category (category_id, owner_id, name, icon_url, is_hidden, is_system, sync_status, created_at, updated_at)
-                        VALUES 
-                        ('sys-cat-1', null, 'Cơm', '🍚', 0, 1, 'PENDING', $now, $now),
-                        ('sys-cat-2', null, 'Mì & Phở', '🍜', 0, 1, 'PENDING', $now, $now),
-                        ('sys-cat-3', null, 'Bánh mì', '🥖', 0, 1, 'PENDING', $now, $now),
-                        ('sys-cat-4', null, 'Đồ uống', '🥤', 0, 1, 'PENDING', $now, $now),
-                        ('sys-cat-5', null, 'Tráng miệng', '🍰', 0, 1, 'PENDING', $now, $now),
-                        ('sys-cat-6', null, 'Ăn vặt', '🍡', 0, 1, 'PENDING', $now, $now);
+                        VALUES
+                        ('a1000000-0000-0000-0000-000000000001', null, 'Cơm',         '🍚', 0, 1, 'PENDING', $now, $now),
+                        ('a1000000-0000-0000-0000-000000000002', null, 'Mì & Phở',    '🍜', 0, 1, 'PENDING', $now, $now),
+                        ('a1000000-0000-0000-0000-000000000003', null, 'Bánh mì',     '🥖', 0, 1, 'PENDING', $now, $now),
+                        ('a1000000-0000-0000-0000-000000000004', null, 'Đồ uống',     '🥤', 0, 1, 'PENDING', $now, $now),
+                        ('a1000000-0000-0000-0000-000000000005', null, 'Tráng miệng', '🍰', 0, 1, 'PENDING', $now, $now),
+                        ('a1000000-0000-0000-0000-000000000006', null, 'Ăn vặt',      '🍡', 0, 1, 'PENDING', $now, $now);
                     """.trimIndent())
                 }
             })
             .build()
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideCategoryDao(db: AppDatabase): CategoryDAO = db.categoryDAO()
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideItemDao(db: AppDatabase): ItemDAO = db.itemDAO()
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideBudgetDao(db: AppDatabase): BudgetDAO = db.budgetDAO()
 }
