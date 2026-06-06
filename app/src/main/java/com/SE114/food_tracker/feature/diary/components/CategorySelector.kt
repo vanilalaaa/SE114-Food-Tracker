@@ -36,6 +36,16 @@ fun CategorySelector(
     onAddClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val displayCategories = categories.ifEmpty {
+        listOf(
+            DiaryCategory("mock-1", "Cơm",        "🍚", isSystem = true),
+            DiaryCategory("mock-2", "Mì & Phở",   "🍜", isSystem = true),
+            DiaryCategory("mock-3", "Bánh mì",    "🥖", isSystem = true),
+            DiaryCategory("mock-4", "Đồ uống",    "🥤", isSystem = true),
+            DiaryCategory("mock-5", "Tráng miệng","🍰", isSystem = true),
+            DiaryCategory("mock-6", "Ăn vặt",     "🍡", isSystem = true)
+        )
+    }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -61,7 +71,8 @@ fun CategorySelector(
 
         Spacer(Modifier.height(8.dp))
 
-        if (categories.isEmpty()) {
+        //if (categories.isEmpty()) {
+        if (displayCategories.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -90,7 +101,8 @@ fun CategorySelector(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(
-                    items = categories,
+                    //items = categories,
+                    items = displayCategories,
                     key = { it.categoryId }
                 ) { category ->
                     CategorySquareItem(
