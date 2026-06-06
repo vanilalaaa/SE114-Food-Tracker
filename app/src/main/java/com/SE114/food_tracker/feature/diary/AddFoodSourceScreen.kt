@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.sp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFoodSourceScreen(
-    onBack: () -> Unit, onSourceSelected: () -> Unit
+    onBack: () -> Unit,
+    onCameraSelected: () -> Unit,
+    onGallerySelected: () -> Unit,
+    onManualSelected: () -> Unit = {}
 ) {
     Scaffold(
         containerColor = Color(0xFFFFF5E4)
@@ -65,13 +68,13 @@ fun AddFoodSourceScreen(
                     label = "Chụp ảnh",
                     icon = Icons.Outlined.PhotoCamera,
                     modifier = Modifier.weight(1f),
-                    onClick = onSourceSelected
+                    onClick = onCameraSelected
                 )
                 SourceCard(
                     label = "Thư viện",
                     icon = Icons.Outlined.Image,
                     modifier = Modifier.weight(1f),
-                    onClick = onSourceSelected
+                    onClick = onGallerySelected
                 )
             }
 
@@ -177,5 +180,5 @@ fun QuickActionItem(title: String, subtitle: String, icon: ImageVector, iconBgCo
 @Preview(showBackground = true, showSystemUi = true, device = "spec:width=411dp,height=891dp")
 @Composable
 fun AddFoodSourcePreview() {
-    AddFoodSourceScreen(onBack = {}, onSourceSelected = {})
+    AddFoodSourceScreen(onBack = {}, onCameraSelected = {}, onGallerySelected = {})
 }
