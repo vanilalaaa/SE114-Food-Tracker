@@ -1,9 +1,11 @@
 package com.SE114.food_tracker.data.remote.mapper
 
 import com.SE114.food_tracker.data.local.entities.Budget
+import com.SE114.food_tracker.data.local.entities.Category
 import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.data.local.entities.SyncStatus
 import com.SE114.food_tracker.data.remote.dto.BudgetDTO
+import com.SE114.food_tracker.data.remote.dto.CategoryDTO
 import com.SE114.food_tracker.data.remote.dto.ItemDTO
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -69,6 +71,37 @@ object DataMapper {
             createdAt = createdAtStr,
             updatedAt = updatedAtStr,
             isDeleted = this.isDeleted
+        )
+    }
+
+    // MAPPERS CHO DANH MỤC (CATEGORY)
+    fun CategoryDTO.toEntity(): Category {
+        val createdAtMillis = Instant.parse(this.createdAt).toEpochMilliseconds()
+
+        return Category(
+            categoryId = this.id,
+            ownerId = this.ownerId,
+            name = this.name,
+            iconUrl = this.iconUrl,
+            isHidden = this.isHidden,
+            isSystem = this.isSystem,
+            syncStatus = SyncStatus.SYNCED.name,
+            createdAt = createdAtMillis,
+            updatedAt = createdAtMillis
+        )
+    }
+
+    fun Category.toDto(): CategoryDTO {
+        val createdAtStr = Instant.fromEpochMilliseconds(this.createdAt).toString()
+
+        return CategoryDTO(
+            id = this.categoryId,
+            ownerId = this.ownerId,
+            name = this.name,
+            iconUrl = this.iconUrl,
+            isHidden = this.isHidden,
+            isSystem = this.isSystem,
+            createdAt = createdAtStr
         )
     }
 

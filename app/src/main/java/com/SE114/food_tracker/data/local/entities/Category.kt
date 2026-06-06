@@ -8,12 +8,20 @@ import java.util.UUID
 
 @Entity(
     tableName = "category",
-    indices = [Index("is_system"), Index("is_hidden")]
+    indices = [
+        Index("is_system"),
+        Index("is_hidden"),
+        Index("owner_id"),
+        Index("sync_status")
+    ]
 )
 data class Category(
     @PrimaryKey
     @ColumnInfo(name = "category_id")
-    var categoryId: String = UUID.randomUUID().toString(), // UUID khớp schema Supabase, tránh đè id chéo thiết bị khi sync
+    var categoryId: String = UUID.randomUUID().toString(),
+
+    @ColumnInfo(name = "owner_id")
+    var ownerId: String? = null, // null đối với danh mục hệ thống (isSystem = true)
 
     var name: String,
 
@@ -24,5 +32,14 @@ data class Category(
     var isHidden: Boolean = false,
 
     @ColumnInfo(name = "is_system")
-    var isSystem: Boolean = false
+    var isSystem: Boolean = false,
+
+    @ColumnInfo(name = "sync_status")
+    var syncStatus: String = SyncStatus.PENDING.name,
+
+    @ColumnInfo(name = "created_at")
+    var createdAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "updated_at")
+    var updatedAt: Long = System.currentTimeMillis()
 )
