@@ -43,6 +43,8 @@ class DiaryViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     private val _streak = MutableStateFlow(0)
 
+    private val _mutationTrigger = MutableStateFlow(0)
+
     private val categories: Flow<List<DiaryCategory>> =
         categoryDAO.getVisibleCategories()
             .map { categories ->
@@ -58,29 +60,31 @@ class DiaryViewModel @Inject constructor(
             }
 
     private val selectedDayItems: Flow<List<DiaryItem>> =
-        _selectedDate.flatMapLatest { selectedDate ->
-            val range = selectedDate.utcDayRange()
-            itemRepository.getDiaryItemsByDay(range.start, range.end)
-        }
+        combine(_selectedDate, _mutationTrigger) { date, _ -> date }
+            .flatMapLatest { selectedDate ->
+                val range = selectedDate.utcDayRange()
+                itemRepository.getDiaryItemsByDay(range.start, range.end)
+            }
 
     private val datesWithData: Flow<Set<Int>> =
-        _selectedDate.flatMapLatest { selectedDate ->
-            val monthStart = LocalDate(selectedDate.year, selectedDate.monthNumber, 1)
-            val nextMonthStart = monthStart.plus(DatePeriod(months = 1))
-            val range = DateRange(
-                start = monthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
-                end = nextMonthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
-            )
-            itemRepository.getItemsByDateRange(range.start, range.end)
-                .map { items ->
-                    items.map { item ->
-                        Instant.fromEpochMilliseconds(item.entryDate)
-                            .toLocalDateTime(TimeZone.UTC)
-                            .date
-                            .dayOfMonth
-                    }.toSet()
-                }
-        }
+        combine(_selectedDate, _mutationTrigger) { date, _ -> date }
+            .flatMapLatest { selectedDate ->
+                val monthStart = LocalDate(selectedDate.year, selectedDate.monthNumber, 1)
+                val nextMonthStart = monthStart.plus(DatePeriod(months = 1))
+                val range = DateRange(
+                    start = monthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
+                    end = nextMonthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+                )
+                itemRepository.getItemsByDateRange(range.start, range.end)
+                    .map { items ->
+                        items.map { item ->
+                            Instant.fromEpochMilliseconds(item.entryDate)
+                                .toLocalDateTime(TimeZone.UTC)
+                                .date
+                                .dayOfMonth
+                        }.toSet()
+                    }
+            }
 
     val uiState: StateFlow<DiaryUiState> =
         combine(
@@ -156,11 +160,6 @@ class DiaryViewModel @Inject constructor(
         note: String,
         timeType: Int
     ) {
-        if (!ensureAuthenticated()) {
-            _error.value = "User unauthenticated"
-            return
-        }
-
         viewModelScope.launch {
             runMutation {
                 val now = Clock.System.now().toEpochMilliseconds()
@@ -191,11 +190,6 @@ class DiaryViewModel @Inject constructor(
         note: String,
         timeType: Int
     ) {
-        if (!ensureAuthenticated()) {
-            _error.value = "User unauthenticated"
-            return
-        }
-
         viewModelScope.launch {
             runMutation {
                 val currentItem = itemRepository.getItemById(itemId).first()
@@ -251,15 +245,13 @@ class DiaryViewModel @Inject constructor(
         try {
             block()
             computeStreak()
+            _mutationTrigger.value += 1
         } catch (throwable: Throwable) {
             _error.value = throwable.message
         } finally {
             _isLoading.value = false
         }
     }
-
-    private fun ensureAuthenticated(): Boolean =
-        itemRepository.getCurrentUserId() != null
 
     private fun LocalDate.utcDayRange(): DateRange {
         val start = atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
