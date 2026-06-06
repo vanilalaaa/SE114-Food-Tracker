@@ -279,4 +279,11 @@ class DiaryViewModel @Inject constructor(
         val categories: List<DiaryCategory>,
         val datesWithData: Set<Int>
     )
+
+    private fun Int.toSessionLabel(): String =
+        when (this) {
+            0    -> "Sáng"
+            2    -> "Tối"
+            else -> "Trưa/Chiều"
+        }
 }
