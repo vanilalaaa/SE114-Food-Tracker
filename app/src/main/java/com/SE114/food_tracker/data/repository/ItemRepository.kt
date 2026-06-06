@@ -59,7 +59,13 @@ class ItemRepository @Inject constructor(
 
     fun getItemById(id: String): Flow<Item?> = itemDAO.getItemById(id)
 
-    suspend fun insert(item: Item) = itemDAO.insertItem(item)
+    suspend fun insert(item: Item) {
+        val pendingItem = item.copy(
+            syncStatus = com.SE114.food_tracker.data.local.entities.SyncStatus.PENDING.name,
+            updatedAt = System.currentTimeMillis()
+        )
+        itemDAO.insertItem(pendingItem)
+    }
 
     suspend fun update(item: Item) = itemDAO.updateItem(item)
 
