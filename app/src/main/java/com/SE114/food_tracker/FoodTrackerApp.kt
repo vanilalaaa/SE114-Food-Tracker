@@ -41,13 +41,7 @@ class FoodTrackerApp : Application(), Configuration.Provider {
                 }
                 Timber.d("FoodTrackerApp: sign-in successful, scheduling sync.")
             }.onSuccess {
-                // Schedule periodic background sync (every 15 min, network required).
                 SyncScheduler.schedulePeriodicSync(this@FoodTrackerApp)
-
-                // BUG FIX: trigger an immediate one-shot sync right after login so any
-                // items that were saved offline (PENDING in Room) are pushed to Supabase
-                // without waiting for the 15-minute periodic window.
-                SyncScheduler.triggerImmediateSync(this@FoodTrackerApp)
             }.onFailure { e ->
                 Timber.e(e, "FoodTrackerApp: sign-in failed — sync NOT scheduled.")
                 SyncScheduler.schedulePeriodicSync(this@FoodTrackerApp)
