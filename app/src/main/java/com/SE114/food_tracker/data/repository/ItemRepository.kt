@@ -5,16 +5,21 @@ import com.SE114.food_tracker.data.local.dao.CategoryExpense
 import com.SE114.food_tracker.data.local.dao.ItemDAO
 import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.feature.diary.DiaryItem
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 class ItemRepository @Inject constructor(
     private val itemDAO: ItemDAO,
-    private val categoryDAO: CategoryDAO
+    private val categoryDAO: CategoryDAO,
+    private val supabaseClient: SupabaseClient
 ) {
 
     fun getAllItems(): Flow<List<Item>> = itemDAO.getAllItems()
+
+    fun getCurrentUserId(): String? = supabaseClient.auth.currentUserOrNull()?.id
 
     fun getItemsByDay(start: Long, end: Long): Flow<List<Item>> =
         itemDAO.getItemsByDay(start, end)

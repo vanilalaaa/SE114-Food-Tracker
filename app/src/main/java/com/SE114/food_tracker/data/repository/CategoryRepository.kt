@@ -2,16 +2,21 @@ package com.SE114.food_tracker.data.repository
 
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.entities.Category
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 class CategoryRepository @Inject constructor(
-    private val categoryDAO: CategoryDAO
+    private val categoryDAO: CategoryDAO,
+    private val supabaseClient: SupabaseClient
 ) {
 
     fun getAllCategories(): Flow<List<Category>> = categoryDAO.getAllCategories()
 
     fun getVisibleCategories(): Flow<List<Category>> = categoryDAO.getVisibleCategories()
+
+    fun getCurrentUserId(): String? = supabaseClient.auth.currentUserOrNull()?.id
 
     suspend fun insertCategory(category: Category) = categoryDAO.insert(category)
 
