@@ -5,6 +5,10 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
+enum class DisplaySize {
+    COMPACT, MEDIUM, EXPANDED
+}
+
 data class DiaryCategory(
     val categoryId: String,
     val name: String,
@@ -36,8 +40,10 @@ data class DiaryItem(
 data class DiaryUiState(
     val items: List<DiaryItem> = emptyList(),
     val categories: List<DiaryCategory> = emptyList(),
+    val recentItems: List<DiaryItem> = emptyList(),
     val selectedDate: LocalDate = currentLocalDate(),
     val selectedCategoryId: String? = null,
+    val displaySize: DisplaySize = DisplaySize.MEDIUM,
     val datesWithData: Set<Int> = emptySet(),
     val selectedItemId: String? = null,
     val totalSpend: Double = 0.0,
