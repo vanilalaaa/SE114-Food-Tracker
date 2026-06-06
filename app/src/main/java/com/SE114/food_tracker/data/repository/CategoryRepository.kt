@@ -29,4 +29,14 @@ class CategoryRepository @Inject constructor(
     suspend fun update(category: Category) = updateCategory(category)
 
     suspend fun delete(category: Category) = deleteCategory(category)
+
+    // ── BỔ SUNG CÁC HÀM PHỤC VỤ ĐỒNG BỘ CHO SYNC WORKER ──
+
+    suspend fun getPendingCategories(): List<Category> = categoryDAO.getPendingCategories()
+
+    suspend fun upsertCategoriesFromServer(categories: List<Category>) = categoryDAO.upsertCategoriesFromServer(categories)
+
+    suspend fun markSynced(categoryId: String) = categoryDAO.markSynced(categoryId)
+
+    suspend fun markFailed(categoryId: String) = categoryDAO.markFailed(categoryId)
 }

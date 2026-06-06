@@ -36,16 +36,6 @@ fun CategorySelector(
     onAddClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val displayCategories = categories.ifEmpty {
-        listOf(
-            DiaryCategory("mock-1", "Cơm",        "🍚", isSystem = true),
-            DiaryCategory("mock-2", "Mì & Phở",   "🍜", isSystem = true),
-            DiaryCategory("mock-3", "Bánh mì",    "🥖", isSystem = true),
-            DiaryCategory("mock-4", "Đồ uống",    "🥤", isSystem = true),
-            DiaryCategory("mock-5", "Tráng miệng","🍰", isSystem = true),
-            DiaryCategory("mock-6", "Ăn vặt",     "🍡", isSystem = true)
-        )
-    }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -71,8 +61,7 @@ fun CategorySelector(
 
         Spacer(Modifier.height(8.dp))
 
-        //if (categories.isEmpty()) {
-        if (displayCategories.isEmpty()) {
+        if (categories.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -102,7 +91,7 @@ fun CategorySelector(
             ) {
                 items(
                     //items = categories,
-                    items = displayCategories,
+                    items = categories,
                     key = { it.categoryId }
                 ) { category ->
                     CategorySquareItem(
@@ -138,21 +127,18 @@ fun CategorySelectorPreview() {
     // Hardcoded preview categories use "preview-N" IDs to clearly signal they are
     // NOT real UUIDs. This block is compile-time only and has zero effect at runtime.
     val previewCategories = listOf(
-        DiaryCategory("preview-1", "Cơm",        "🍚", isSystem = true),
-        DiaryCategory("preview-2", "Mì & Phở",   "🍜", isSystem = true),
-        DiaryCategory("preview-3", "Bánh mì",    "🥖", isSystem = true),
-        DiaryCategory("preview-4", "Đồ uống",    "🥤", isSystem = true),
-        DiaryCategory("preview-5", "Tráng miệng","🍰", isSystem = true),
-        DiaryCategory("preview-6", "Ăn vặt",     "🍡", isSystem = true),
-        DiaryCategory("preview-7", "Hải sản",    "🦪", isSystem = true),
-        DiaryCategory("preview-8", "Thịt",       "🥩", isSystem = true),
-        DiaryCategory("preview-9", "Đồ dùng",    "🍴", isSystem = true),
+        DiaryCategory("sys-cat-1", "Cơm",        "🍚", isSystem = true),
+        DiaryCategory("sys-cat-2", "Mì & Phở",   "🍜", isSystem = true),
+        DiaryCategory("sys-cat-3", "Bánh mì",    "🥖", isSystem = true),
+        DiaryCategory("sys-cat-4", "Đồ uống",    "🥤", isSystem = true),
+        DiaryCategory("sys-cat-5", "Tráng miệng","🍰", isSystem = true),
+        DiaryCategory("sys-cat-6", "Ăn vặt",     "🍡", isSystem = true)
     )
     FoodTrackerTheme {
         Box(modifier = Modifier.padding(16.dp)) {
             CategorySelector(
                 categories = previewCategories,
-                selectedCategoryId = "preview-2",
+                selectedCategoryId = "sys-cat-2",
                 onCategorySelected = {}
             )
         }
