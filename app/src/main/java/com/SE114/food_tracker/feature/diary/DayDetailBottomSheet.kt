@@ -1,30 +1,54 @@
 package com.SE114.food_tracker.feature.diary
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.DayOfWeek
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.SE114.food_tracker.core.designsystem.theme.*
-import com.SE114.food_tracker.feature.diary.components.*
-import com.SE114.food_tracker.data.local.entities.Item
-import com.SE114.food_tracker.data.local.entities.Category
+import com.SE114.food_tracker.core.designsystem.theme.AppTypography
+import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
+import com.SE114.food_tracker.feature.diary.components.DayItem
+import com.SE114.food_tracker.feature.diary.components.PrimaryButton
+import com.SE114.food_tracker.feature.diary.components.StatBox
+import com.SE114.food_tracker.feature.diary.components.getEmojiByName
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DayDetailBottomSheet(
     onDismiss: () -> Unit,
-    items: List<Item>,
-    categories: List<Category>,
-    onEditItem: (Item) -> Unit
+    selectedDate: LocalDate,
+    items: List<DiaryItem>,
+    categories: List<DiaryCategory>,
+    onEditItem: (DiaryItem) -> Unit,
+    onAddItem: () -> Unit,
+    onDeleteItem: (String) -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -38,18 +62,40 @@ fun DayDetailBottomSheet(
             )
         }
     ) {
-        DayDetailBottomSheetContent(items, categories, onEditItem)
+        DayDetailBottomSheetContent(
+            selectedDate = selectedDate,
+            items = items,
+            categories = categories,
+            onEditItemClick = onEditItem,
+            onAddItem = onAddItem,
+            onDeleteItem = onDeleteItem
+        )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DayDetailBottomSheetContent(
-    items: List<Item>,
-    categories: List<Category>,
-    onEditItemClick: (Item) -> Unit
+    selectedDate: LocalDate,
+    items: List<DiaryItem>,
+    categories: List<DiaryCategory>,
+    onEditItemClick: (DiaryItem) -> Unit,
+    onAddItem: () -> Unit,
+    onDeleteItem: (String) -> Unit
 ) {
     val scrollState = rememberScrollState()
     val totalEntry = items.sumOf { it.price }.toInt()
+    // Format: "Thứ X, DD tháng MM, YYYY"
+    val dayOfWeekLabel = when (selectedDate.dayOfWeek.ordinal) {
+        0 -> "Thứ Hai"
+        1 -> "Thứ Ba"
+        2 -> "Thứ Tư"
+        3 -> "Thứ Năm"
+        4 -> "Thứ Sáu"
+        5 -> "Thứ Bảy"
+        else -> "Chủ Nhật"
+    }
+    val dateLabel = "$dayOfWeekLabel, ${selectedDate.dayOfMonth} tháng ${selectedDate.monthNumber}, ${selectedDate.year}"
 
     Column(
         modifier = Modifier
@@ -58,43 +104,79 @@ fun DayDetailBottomSheetContent(
             .padding(bottom = 32.dp)
             .verticalScroll(scrollState)
     ) {
-        Text("03/04/2026", style = AppTypography.titleLarge.copy(fontSize = 22.sp))
-        Text("Thứ Sáu", style = AppTypography.labelMedium)
+        Text(dateLabel, style = AppTypography.titleLarge.copy(fontSize = 22.sp))
+        Text("${items.size} entries", style = AppTypography.labelMedium)
 
         Spacer(Modifier.height(24.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             StatBox(label = "Món", value = "${items.size}", modifier = Modifier.weight(1f))
-            StatBox(label = "Chi", value = "${totalEntry / 1000}k đ", modifier = Modifier.weight(1f))
+            StatBox(label = "Chi", value = "${totalEntry / 1000}k d", modifier = Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(24.dp))
 
         PrimaryButton(
             text = "Thêm món",
-            onClick = { /* Mở màn hình FoodEntryScreen */ }
+            onClick = onAddItem
         )
 
         Spacer(Modifier.height(28.dp))
         Text("Danh sách", style = AppTypography.titleSmall)
         Text(
-            "← Vuốt để xóa . Nhấn để sửa",
+            "Swipe left to delete. Tap to edit.",
             style = AppTypography.labelMedium,
-            modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp)
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(vertical = 8.dp)
         )
 
         Spacer(Modifier.height(12.dp))
 
         items.forEach { item ->
-            val catName = categories.find { it.categoryId == item.categoryId }?.name ?: "Khác"
-            DayItem(
-                name = item.name,
-                category = catName,
-                price = item.price,
-                time = if (item.timeType == 1) "Chiều" else "Sáng",
-                onClick = { onEditItemClick(item) }
-            )
-            Spacer(Modifier.height(12.dp))
+            key(item.itemId) {
+                val dismissState = rememberSwipeToDismissBoxState(
+                    confirmValueChange = { value ->
+                        if (value == SwipeToDismissBoxValue.EndToStart) {
+                            onDeleteItem(item.itemId)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                )
+
+                SwipeToDismissBox(
+                    state = dismissState,
+                    backgroundContent = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0xFFE57373), RoundedCornerShape(16.dp))
+                                .padding(horizontal = 20.dp),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            Text("Delete", color = Color.White)
+                        }
+                    },
+                    enableDismissFromStartToEnd = false,
+                    enableDismissFromEndToStart = true
+                ) {
+                    val matchedCategory = categories.find { it.categoryId == item.categoryId }
+                    val catName = categories.find { it.categoryId == item.categoryId }?.name
+                        ?: item.categoryName
+                    val catIcon = matchedCategory?.iconUrl ?: getEmojiByName(catName)
+                    DayItem(
+                        name = item.name,
+                        category = catName,
+                        categoryIcon = catIcon,
+                        price = item.price,
+                        time = item.timeLabel.ifBlank { item.timeType.toSessionLabel() },
+                        onClick = { onEditItemClick(item) }
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+            }
         }
     }
 }
@@ -122,9 +204,12 @@ fun DayDetailBottomSheetPreview() {
                     )
 
                     DayDetailBottomSheetContent(
-                        items = DiaryMockData.items,
-                        categories = DiaryMockData.categories,
-                        onEditItemClick = {}
+                        selectedDate = LocalDate(2026, 6, 6),
+                        items = emptyList(),
+                        categories = emptyList(),
+                        onEditItemClick = {},
+                        onAddItem = {},
+                        onDeleteItem = {}
                     )
                 }
             }
