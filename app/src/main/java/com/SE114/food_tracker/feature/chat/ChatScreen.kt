@@ -127,6 +127,8 @@ fun ChatScreen(
                             .padding(horizontal = 8.dp),
                         shape = RoundedCornerShape(24.dp),
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = CardWhite,
+                            unfocusedContainerColor = CardWhite,
                             focusedBorderColor = StatPinkDark,
                             unfocusedBorderColor = Color(0xFFE0E0E0)
                         ),
