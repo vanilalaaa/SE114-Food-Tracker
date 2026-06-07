@@ -22,6 +22,7 @@ fun DayItem(
     category: String,
     price: Double,
     time: String,
+    categoryIcon: String = "",
     onClick: () -> Unit
 ) {
     Surface(
@@ -43,7 +44,10 @@ fun DayItem(
                     .background(LightPeach, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                // Sau này load icon hoặc ảnh vào đây
+                Text(
+                    text = categoryIcon.ifEmpty { "🍱" },
+                    fontSize = 22.sp
+                )
             }
 
             Spacer(Modifier.width(12.dp))

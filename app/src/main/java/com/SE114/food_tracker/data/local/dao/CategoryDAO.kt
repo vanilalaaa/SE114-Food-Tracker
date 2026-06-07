@@ -22,4 +22,18 @@ interface CategoryDAO {
     // CHỈ lấy các danh mục đang hiển thị (Dùng hiển thị lên List cho user chọn khi add món ăn)
     @Query("SELECT * FROM category WHERE is_hidden = 0 ORDER BY is_system DESC, name ASC")
     fun getVisibleCategories(): Flow<List<Category>>
+
+    // ── BỔ SUNG CÁC HÀM PHỤC VỤ ĐỒNG BỘ (SYNC LOGIC) ──
+
+    @Query("SELECT * FROM category WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
+    suspend fun getPendingCategories(): List<Category>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCategoriesFromServer(categories: List<Category>)
+
+    @Query("UPDATE category SET sync_status = 'SYNCED' WHERE category_id = :categoryId")
+    suspend fun markSynced(categoryId: String)
+
+    @Query("UPDATE category SET sync_status = 'FAILED' WHERE category_id = :categoryId")
+    suspend fun markFailed(categoryId: String)
 }
