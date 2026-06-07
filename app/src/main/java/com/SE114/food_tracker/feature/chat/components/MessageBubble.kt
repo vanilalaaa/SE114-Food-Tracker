@@ -42,7 +42,7 @@ fun MessageBubble(
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 1. Trường hợp đặc biệt: Tin nhắn hệ thống (System Message) theo mục 6.7 đặc tả
+    // 1. Trường hợp đặc biệt: Tin nhắn hệ thống (System Message)
     if (message.isSystem) {
         Box(
             modifier = modifier
@@ -91,7 +91,7 @@ fun MessageBubble(
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
         ) {
             Surface(
-                color = if (isMine) StatPinkDark else Color(0xFFF0F0F0),
+                color = if (isMine) LightPeach else LightGreenStat,
                 contentColor = if (isMine) Color.White else TextPrimaryStat,
                 shape = RoundedCornerShape(
                     topStart = 16.dp,

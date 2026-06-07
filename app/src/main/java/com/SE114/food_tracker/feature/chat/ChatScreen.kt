@@ -25,7 +25,7 @@ import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 @Composable
 fun ChatScreen(
     conversationId: String,
-    conversationName: String = "Azun (Dev)",
+    conversationName: String = "Azun (Data)",
     onBackClick: () -> Unit = {}
 ) {
     val myId = "vy_id"
@@ -59,7 +59,7 @@ fun ChatScreen(
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = CardWhite)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
             )
         },
         containerColor = MainBackground
@@ -94,7 +94,7 @@ fun ChatScreen(
 
             // 2. Ô soạn thảo tin nhắn (Bottom Input Bar)
             Surface(
-                color = CardWhite,
+                color = MainBackground,
                 tonalElevation = 2.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
