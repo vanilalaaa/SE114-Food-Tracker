@@ -1,0 +1,178 @@
+package com.SE114.food_tracker.feature.auth
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.AlternateEmail
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.SE114.food_tracker.R
+import com.SE114.food_tracker.core.designsystem.components.AppButton
+import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
+import com.SE114.food_tracker.core.designsystem.components.AppTextField
+import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
+
+@Composable
+fun RegisterScreen(
+    onRegisterSuccess: () -> Unit,
+    onNavigateLogin: () -> Unit,
+    viewModel: RegisterViewModel = hiltViewModel()
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(state.registered) {
+        if (state.registered) onRegisterSuccess()
+    }
+
+    val userIdIsError = state.userIdStatus == UserIdStatus.Invalid ||
+        state.userIdStatus == UserIdStatus.Taken ||
+        state.userIdStatus == UserIdStatus.Error
+
+    val userIdHelper = when (state.userIdStatus) {
+        UserIdStatus.Idle -> stringResource(R.string.auth_register_user_id_helper)
+        UserIdStatus.Checking -> stringResource(R.string.auth_register_user_id_checking)
+        UserIdStatus.Available -> stringResource(R.string.auth_register_user_id_available)
+        else -> null
+    }
+    val userIdError = when (state.userIdStatus) {
+        UserIdStatus.Invalid -> stringResource(R.string.auth_register_user_id_invalid)
+        UserIdStatus.Taken -> stringResource(R.string.auth_register_user_id_taken)
+        UserIdStatus.Error -> stringResource(R.string.auth_register_user_id_error)
+        else -> null
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.auth_register_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(vertical = 24.dp)
+            )
+
+            AppTextField(
+                value = state.displayName,
+                onValueChange = viewModel::onDisplayNameChange,
+                label = stringResource(R.string.auth_register_display_name),
+                leadingIcon = Icons.Outlined.Person
+            )
+
+            AppTextField(
+                value = state.email,
+                onValueChange = viewModel::onEmailChange,
+                label = stringResource(R.string.auth_register_email),
+                leadingIcon = Icons.Outlined.Email,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
+
+            AppTextField(
+                value = state.userId,
+                onValueChange = viewModel::onUserIdChange,
+                label = stringResource(R.string.auth_register_user_id),
+                leadingIcon = Icons.Outlined.AlternateEmail,
+                isError = userIdIsError,
+                errorText = userIdError,
+                supportingText = userIdHelper,
+                trailing = { UserIdStatusIcon(state.userIdStatus) }
+            )
+
+            AppTextField(
+                value = state.password,
+                onValueChange = viewModel::onPasswordChange,
+                label = stringResource(R.string.auth_register_password),
+                leadingIcon = Icons.Outlined.Lock,
+                isPassword = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+            )
+
+            if (state.errorRes != null) {
+                Text(
+                    text = stringResource(state.errorRes!!),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            AppButton(
+                text = stringResource(R.string.auth_register_submit),
+                onClick = viewModel::submit,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.canSubmit,
+                loading = state.isLoading
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.auth_register_have_account),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                AppButton(
+                    text = stringResource(R.string.auth_register_login_cta),
+                    onClick = onNavigateLogin,
+                    variant = AppButtonVariant.Text
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserIdStatusIcon(status: UserIdStatus) {
+    when (status) {
+        UserIdStatus.Checking -> CircularProgressIndicator(
+            modifier = Modifier.size(18.dp),
+            strokeWidth = 2.dp
+        )
+        UserIdStatus.Available -> Icon(
+            imageVector = Icons.Filled.Check,
+            contentDescription = stringResource(R.string.auth_register_user_id_available_desc),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        UserIdStatus.Taken, UserIdStatus.Invalid, UserIdStatus.Error -> Icon(
+            imageVector = Icons.Filled.Close,
+            contentDescription = stringResource(R.string.auth_register_user_id_taken_desc),
+            tint = MaterialTheme.colorScheme.error
+        )
+        UserIdStatus.Idle -> Unit
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun RegisterScreenPreview() {
+    FoodTrackerTheme {
+        RegisterScreen(onRegisterSuccess = {}, onNavigateLogin = {})
+    }
+}
