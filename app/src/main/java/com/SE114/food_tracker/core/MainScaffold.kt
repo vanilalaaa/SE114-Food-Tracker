@@ -3,51 +3,75 @@ package com.SE114.food_tracker.core
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.SE114.food_tracker.core.designsystem.components.BottomBar
 import com.SE114.food_tracker.core.navigation.AppDestinations
 import com.SE114.food_tracker.core.navigation.AppNavGraph
-import com.SE114.food_tracker.core.designsystem.components.BottomBar
 import com.SE114.food_tracker.feature.diary.components.AddActionButton
+import io.github.jan.supabase.auth.status.SessionStatus
+
+private val BAR_ROUTES = listOf(
+    AppDestinations.Diary.route,
+    AppDestinations.Stats.route,
+    AppDestinations.Feed.route,
+    AppDestinations.Settings.route
+)
+
+private val AUTH_ROUTES = setOf(
+    AppDestinations.Splash.route,
+    AppDestinations.Login.route,
+    AppDestinations.Register.route,
+    AppDestinations.Forgot.route
+)
 
 @Composable
 fun MainScaffold() {
     val navController = rememberNavController()
-    var selectedIndex by remember { mutableIntStateOf(0) }
+    val mainViewModel: MainViewModel = hiltViewModel()
+    val session by mainViewModel.sessionStatus.collectAsStateWithLifecycle()
 
-    val barRoutes = listOf(
-        AppDestinations.Diary.route,
-        AppDestinations.Stats.route,
-        AppDestinations.Feed.route,
-        AppDestinations.Settings.route
-    )
-
-    // Track the current route so the FAB only appears on the Diary tab
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
+
+    val selectedIndex = BAR_ROUTES.indexOf(currentRoute).coerceAtLeast(0)
+    val showBottomBar = currentRoute != null && currentRoute !in AUTH_ROUTES
 
     // FAB state lives here; DiaryScreen receives a callback to trigger the add flow
     var triggerDiaryAdd by remember { mutableStateOf(false) }
 
+    // Auth guard: if the session drops while inside the app, return to login and clear the back stack.
+    LaunchedEffect(session, currentRoute) {
+        if (session is SessionStatus.NotAuthenticated && currentRoute != null && currentRoute !in AUTH_ROUTES) {
+            navController.navigate(AppDestinations.Login.route) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+        }
+    }
+
     Scaffold(
         bottomBar = {
-            BottomBar(
-                selectedIndex = selectedIndex,
-                onItemSelected = { index ->
-                    selectedIndex = index
-                    navController.navigate(barRoutes[index]) {
-                        popUpTo(AppDestinations.Diary.route) { saveState = true }
-                        launchSingleTop = true
-                        restoreState    = true
+            if (showBottomBar) {
+                BottomBar(
+                    selectedIndex = selectedIndex,
+                    onItemSelected = { index ->
+                        navController.navigate(BAR_ROUTES[index]) {
+                            // Diary is the main graph's start destination.
+                            popUpTo(AppDestinations.Diary.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         floatingActionButton = {
             // FAB only visible on the Diary destination
@@ -57,9 +81,9 @@ fun MainScaffold() {
         }
     ) { padding ->
         AppNavGraph(
-            navController    = navController,
-            modifier         = Modifier.padding(padding),
-            triggerDiaryAdd  = triggerDiaryAdd,
+            navController = navController,
+            modifier = Modifier.padding(padding),
+            triggerDiaryAdd = triggerDiaryAdd,
             onDiaryAddHandled = { triggerDiaryAdd = false }
         )
     }
