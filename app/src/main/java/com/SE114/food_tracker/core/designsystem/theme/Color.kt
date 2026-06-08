@@ -21,6 +21,7 @@ val DarkPink = Color(0xFFAA7171)
 val StatRed = Color(0xFFC98989)
 val StatPinkDark = Color(0xFFC98989)
 val StatPinkLight = Color(0xFFFCDFCF)
+val SettingActionOrange = Color(0xFFDE9974)
 
 // --- 4. CHỮ ---
 val TextPrimary = Color(0xFF171717)
