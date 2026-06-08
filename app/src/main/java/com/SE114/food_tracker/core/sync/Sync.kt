@@ -6,7 +6,6 @@ import android.net.NetworkCapabilities
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.SE114.food_tracker.data.local.entities.SyncStatus
 import com.SE114.food_tracker.data.remote.SupabaseItemService
 import com.SE114.food_tracker.data.remote.dto.CategoryDTO
 import com.SE114.food_tracker.data.remote.mapper.DataMapper

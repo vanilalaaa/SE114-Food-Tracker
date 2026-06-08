@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.entities.Item
-import com.SE114.food_tracker.data.local.entities.SyncStatus
+import com.SE114.food_tracker.core.sync.SyncStatus
 import com.SE114.food_tracker.data.repository.ItemRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext

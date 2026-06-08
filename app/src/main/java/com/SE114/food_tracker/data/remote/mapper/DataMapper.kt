@@ -3,7 +3,7 @@ package com.SE114.food_tracker.data.remote.mapper
 import com.SE114.food_tracker.data.local.entities.Budget
 import com.SE114.food_tracker.data.local.entities.Category
 import com.SE114.food_tracker.data.local.entities.Item
-import com.SE114.food_tracker.data.local.entities.SyncStatus
+import com.SE114.food_tracker.core.sync.SyncStatus
 import com.SE114.food_tracker.data.remote.dto.BudgetDTO
 import com.SE114.food_tracker.data.remote.dto.CategoryDTO
 import com.SE114.food_tracker.data.remote.dto.ItemDTO
