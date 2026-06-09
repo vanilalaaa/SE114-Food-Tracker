@@ -1,0 +1,19 @@
+package com.SE114.food_tracker.feature.auth
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.SE114.food_tracker.R
+import com.SE114.food_tracker.data.repository.AuthError
+
+@Composable
+fun AuthError.asMessage(): String = when (this) {
+    AuthError.InvalidCredentials -> stringResource(R.string.auth_err_invalid_credentials)
+    AuthError.EmailNotConfirmed -> stringResource(R.string.auth_err_email_not_confirmed)
+    AuthError.EmailAlreadyRegistered -> stringResource(R.string.auth_err_email_registered)
+    AuthError.WeakPassword -> stringResource(R.string.auth_err_weak_password)
+    AuthError.InvalidEmail -> stringResource(R.string.auth_err_invalid_email)
+    AuthError.RateLimited -> stringResource(R.string.auth_err_rate_limited)
+    AuthError.UserIdTaken -> stringResource(R.string.auth_err_user_id_taken)
+    AuthError.NoNetwork -> stringResource(R.string.auth_err_no_network)
+    is AuthError.Unknown -> stringResource(R.string.auth_err_unknown)
+}

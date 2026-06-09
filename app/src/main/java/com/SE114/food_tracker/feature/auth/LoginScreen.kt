@@ -42,8 +42,8 @@ fun LoginScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.loggedIn) {
-        if (state.loggedIn) onLoginSuccess()
+    LaunchedEffect(state.authenticated) {
+        if (state.authenticated) onLoginSuccess()
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -66,7 +66,7 @@ fun LoginScreen(
                 label = stringResource(R.string.auth_login_email),
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                isError = state.errorRes != null
+                isError = state.error != null
             )
 
             AppTextField(
@@ -76,12 +76,12 @@ fun LoginScreen(
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                isError = state.errorRes != null
+                isError = state.error != null
             )
 
-            if (state.errorRes != null) {
+            state.error?.let { error ->
                 Text(
-                    text = stringResource(state.errorRes!!),
+                    text = error.asMessage(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )

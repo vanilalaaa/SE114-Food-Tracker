@@ -41,4 +41,15 @@
     <string name="auth_forgot_success">Đã gửi liên kết đặt lại. Vui lòng kiểm tra email của bạn.</string>
     <string name="auth_forgot_error">Không gửi được liên kết. Vui lòng thử lại.</string>
     <string name="auth_forgot_back">Quay lại đăng nhập</string>
+
+    <!-- Auth errors -->
+    <string name="auth_err_invalid_credentials">Email hoặc mật khẩu không đúng</string>
+    <string name="auth_err_email_not_confirmed">Email chưa được xác nhận. Vui lòng kiểm tra hộp thư của bạn.</string>
+    <string name="auth_err_email_registered">Email đã được đăng ký</string>
+    <string name="auth_err_weak_password">Mật khẩu quá yếu — cần ít nhất 6 ký tự</string>
+    <string name="auth_err_invalid_email">Email không hợp lệ</string>
+    <string name="auth_err_rate_limited">Bạn thao tác quá nhanh. Vui lòng thử lại sau giây lát.</string>
+    <string name="auth_err_user_id_taken">User ID đã tồn tại</string>
+    <string name="auth_err_no_network">Không có kết nối mạng. Vui lòng kiểm tra Internet và thử lại.</string>
+    <string name="auth_err_unknown">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
 </resources>

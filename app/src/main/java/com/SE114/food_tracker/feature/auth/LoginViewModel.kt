@@ -1,10 +1,11 @@
 package com.SE114.food_tracker.feature.auth
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.sync.SyncManager
+import com.SE114.food_tracker.data.repository.AuthError
+import com.SE114.food_tracker.data.repository.AuthOutcome
+import com.SE114.food_tracker.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,8 +18,8 @@ data class LoginUiState(
     val email: String = "",
     val password: String = "",
     val isLoading: Boolean = false,
-    @StringRes val errorRes: Int? = null,
-    val loggedIn: Boolean = false
+    val error: AuthError? = null,
+    val authenticated: Boolean = false
 ) {
     val canSubmit: Boolean get() = email.isNotBlank() && password.isNotBlank() && !isLoading
 }
@@ -32,22 +33,22 @@ class LoginViewModel @Inject constructor(
     private val _state = MutableStateFlow(LoginUiState())
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
-    fun onEmailChange(value: String) = _state.update { it.copy(email = value, errorRes = null) }
-    fun onPasswordChange(value: String) = _state.update { it.copy(password = value, errorRes = null) }
+    fun onEmailChange(value: String) = _state.update { it.copy(email = value, error = null) }
+    fun onPasswordChange(value: String) = _state.update { it.copy(password = value, error = null) }
 
     fun submit() {
         val current = _state.value
         if (!current.canSubmit) return
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, errorRes = null) }
-            authRepository.signIn(current.email.trim(), current.password)
-                .onSuccess {
+            _state.update { it.copy(isLoading = true, error = null) }
+            when (val outcome = authRepository.signIn(current.email.trim(), current.password)) {
+                is AuthOutcome.Success -> {
                     syncManager.startInitialSync()
-                    _state.update { it.copy(isLoading = false, loggedIn = true) }
+                    _state.update { it.copy(isLoading = false, authenticated = true) }
                 }
-                .onFailure {
-                    _state.update { it.copy(isLoading = false, errorRes = R.string.auth_login_error) }
-                }
+                is AuthOutcome.Failure ->
+                    _state.update { it.copy(isLoading = false, error = outcome.error) }
+            }
         }
     }
 }

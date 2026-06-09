@@ -62,7 +62,7 @@ fun ForgotPasswordScreen(
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 enabled = !state.sent,
-                isError = state.errorRes != null
+                isError = state.error != null
             )
 
             if (state.sent) {
@@ -73,9 +73,9 @@ fun ForgotPasswordScreen(
                 )
             }
 
-            if (state.errorRes != null) {
+            state.error?.let { error ->
                 Text(
-                    text = stringResource(state.errorRes!!),
+                    text = error.asMessage(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )

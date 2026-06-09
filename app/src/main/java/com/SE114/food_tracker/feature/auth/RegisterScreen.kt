@@ -6,19 +6,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,23 +45,6 @@ fun RegisterScreen(
         if (state.registered) onRegisterSuccess()
     }
 
-    val userIdIsError = state.userIdStatus == UserIdStatus.Invalid ||
-        state.userIdStatus == UserIdStatus.Taken ||
-        state.userIdStatus == UserIdStatus.Error
-
-    val userIdHelper = when (state.userIdStatus) {
-        UserIdStatus.Idle -> stringResource(R.string.auth_register_user_id_helper)
-        UserIdStatus.Checking -> stringResource(R.string.auth_register_user_id_checking)
-        UserIdStatus.Available -> stringResource(R.string.auth_register_user_id_available)
-        else -> null
-    }
-    val userIdError = when (state.userIdStatus) {
-        UserIdStatus.Invalid -> stringResource(R.string.auth_register_user_id_invalid)
-        UserIdStatus.Taken -> stringResource(R.string.auth_register_user_id_taken)
-        UserIdStatus.Error -> stringResource(R.string.auth_register_user_id_error)
-        else -> null
-    }
-
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
@@ -98,17 +75,6 @@ fun RegisterScreen(
             )
 
             AppTextField(
-                value = state.userId,
-                onValueChange = viewModel::onUserIdChange,
-                label = stringResource(R.string.auth_register_user_id),
-                leadingIcon = Icons.Outlined.AlternateEmail,
-                isError = userIdIsError,
-                errorText = userIdError,
-                supportingText = userIdHelper,
-                trailing = { UserIdStatusIcon(state.userIdStatus) }
-            )
-
-            AppTextField(
                 value = state.password,
                 onValueChange = viewModel::onPasswordChange,
                 label = stringResource(R.string.auth_register_password),
@@ -117,9 +83,9 @@ fun RegisterScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
             )
 
-            if (state.errorRes != null) {
+            state.error?.let { error ->
                 Text(
-                    text = stringResource(state.errorRes!!),
+                    text = error.asMessage(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -145,27 +111,6 @@ fun RegisterScreen(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun UserIdStatusIcon(status: UserIdStatus) {
-    when (status) {
-        UserIdStatus.Checking -> CircularProgressIndicator(
-            modifier = Modifier.size(18.dp),
-            strokeWidth = 2.dp
-        )
-        UserIdStatus.Available -> Icon(
-            imageVector = Icons.Filled.Check,
-            contentDescription = stringResource(R.string.auth_register_user_id_available_desc),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        UserIdStatus.Taken, UserIdStatus.Invalid, UserIdStatus.Error -> Icon(
-            imageVector = Icons.Filled.Close,
-            contentDescription = stringResource(R.string.auth_register_user_id_taken_desc),
-            tint = MaterialTheme.colorScheme.error
-        )
-        UserIdStatus.Idle -> Unit
     }
 }
 
