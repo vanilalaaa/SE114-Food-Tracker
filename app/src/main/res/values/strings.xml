@@ -19,15 +19,6 @@
     <string name="auth_register_email">Email</string>
     <string name="auth_register_password">Mật khẩu</string>
     <string name="auth_register_display_name">Tên hiển thị</string>
-    <string name="auth_register_user_id">Tên đăng nhập</string>
-    <string name="auth_register_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
-    <string name="auth_register_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
-    <string name="auth_register_user_id_checking">Đang kiểm tra…</string>
-    <string name="auth_register_user_id_available">Tên đăng nhập khả dụng</string>
-    <string name="auth_register_user_id_taken">Tên đăng nhập đã được sử dụng</string>
-    <string name="auth_register_user_id_error">Không kiểm tra được, vui lòng thử lại</string>
-    <string name="auth_register_user_id_available_desc">Khả dụng</string>
-    <string name="auth_register_user_id_taken_desc">Đã được dùng</string>
     <string name="auth_register_submit">Đăng ký</string>
     <string name="auth_register_error">Đăng ký không thành công. Vui lòng thử lại.</string>
     <string name="auth_register_have_account">Đã có tài khoản?</string>
@@ -63,6 +54,12 @@
     <string name="auth_complete_user_id">User ID</string>
     <string name="auth_complete_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
     <string name="auth_complete_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
+    <string name="auth_complete_user_id_checking">Đang kiểm tra…</string>
+    <string name="auth_complete_user_id_available">User ID khả dụng</string>
+    <string name="auth_complete_user_id_taken">User ID đã được sử dụng</string>
+    <string name="auth_complete_user_id_error">Không kiểm tra được, vui lòng thử lại</string>
+    <string name="auth_complete_user_id_available_desc">Khả dụng</string>
+    <string name="auth_complete_user_id_taken_desc">Đã được dùng</string>
     <string name="auth_complete_submit">Hoàn tất</string>
 
     <!-- Google sign-in -->
