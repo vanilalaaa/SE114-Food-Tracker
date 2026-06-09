@@ -35,14 +35,14 @@ import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
+    onAuthenticated: (PostAuthDestination) -> Unit,
     onNavigateLogin: () -> Unit,
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.registered) {
-        if (state.registered) onRegisterSuccess()
+    LaunchedEffect(state.navTarget) {
+        state.navTarget?.let(onAuthenticated)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -136,6 +136,6 @@ fun RegisterScreen(
 @Composable
 private fun RegisterScreenPreview() {
     FoodTrackerTheme {
-        RegisterScreen(onRegisterSuccess = {}, onNavigateLogin = {})
+        RegisterScreen(onAuthenticated = {}, onNavigateLogin = {})
     }
 }

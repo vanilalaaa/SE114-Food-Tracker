@@ -21,7 +21,7 @@ data class RegisterUiState(
     val confirmPassword: String = "",
     val isLoading: Boolean = false,
     val error: AuthError? = null,
-    val registered: Boolean = false
+    val navTarget: PostAuthDestination? = null
 ) {
     val passwordMismatch: Boolean get() = confirmPassword.isNotEmpty() && confirmPassword != password
 
@@ -36,6 +36,7 @@ data class RegisterUiState(
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val postAuthNavigator: PostAuthNavigator,
     private val syncManager: SyncManager
 ) : ViewModel() {
 
@@ -58,12 +59,8 @@ class RegisterViewModel @Inject constructor(
                 displayName = current.displayName.trim()
             )
             when (outcome) {
-                is AuthOutcome.Success -> {
-                    syncManager.startInitialSync()
-                    _state.update { it.copy(isLoading = false, registered = true) }
-                }
-                is AuthOutcome.Failure ->
-                    _state.update { it.copy(isLoading = false, error = outcome.error) }
+                is AuthOutcome.Success -> resolveDestination()
+                is AuthOutcome.Failure -> _state.update { it.copy(isLoading = false, error = outcome.error) }
             }
         }
     }
@@ -72,15 +69,19 @@ class RegisterViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             when (val outcome = authRepository.signInWithGoogle(idToken, rawNonce)) {
-                is AuthOutcome.Success -> {
-                    syncManager.startInitialSync()
-                    _state.update { it.copy(isLoading = false, registered = true) }
-                }
-                is AuthOutcome.Failure ->
-                    _state.update { it.copy(isLoading = false, error = outcome.error) }
+                is AuthOutcome.Success -> resolveDestination()
+                is AuthOutcome.Failure -> _state.update { it.copy(isLoading = false, error = outcome.error) }
             }
         }
     }
 
     fun onGoogleError() = _state.update { it.copy(isLoading = false, error = AuthError.Unknown(null)) }
+
+    private suspend fun resolveDestination() {
+        syncManager.startInitialSync()
+        when (val result = postAuthNavigator.resolve()) {
+            is AuthOutcome.Success -> _state.update { it.copy(isLoading = false, navTarget = result.data) }
+            is AuthOutcome.Failure -> _state.update { it.copy(isLoading = false, error = result.error) }
+        }
+    }
 }

@@ -10,6 +10,7 @@ import androidx.navigation.compose.navigation
 import com.SE114.food_tracker.feature.auth.CompleteProfileScreen
 import com.SE114.food_tracker.feature.auth.ForgotPasswordScreen
 import com.SE114.food_tracker.feature.auth.LoginScreen
+import com.SE114.food_tracker.feature.auth.PostAuthDestination
 import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
@@ -40,6 +41,11 @@ fun AppNavGraph(
         }
     }
 
+    fun navigatePostAuth(destination: PostAuthDestination) = when (destination) {
+        PostAuthDestination.Diary -> enterMain()
+        PostAuthDestination.CompleteProfile -> goToCompleteProfile()
+    }
+
     NavHost(
         navController = navController,
         startDestination = NavGraphs.AUTH,
@@ -48,7 +54,7 @@ fun AppNavGraph(
         navigation(startDestination = AppDestinations.Splash.route, route = NavGraphs.AUTH) {
             composable(AppDestinations.Splash.route) {
                 SplashScreen(
-                    onAuthenticated = ::enterMain,
+                    onResolved = ::navigatePostAuth,
                     onUnauthenticated = {
                         navController.navigate(AppDestinations.Login.route) {
                             popUpTo(AppDestinations.Splash.route) { inclusive = true }
@@ -58,14 +64,14 @@ fun AppNavGraph(
             }
             composable(AppDestinations.Login.route) {
                 LoginScreen(
-                    onLoginSuccess = ::enterMain,
+                    onAuthenticated = ::navigatePostAuth,
                     onNavigateRegister = { navController.navigate(AppDestinations.Register.route) },
                     onNavigateForgot = { navController.navigate(AppDestinations.Forgot.route) }
                 )
             }
             composable(AppDestinations.Register.route) {
                 RegisterScreen(
-                    onRegisterSuccess = ::goToCompleteProfile,
+                    onAuthenticated = ::navigatePostAuth,
                     onNavigateLogin = { navController.popBackStack() }
                 )
             }

@@ -35,15 +35,15 @@ import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onAuthenticated: (PostAuthDestination) -> Unit,
     onNavigateRegister: () -> Unit,
     onNavigateForgot: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.authenticated) {
-        if (state.authenticated) onLoginSuccess()
+    LaunchedEffect(state.navTarget) {
+        state.navTarget?.let(onAuthenticated)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -128,6 +128,6 @@ fun LoginScreen(
 @Composable
 private fun LoginScreenPreview() {
     FoodTrackerTheme {
-        LoginScreen(onLoginSuccess = {}, onNavigateRegister = {}, onNavigateForgot = {})
+        LoginScreen(onAuthenticated = {}, onNavigateRegister = {}, onNavigateForgot = {})
     }
 }

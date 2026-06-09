@@ -67,4 +67,6 @@
 
     <!-- Google sign-in -->
     <string name="auth_google_signin">Tiếp tục với Google</string>
+
+    <string name="auth_retry">Thử lại</string>
 </resources>

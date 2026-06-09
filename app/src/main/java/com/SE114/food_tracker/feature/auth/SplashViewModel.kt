@@ -3,6 +3,8 @@ package com.SE114.food_tracker.feature.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.core.sync.SyncManager
+import com.SE114.food_tracker.data.repository.AuthError
+import com.SE114.food_tracker.data.repository.AuthOutcome
 import com.SE114.food_tracker.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -15,13 +17,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
-enum class SplashDestination { Diary, Login }
-
-data class SplashUiState(val destination: SplashDestination? = null)
+data class SplashUiState(
+    val navTarget: PostAuthDestination? = null,
+    val goToLogin: Boolean = false,
+    val error: AuthError? = null
+)
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val authRepository: AuthRepository,
+    private val postAuthNavigator: PostAuthNavigator,
     private val syncManager: SyncManager
 ) : ViewModel() {
 
@@ -29,15 +34,26 @@ class SplashViewModel @Inject constructor(
     val state: StateFlow<SplashUiState> = _state.asStateFlow()
 
     init {
+        decide()
+    }
+
+    fun retry() = decide()
+
+    private fun decide() {
         viewModelScope.launch {
+            _state.update { it.copy(error = null) }
             // Show the logo while the stored session resolves, but never block longer than 1s.
             val status = withTimeoutOrNull(SPLASH_TIMEOUT_MS) {
                 authRepository.currentSessionFlow().first { it !is SessionStatus.Initializing }
             }
-            val authenticated = status is SessionStatus.Authenticated
-            if (authenticated) syncManager.startInitialSync()
-            _state.update {
-                it.copy(destination = if (authenticated) SplashDestination.Diary else SplashDestination.Login)
+            if (status is SessionStatus.Authenticated) {
+                syncManager.startInitialSync()
+                when (val result = postAuthNavigator.resolve()) {
+                    is AuthOutcome.Success -> _state.update { it.copy(navTarget = result.data) }
+                    is AuthOutcome.Failure -> _state.update { it.copy(error = result.error) }
+                }
+            } else {
+                _state.update { it.copy(goToLogin = true) }
             }
         }
     }
