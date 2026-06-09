@@ -7,6 +7,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.SE114.food_tracker.feature.auth.CompleteProfileScreen
 import com.SE114.food_tracker.feature.auth.ForgotPasswordScreen
 import com.SE114.food_tracker.feature.auth.LoginScreen
 import com.SE114.food_tracker.feature.auth.RegisterScreen
@@ -27,8 +28,14 @@ fun AppNavGraph(
     triggerDiaryAdd: Boolean = false,
     onDiaryAddHandled: () -> Unit = {}
 ) {
-    fun enterMainClearingAuth() {
+    fun enterMain() {
         navController.navigate(NavGraphs.MAIN) {
+            popUpTo(navController.graph.id) { inclusive = true }
+        }
+    }
+
+    fun goToCompleteProfile() {
+        navController.navigate(AppDestinations.CompleteProfile.route) {
             popUpTo(NavGraphs.AUTH) { inclusive = true }
         }
     }
@@ -41,7 +48,7 @@ fun AppNavGraph(
         navigation(startDestination = AppDestinations.Splash.route, route = NavGraphs.AUTH) {
             composable(AppDestinations.Splash.route) {
                 SplashScreen(
-                    onAuthenticated = ::enterMainClearingAuth,
+                    onAuthenticated = ::enterMain,
                     onUnauthenticated = {
                         navController.navigate(AppDestinations.Login.route) {
                             popUpTo(AppDestinations.Splash.route) { inclusive = true }
@@ -51,20 +58,24 @@ fun AppNavGraph(
             }
             composable(AppDestinations.Login.route) {
                 LoginScreen(
-                    onLoginSuccess = ::enterMainClearingAuth,
+                    onLoginSuccess = ::enterMain,
                     onNavigateRegister = { navController.navigate(AppDestinations.Register.route) },
                     onNavigateForgot = { navController.navigate(AppDestinations.Forgot.route) }
                 )
             }
             composable(AppDestinations.Register.route) {
                 RegisterScreen(
-                    onRegisterSuccess = ::enterMainClearingAuth,
+                    onRegisterSuccess = ::goToCompleteProfile,
                     onNavigateLogin = { navController.popBackStack() }
                 )
             }
             composable(AppDestinations.Forgot.route) {
                 ForgotPasswordScreen(onBack = { navController.popBackStack() })
             }
+        }
+
+        composable(AppDestinations.CompleteProfile.route) {
+            CompleteProfileScreen(onComplete = ::enterMain)
         }
 
         navigation(startDestination = AppDestinations.Diary.route, route = NavGraphs.MAIN) {

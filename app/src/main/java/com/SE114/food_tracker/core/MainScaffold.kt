@@ -33,6 +33,10 @@ private val AUTH_ROUTES = setOf(
     AppDestinations.Forgot.route
 )
 
+// complete_profile is post-auth but pre-onboarding: no bottom bar, but a dropped
+// session there should still bounce to login (so it stays out of the guard skip set).
+private val NO_BOTTOM_BAR_ROUTES = AUTH_ROUTES + AppDestinations.CompleteProfile.route
+
 @Composable
 fun MainScaffold() {
     val navController = rememberNavController()
@@ -43,7 +47,7 @@ fun MainScaffold() {
     val currentRoute = currentBackStack?.destination?.route
 
     val selectedIndex = BAR_ROUTES.indexOf(currentRoute).coerceAtLeast(0)
-    val showBottomBar = currentRoute != null && currentRoute !in AUTH_ROUTES
+    val showBottomBar = currentRoute != null && currentRoute !in NO_BOTTOM_BAR_ROUTES
 
     // FAB state lives here; DiaryScreen receives a callback to trigger the add flow
     var triggerDiaryAdd by remember { mutableStateOf(false) }

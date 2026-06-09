@@ -52,4 +52,16 @@
     <string name="auth_err_user_id_taken">User ID đã tồn tại</string>
     <string name="auth_err_no_network">Không có kết nối mạng. Vui lòng kiểm tra Internet và thử lại.</string>
     <string name="auth_err_unknown">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
+    <string name="auth_err_password_mismatch">Mật khẩu nhập lại không khớp</string>
+
+    <!-- Register confirm password -->
+    <string name="auth_register_confirm_password">Nhập lại mật khẩu</string>
+
+    <!-- Complete profile -->
+    <string name="auth_complete_title">Hoàn tất hồ sơ</string>
+    <string name="auth_complete_subtitle">Chọn một User ID để bạn bè có thể tìm thấy bạn.</string>
+    <string name="auth_complete_user_id">User ID</string>
+    <string name="auth_complete_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
+    <string name="auth_complete_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
+    <string name="auth_complete_submit">Hoàn tất</string>
 </resources>

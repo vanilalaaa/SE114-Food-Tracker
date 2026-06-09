@@ -18,12 +18,19 @@ data class RegisterUiState(
     val displayName: String = "",
     val email: String = "",
     val password: String = "",
+    val confirmPassword: String = "",
     val isLoading: Boolean = false,
     val error: AuthError? = null,
     val registered: Boolean = false
 ) {
+    val passwordMismatch: Boolean get() = confirmPassword.isNotEmpty() && confirmPassword != password
+
     val canSubmit: Boolean
-        get() = displayName.isNotBlank() && email.isNotBlank() && password.isNotBlank() && !isLoading
+        get() = displayName.isNotBlank() &&
+            email.isNotBlank() &&
+            password.isNotBlank() &&
+            confirmPassword == password &&
+            !isLoading
 }
 
 @HiltViewModel
@@ -38,6 +45,7 @@ class RegisterViewModel @Inject constructor(
     fun onDisplayNameChange(value: String) = _state.update { it.copy(displayName = value, error = null) }
     fun onEmailChange(value: String) = _state.update { it.copy(email = value, error = null) }
     fun onPasswordChange(value: String) = _state.update { it.copy(password = value, error = null) }
+    fun onConfirmPasswordChange(value: String) = _state.update { it.copy(confirmPassword = value, error = null) }
 
     fun submit() {
         val current = _state.value

@@ -83,6 +83,17 @@ fun RegisterScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
             )
 
+            AppTextField(
+                value = state.confirmPassword,
+                onValueChange = viewModel::onConfirmPasswordChange,
+                label = stringResource(R.string.auth_register_confirm_password),
+                leadingIcon = Icons.Outlined.Lock,
+                isPassword = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                isError = state.passwordMismatch,
+                errorText = stringResource(R.string.auth_err_password_mismatch)
+            )
+
             state.error?.let { error ->
                 Text(
                     text = error.asMessage(),
