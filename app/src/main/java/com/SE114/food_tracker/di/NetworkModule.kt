@@ -1,6 +1,8 @@
 package com.SE114.food_tracker.di
 
 import com.SE114.food_tracker.BuildConfig
+import com.SE114.food_tracker.core.network.NetworkMonitor
+import com.SE114.food_tracker.core.network.NetworkMonitorImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,4 +34,8 @@ object NetworkModule {
             install(Realtime)
             install(Storage)
         }
+
+    @Provides
+    @Singleton
+    fun provideNetworkMonitor(impl: NetworkMonitorImpl): NetworkMonitor = impl
 }

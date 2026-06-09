@@ -2,13 +2,22 @@ package com.SE114.food_tracker.core.navigation
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
+import com.SE114.food_tracker.feature.auth.ForgotPasswordScreen
+import com.SE114.food_tracker.feature.auth.LoginScreen
+import com.SE114.food_tracker.feature.auth.RegisterScreen
+import com.SE114.food_tracker.feature.auth.SplashScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
 import com.SE114.food_tracker.feature.stats.StatisticsScreen
+
+object NavGraphs {
+    const val AUTH = "auth_graph"
+    const val MAIN = "main_graph"
+}
 
 @Composable
 fun AppNavGraph(
@@ -18,20 +27,57 @@ fun AppNavGraph(
     triggerDiaryAdd: Boolean = false,
     onDiaryAddHandled: () -> Unit = {}
 ) {
-    NavHost(
-        navController    = navController,
-        startDestination = AppDestinations.Diary.route,
-        modifier         = modifier
-    ) {
-        composable(AppDestinations.Diary.route) {
-            DiaryScreen(
-                triggerAdd     = triggerDiaryAdd,
-                onAddTriggered = onDiaryAddHandled
-            )
+    fun enterMainClearingAuth() {
+        navController.navigate(NavGraphs.MAIN) {
+            popUpTo(NavGraphs.AUTH) { inclusive = true }
         }
-        composable(AppDestinations.Stats.route)    { StatisticsScreen() }
-        composable(AppDestinations.Feed.route)     { Text("TODO: Feed (TV3)") }
-        composable(AppDestinations.Chat.route)     { Text("TODO: Chat (TV4)") }
-        composable(AppDestinations.Settings.route) { Text("TODO: Settings (TV5)") }
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = NavGraphs.AUTH,
+        modifier = modifier
+    ) {
+        navigation(startDestination = AppDestinations.Splash.route, route = NavGraphs.AUTH) {
+            composable(AppDestinations.Splash.route) {
+                SplashScreen(
+                    onAuthenticated = ::enterMainClearingAuth,
+                    onUnauthenticated = {
+                        navController.navigate(AppDestinations.Login.route) {
+                            popUpTo(AppDestinations.Splash.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(AppDestinations.Login.route) {
+                LoginScreen(
+                    onLoginSuccess = ::enterMainClearingAuth,
+                    onNavigateRegister = { navController.navigate(AppDestinations.Register.route) },
+                    onNavigateForgot = { navController.navigate(AppDestinations.Forgot.route) }
+                )
+            }
+            composable(AppDestinations.Register.route) {
+                RegisterScreen(
+                    onRegisterSuccess = ::enterMainClearingAuth,
+                    onNavigateLogin = { navController.popBackStack() }
+                )
+            }
+            composable(AppDestinations.Forgot.route) {
+                ForgotPasswordScreen(onBack = { navController.popBackStack() })
+            }
+        }
+
+        navigation(startDestination = AppDestinations.Diary.route, route = NavGraphs.MAIN) {
+            composable(AppDestinations.Diary.route) {
+                DiaryScreen(
+                    triggerAdd = triggerDiaryAdd,
+                    onAddTriggered = onDiaryAddHandled
+                )
+            }
+            composable(AppDestinations.Stats.route)    { StatisticsScreen() }
+            composable(AppDestinations.Feed.route)     { Text("TODO: Feed (TV3)") }
+            composable(AppDestinations.Chat.route)     { Text("TODO: Chat (TV4)") }
+            composable(AppDestinations.Settings.route) { Text("TODO: Settings (TV5)") }
+        }
     }
 }

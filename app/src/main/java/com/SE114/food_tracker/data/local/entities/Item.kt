@@ -1,4 +1,5 @@
 package com.SE114.food_tracker.data.local.entities
+import com.SE114.food_tracker.core.sync.SyncStatus
 
 import androidx.room.*
 import java.util.UUID

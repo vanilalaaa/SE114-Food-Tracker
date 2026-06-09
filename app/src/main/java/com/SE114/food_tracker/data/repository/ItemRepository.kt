@@ -61,7 +61,7 @@ class ItemRepository @Inject constructor(
 
     suspend fun insert(item: Item) {
         val pendingItem = item.copy(
-            syncStatus = com.SE114.food_tracker.data.local.entities.SyncStatus.PENDING.name,
+            syncStatus = com.SE114.food_tracker.core.sync.SyncStatus.PENDING.name,
             updatedAt = System.currentTimeMillis()
         )
         itemDAO.insertItem(pendingItem)
