@@ -42,6 +42,19 @@ fun CompleteProfileScreen(
         if (state.completed) onComplete()
     }
 
+    CompleteProfileContent(
+        state = state,
+        onUserIdChange = viewModel::onUserIdChange,
+        onSubmit = viewModel::submit
+    )
+}
+
+@Composable
+private fun CompleteProfileContent(
+    state: CompleteProfileUiState,
+    onUserIdChange: (String) -> Unit,
+    onSubmit: () -> Unit
+) {
     val isError = state.userIdStatus == UserIdStatus.Invalid ||
         state.userIdStatus == UserIdStatus.Taken ||
         state.userIdStatus == UserIdStatus.Error
@@ -79,7 +92,7 @@ fun CompleteProfileScreen(
 
             AppTextField(
                 value = state.userId,
-                onValueChange = viewModel::onUserIdChange,
+                onValueChange = onUserIdChange,
                 label = stringResource(R.string.auth_complete_user_id),
                 leadingIcon = Icons.Outlined.AlternateEmail,
                 isError = isError,
@@ -98,7 +111,7 @@ fun CompleteProfileScreen(
 
             AppButton(
                 text = stringResource(R.string.auth_complete_submit),
-                onClick = viewModel::submit,
+                onClick = onSubmit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.canSubmit,
                 loading = state.isSubmitting
@@ -130,8 +143,12 @@ private fun UserIdStatusIcon(status: UserIdStatus) {
 
 @Preview(showBackground = true)
 @Composable
-private fun CompleteProfileScreenPreview() {
+private fun CompleteProfileContentPreview() {
     FoodTrackerTheme {
-        CompleteProfileScreen(onComplete = {})
+        CompleteProfileContent(
+            state = CompleteProfileUiState(userId = "an.nguyen", userIdStatus = UserIdStatus.Available),
+            onUserIdChange = {},
+            onSubmit = {}
+        )
     }
 }

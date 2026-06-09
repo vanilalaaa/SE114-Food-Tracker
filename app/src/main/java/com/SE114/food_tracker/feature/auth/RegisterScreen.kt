@@ -45,6 +45,36 @@ fun RegisterScreen(
         state.navTarget?.let(onAuthenticated)
     }
 
+    RegisterContent(
+        state = state,
+        onDisplayNameChange = viewModel::onDisplayNameChange,
+        onEmailChange = viewModel::onEmailChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
+        onSubmit = viewModel::submit,
+        onNavigateLogin = onNavigateLogin,
+        googleButton = {
+            GoogleSignInButton(
+                enabled = !state.isLoading,
+                onIdToken = viewModel::signInWithGoogle,
+                onError = viewModel::onGoogleError,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    )
+}
+
+@Composable
+private fun RegisterContent(
+    state: RegisterUiState,
+    onDisplayNameChange: (String) -> Unit,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onNavigateLogin: () -> Unit,
+    googleButton: @Composable () -> Unit
+) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
@@ -61,14 +91,14 @@ fun RegisterScreen(
 
             AppTextField(
                 value = state.displayName,
-                onValueChange = viewModel::onDisplayNameChange,
+                onValueChange = onDisplayNameChange,
                 label = stringResource(R.string.auth_register_display_name),
                 leadingIcon = Icons.Outlined.Person
             )
 
             AppTextField(
                 value = state.email,
-                onValueChange = viewModel::onEmailChange,
+                onValueChange = onEmailChange,
                 label = stringResource(R.string.auth_register_email),
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
@@ -76,7 +106,7 @@ fun RegisterScreen(
 
             AppTextField(
                 value = state.password,
-                onValueChange = viewModel::onPasswordChange,
+                onValueChange = onPasswordChange,
                 label = stringResource(R.string.auth_register_password),
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
@@ -85,7 +115,7 @@ fun RegisterScreen(
 
             AppTextField(
                 value = state.confirmPassword,
-                onValueChange = viewModel::onConfirmPasswordChange,
+                onValueChange = onConfirmPasswordChange,
                 label = stringResource(R.string.auth_register_confirm_password),
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
@@ -104,18 +134,13 @@ fun RegisterScreen(
 
             AppButton(
                 text = stringResource(R.string.auth_register_submit),
-                onClick = viewModel::submit,
+                onClick = onSubmit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.canSubmit,
                 loading = state.isLoading
             )
 
-            GoogleSignInButton(
-                enabled = !state.isLoading,
-                onIdToken = viewModel::signInWithGoogle,
-                onError = viewModel::onGoogleError,
-                modifier = Modifier.fillMaxWidth()
-            )
+            googleButton()
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -134,8 +159,24 @@ fun RegisterScreen(
 
 @Preview(showBackground = true)
 @Composable
-private fun RegisterScreenPreview() {
+private fun RegisterContentPreview() {
     FoodTrackerTheme {
-        RegisterScreen(onAuthenticated = {}, onNavigateLogin = {})
+        RegisterContent(
+            state = RegisterUiState(displayName = "An Nguyễn", email = "an@example.com"),
+            onDisplayNameChange = {},
+            onEmailChange = {},
+            onPasswordChange = {},
+            onConfirmPasswordChange = {},
+            onSubmit = {},
+            onNavigateLogin = {},
+            googleButton = {
+                AppButton(
+                    text = stringResource(R.string.auth_google_signin),
+                    onClick = {},
+                    variant = AppButtonVariant.Secondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        )
     }
 }

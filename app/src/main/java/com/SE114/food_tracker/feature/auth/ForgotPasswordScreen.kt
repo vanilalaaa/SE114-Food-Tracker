@@ -36,6 +36,21 @@ fun ForgotPasswordScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    ForgotPasswordContent(
+        state = state,
+        onEmailChange = viewModel::onEmailChange,
+        onSubmit = viewModel::submit,
+        onBack = onBack
+    )
+}
+
+@Composable
+private fun ForgotPasswordContent(
+    state: ForgotPasswordUiState,
+    onEmailChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onBack: () -> Unit
+) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
@@ -57,7 +72,7 @@ fun ForgotPasswordScreen(
 
             AppTextField(
                 value = state.email,
-                onValueChange = viewModel::onEmailChange,
+                onValueChange = onEmailChange,
                 label = stringResource(R.string.auth_forgot_email),
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -83,7 +98,7 @@ fun ForgotPasswordScreen(
 
             AppButton(
                 text = stringResource(R.string.auth_forgot_submit),
-                onClick = viewModel::submit,
+                onClick = onSubmit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.canSubmit,
                 loading = state.isLoading
@@ -101,8 +116,13 @@ fun ForgotPasswordScreen(
 
 @Preview(showBackground = true)
 @Composable
-private fun ForgotPasswordScreenPreview() {
+private fun ForgotPasswordContentPreview() {
     FoodTrackerTheme {
-        ForgotPasswordScreen(onBack = {})
+        ForgotPasswordContent(
+            state = ForgotPasswordUiState(email = "an@example.com", sent = true),
+            onEmailChange = {},
+            onSubmit = {},
+            onBack = {}
+        )
     }
 }

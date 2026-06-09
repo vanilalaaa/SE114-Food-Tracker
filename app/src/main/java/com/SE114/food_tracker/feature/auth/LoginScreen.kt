@@ -32,6 +32,7 @@ import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
 import com.SE114.food_tracker.core.designsystem.components.AppTextField
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
+import com.SE114.food_tracker.data.repository.AuthError
 
 @Composable
 fun LoginScreen(
@@ -46,6 +47,34 @@ fun LoginScreen(
         state.navTarget?.let(onAuthenticated)
     }
 
+    LoginContent(
+        state = state,
+        onEmailChange = viewModel::onEmailChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onSubmit = viewModel::submit,
+        onNavigateRegister = onNavigateRegister,
+        onNavigateForgot = onNavigateForgot,
+        googleButton = {
+            GoogleSignInButton(
+                enabled = !state.isLoading,
+                onIdToken = viewModel::signInWithGoogle,
+                onError = viewModel::onGoogleError,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    )
+}
+
+@Composable
+private fun LoginContent(
+    state: LoginUiState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onNavigateRegister: () -> Unit,
+    onNavigateForgot: () -> Unit,
+    googleButton: @Composable () -> Unit
+) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
@@ -62,7 +91,7 @@ fun LoginScreen(
 
             AppTextField(
                 value = state.email,
-                onValueChange = viewModel::onEmailChange,
+                onValueChange = onEmailChange,
                 label = stringResource(R.string.auth_login_email),
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -71,7 +100,7 @@ fun LoginScreen(
 
             AppTextField(
                 value = state.password,
-                onValueChange = viewModel::onPasswordChange,
+                onValueChange = onPasswordChange,
                 label = stringResource(R.string.auth_login_password),
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
@@ -89,18 +118,13 @@ fun LoginScreen(
 
             AppButton(
                 text = stringResource(R.string.auth_login_submit),
-                onClick = viewModel::submit,
+                onClick = onSubmit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.canSubmit,
                 loading = state.isLoading
             )
 
-            GoogleSignInButton(
-                enabled = !state.isLoading,
-                onIdToken = viewModel::signInWithGoogle,
-                onError = viewModel::onGoogleError,
-                modifier = Modifier.fillMaxWidth()
-            )
+            googleButton()
 
             TextButton(
                 onClick = onNavigateForgot,
@@ -126,8 +150,23 @@ fun LoginScreen(
 
 @Preview(showBackground = true)
 @Composable
-private fun LoginScreenPreview() {
+private fun LoginContentPreview() {
     FoodTrackerTheme {
-        LoginScreen(onAuthenticated = {}, onNavigateRegister = {}, onNavigateForgot = {})
+        LoginContent(
+            state = LoginUiState(email = "an@example.com", error = AuthError.InvalidCredentials),
+            onEmailChange = {},
+            onPasswordChange = {},
+            onSubmit = {},
+            onNavigateRegister = {},
+            onNavigateForgot = {},
+            googleButton = {
+                AppButton(
+                    text = stringResource(R.string.auth_google_signin),
+                    onClick = {},
+                    variant = AppButtonVariant.Secondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        )
     }
 }

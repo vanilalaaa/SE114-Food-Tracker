@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
+import com.SE114.food_tracker.data.repository.AuthError
 
 @Composable
 fun SplashScreen(
@@ -42,6 +43,14 @@ fun SplashScreen(
         if (state.goToLogin) onUnauthenticated()
     }
 
+    SplashContent(state = state, onRetry = viewModel::retry)
+}
+
+@Composable
+private fun SplashContent(
+    state: SplashUiState,
+    onRetry: () -> Unit
+) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
@@ -79,7 +88,7 @@ fun SplashScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 40.dp, bottom = 16.dp)
                 )
-                AppButton(text = stringResource(R.string.auth_retry), onClick = viewModel::retry)
+                AppButton(text = stringResource(R.string.auth_retry), onClick = onRetry)
             }
         }
     }
@@ -87,8 +96,11 @@ fun SplashScreen(
 
 @Preview(showBackground = true)
 @Composable
-private fun SplashScreenPreview() {
+private fun SplashContentPreview() {
     FoodTrackerTheme {
-        SplashScreen(onResolved = {}, onUnauthenticated = {})
+        SplashContent(
+            state = SplashUiState(error = AuthError.NoNetwork),
+            onRetry = {}
+        )
     }
 }
