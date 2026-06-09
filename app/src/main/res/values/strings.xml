@@ -64,4 +64,7 @@
     <string name="auth_complete_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
     <string name="auth_complete_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
     <string name="auth_complete_submit">Hoàn tất</string>
+
+    <!-- Google sign-in -->
+    <string name="auth_google_signin">Tiếp tục với Google</string>
 </resources>

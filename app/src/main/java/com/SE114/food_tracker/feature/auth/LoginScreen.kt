@@ -95,6 +95,13 @@ fun LoginScreen(
                 loading = state.isLoading
             )
 
+            GoogleSignInButton(
+                enabled = !state.isLoading,
+                onIdToken = viewModel::signInWithGoogle,
+                onError = viewModel::onGoogleError,
+                modifier = Modifier.fillMaxWidth()
+            )
+
             TextButton(
                 onClick = onNavigateForgot,
                 modifier = Modifier.align(Alignment.End)

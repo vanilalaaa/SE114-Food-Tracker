@@ -67,4 +67,20 @@ class RegisterViewModel @Inject constructor(
             }
         }
     }
+
+    fun signInWithGoogle(idToken: String, rawNonce: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            when (val outcome = authRepository.signInWithGoogle(idToken, rawNonce)) {
+                is AuthOutcome.Success -> {
+                    syncManager.startInitialSync()
+                    _state.update { it.copy(isLoading = false, registered = true) }
+                }
+                is AuthOutcome.Failure ->
+                    _state.update { it.copy(isLoading = false, error = outcome.error) }
+            }
+        }
+    }
+
+    fun onGoogleError() = _state.update { it.copy(isLoading = false, error = AuthError.Unknown(null)) }
 }

@@ -2,7 +2,9 @@ package com.SE114.food_tracker.data.repository
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -38,6 +40,14 @@ class SupabaseAuthRepository @Inject constructor(
             }
             Unit
         }
+
+    override suspend fun signInWithGoogle(idToken: String, rawNonce: String): AuthOutcome<Unit> = runAuth {
+        auth.signInWith(IDToken) {
+            this.idToken = idToken
+            provider = Google
+            nonce = rawNonce
+        }
+    }
 
     override suspend fun sendPasswordReset(email: String): AuthOutcome<Unit> = runAuth {
         auth.resetPasswordForEmail(email)
