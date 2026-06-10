@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.diary
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,13 +37,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage // <-- BỔ SUNG THƯ VIỆN COIL
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
@@ -56,11 +58,10 @@ import kotlinx.datetime.toLocalDateTime
 fun FoodEntryScreen(
     existingItem: DiaryItem? = null,
     categories: List<DiaryCategory> = emptyList(),
+    pendingImageUri: Uri? = null,
     onDismiss: () -> Unit,
     onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int) -> Unit,
     onDelete: ((String) -> Unit)? = null,
-    // GAP: onManageCategories is wired here so DiaryScreen can open a category
-    // management sheet. Not implemented yet — TODO in Sprint 2.
     onManageCategories: () -> Unit = {}
 ) {
     var foodName by remember(existingItem?.itemId) { mutableStateOf(existingItem?.name.orEmpty()) }
@@ -69,15 +70,7 @@ fun FoodEntryScreen(
     }
     var note by remember(existingItem?.itemId) { mutableStateOf(existingItem?.note.orEmpty()) }
 
-//    var selectedCategoryId by remember(existingItem?.itemId, categories) {
-//        mutableStateOf(
-//            existingItem?.categoryId
-//                ?: categories.firstOrNull()?.categoryId
-//                ?: ""
-//        )
-//    }
     var selectedCategoryId by remember(existingItem?.itemId, categories) {
-        // Tạo danh sách kết hợp phòng hờ giống hệt bên Selector
         val fallbackCategories = categories.ifEmpty {
             listOf(DiaryCategory("mock-1", "Cơm", "🍚", isSystem = true))
         }
@@ -95,17 +88,11 @@ fun FoodEntryScreen(
     var categoryError by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // Polish 1: show a real clock time rather than "15:20".
-    // For a new entry we use the current system time; for an edit we keep the same
-    // display (the item entity stores entryDate as a date-only epoch, not a time-of-day,
-    // so we still fall back to now — a proper TimePicker is TODO Sprint 2).
     val displayTime = remember(existingItem?.itemId) {
         val now = kotlinx.datetime.Clock.System.now()
         val localDateTime = now.toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault())
-
         val hourStr = localDateTime.hour.toString().padStart(2, '0')
         val minuteStr = localDateTime.minute.toString().padStart(2, '0')
-
         "$hourStr:$minuteStr"
     }
 
@@ -186,19 +173,31 @@ fun FoodEntryScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // POLISH: placeholder circle for food image — TODO Sprint 2: replace with
-        // AsyncImage (Coil) showing the picked/captured image URI or existingItem.imageUrl.
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Surface(
                 modifier = Modifier.size(140.dp),
                 shape = RoundedCornerShape(70.dp),
                 color = Color(0xFFFFE9DD)
             ) {
-                Text(
-                    text = "🍱",
-                    fontSize = 54.sp,
-                    modifier = Modifier.wrapContentSize()
-                )
+                // Thứ tự ưu tiên: 1. Ảnh mới chụp/chọn -> 2. Ảnh cũ từ mạng -> 3. Không có gì (Null)
+                val imageSource = pendingImageUri ?: existingItem?.imageUrl
+
+                if (imageSource != null) {
+                    AsyncImage(
+                        model = imageSource,
+                        contentDescription = "Ảnh món ăn",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(70.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = "🍱",
+                        fontSize = 54.sp,
+                        modifier = Modifier.wrapContentSize()
+                    )
+                }
             }
         }
 
@@ -227,8 +226,6 @@ fun FoodEntryScreen(
         )
         FieldError(priceError)
 
-        // GAP: onManageClick and onAddClick both route to onManageCategories —
-        //   a full management sheet (CategoryRowItem list + add form) is TODO Sprint 2.
         CategorySelector(
             categories = categories,
             selectedCategoryId = selectedCategoryId,
@@ -248,7 +245,6 @@ fun FoodEntryScreen(
             TimeTypeButton(label = "Trưa/Chiều", selected = timeType == 1, onClick = { timeType = 1 })
             TimeTypeButton(label = "Tối",        selected = timeType == 2, onClick = { timeType = 2 })
         }
-        // TODO Sprint 2: replace with a real TimePickerDialog.
         TimeSelector(time = displayTime, session = timeType.toSessionLabel(), onTimeClick = { })
 
         Spacer(Modifier.height(16.dp))
@@ -340,9 +336,6 @@ fun Int.toSessionLabel(): String =
 @Preview(showSystemUi = true, device = "spec:width=411dp,height=891dp")
 @Composable
 fun FoodEntryScreenPreview() {
-    // Preview uses a hardcoded category list so CategorySelector renders correctly
-    // without a real DB. This does NOT affect runtime — at runtime DiaryScreen
-    // passes the live list from CategoryViewModel.
     val previewCategories = listOf(
         DiaryCategory("preview-1", "Cơm",       "🍚", isSystem = true),
         DiaryCategory("preview-2", "Mì & Phở",  "🍜", isSystem = true),
