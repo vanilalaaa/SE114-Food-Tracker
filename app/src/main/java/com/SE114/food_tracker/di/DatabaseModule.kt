@@ -6,6 +6,7 @@ import androidx.room.RoomDatabase
 import com.SE114.food_tracker.data.local.AppDatabase
 import com.SE114.food_tracker.data.local.dao.BudgetDAO
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
+import com.SE114.food_tracker.data.local.dao.ChatDAO
 import com.SE114.food_tracker.data.local.dao.ItemDAO
 import dagger.Module
 import dagger.Provides
@@ -50,4 +51,7 @@ object DatabaseModule {
 
     @Provides @Singleton
     fun provideBudgetDao(db: AppDatabase): BudgetDAO = db.budgetDAO()
+
+    @Provides @Singleton
+    fun provideChatDao(db: AppDatabase): ChatDAO = db.chatDAO()
 }

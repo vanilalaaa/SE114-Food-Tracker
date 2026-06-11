@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.feature.chat
 
-import androidx.compose.foundation.background
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,41 +17,68 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.SE114.food_tracker.core.designsystem.theme.*
-import com.SE114.food_tracker.data.local.entities.MessageSyncStatus
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+// --- CHAT SCREEN CHÍNH (DÙNG KHI CHẠY APP THẬT - LIÊN KẾT VIEWMODEL) ---
 @Composable
 fun ChatScreen(
     conversationId: String,
-    conversationName: String = "Azun (Data)",
+    conversationName: String,
+    viewModel: ChatViewModel = viewModel(),
     onBackClick: () -> Unit = {}
 ) {
-    val myId = "vy_id"
-    var messageList by remember {
-        mutableStateOf(
-            listOf(
-                MessageUiModel(senderId = "azun_id", body = "Ăn bún bò Huế đi", imageUrl = null, timeLabel = "10:12 PM", dateLabel = "07/06/2026"),
-                MessageUiModel(senderId = "system", body = "Vy đã nộp 100k vào quỹ nhóm", imageUrl = null, isSystem = true, timeLabel = "10:13 PM", dateLabel = "07/06/2026"),
+    val myId = viewModel.currentUserId
 
-                MessageUiModel(senderId = "vy_id", body = "Oki lên kèo. Ăn chỗ này đi", imageUrl = null, timeLabel = "10:15 PM", dateLabel = "Hôm nay"),
-                MessageUiModel(senderId = "vy_id", body = null, imageUrl = "MOCK_URL_IMAGE", syncStatus = MessageSyncStatus.SENT, timeLabel = "10:15 PM", dateLabel = "Hôm nay"),
-                MessageUiModel(senderId = "vy_id", body = "Ủa cái ảnh này gửi lên chưa ta?", imageUrl = null, syncStatus = MessageSyncStatus.PENDING, timeLabel = "10:16 PM", dateLabel = "Hôm nay"),
-                MessageUiModel(senderId = "vy_id", body = "Tin nhắn này bị lỗi mạng rồi nè", imageUrl = null, syncStatus = MessageSyncStatus.FAILED, timeLabel = "10:17 PM", dateLabel = "Hôm nay")
-            ).reversed() // Đảo ngược mảng để tin mới nhất nằm dưới đáy
-        )
-    }
+    // Đọc luồng dữ liệu thật realtime từ Room DB thông qua Flow
+    val messageList by viewModel.getMessagesState(conversationId)
+        .collectAsState(initial = emptyList())
 
+    // Chuyển tiếp dữ liệu và sự kiện xuống hàm xử lý giao diện thuần
+    ChatScreenContent(
+        conversationName = conversationName,
+        messageList = messageList,
+        myId = myId,
+        onBackClick = onBackClick,
+        onSendMessage = { text -> viewModel.sendTextMessage(conversationId, text) },
+        onSendImage = { uri -> viewModel.sendImageMessage(conversationId, uri) },
+        onRetryMessage = { rawMsg -> viewModel.retryFailedMessage(rawMsg) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatScreenContent(
+    conversationName: String,
+    messageList: List<MessageUiModel>,
+    myId: String,
+    onBackClick: () -> Unit,
+    onSendMessage: (String) -> Unit,
+    onSendImage: (String) -> Unit,
+    onRetryMessage: (com.SE114.food_tracker.data.local.entities.Message) -> Unit,
+    modifier: Modifier = Modifier
+) {
     var textInput by remember { mutableStateOf("") }
+
+    // Bộ phóng mở Gallery thật của hệ điều hành lấy Uri ảnh thật
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { onSendImage(it.toString()) }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text(text = conversationName, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = conversationName,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         Text(text = "Đang trực tuyến", fontSize = 11.sp, color = Color(0xFF4CAF50))
                     }
                 },
@@ -62,46 +90,38 @@ fun ChatScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
             )
         },
-        containerColor = MainBackground
+        containerColor = MainBackground,
+        modifier = modifier
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 1. Vùng hiển thị nội dung tin nhắn kèm dòng phân cách ngày tháng động
+            // 1. Vùng hiển thị nội dung danh sách tin nhắn
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                reverseLayout = true, // Đảo ngược layout
+                reverseLayout = true,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp, top = 16.dp)
             ) {
-                // Duyệt danh sách theo index để xử lý logic so sánh ngày giữa các phần tử liền kề
                 items(messageList.size, key = { messageList[it].localId }) { index ->
                     val message = messageList[index]
 
-                    // Vẽ bong bóng chat bình thường
                     MessageBubble(
                         message = message,
                         isMine = message.senderId == myId,
                         onRetryClick = {
-                            messageList = messageList.map {
-                                if (it.localId == message.localId) it.copy(syncStatus = MessageSyncStatus.PENDING) else it
-                            }
+                            message.rawEntity?.let { onRetryMessage(it) }
                         }
                     )
 
-                    // LOGIC TỰ ĐỘNG CHÈN DÒNG PHÂN CÁCH NGÀY THÁNG:
-                    // Vì danh sách reverse nên phần tử phía sau trong mảng (index + 1) thực chất lại là tin nhắn cũ hơn
                     val hasOlderMessage = index + 1 < messageList.size
                     val olderMessage = if (hasOlderMessage) messageList[index + 1] else null
 
-                    // Điều kiện hiện dòng ngày:
-                    // Nếu nó là tin nhắn đầu tiên của cuộc trò chuyện (olderMessage == null)
-                    // HOẶC ngày của tin nhắn hiện tại khác hoàn toàn với ngày của tin nhắn cũ hơn trước đó
                     if (olderMessage == null || message.dateLabel != olderMessage.dateLabel) {
                         Box(
                             modifier = Modifier
@@ -134,15 +154,7 @@ fun ChatScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = {
-                        val newImageMessage = MessageUiModel(
-                            senderId = myId,
-                            body = null,
-                            imageUrl = "LOCAL_GALLERY_URI",
-                            syncStatus = MessageSyncStatus.PENDING,
-                            timeLabel = "Vừa xong",
-                            dateLabel = "Hôm nay"
-                        )
-                        messageList = listOf(newImageMessage) + messageList
+                        imagePickerLauncher.launch("image/*")
                     }) {
                         Text("🖼️", fontSize = 22.sp)
                     }
@@ -167,15 +179,7 @@ fun ChatScreen(
                     IconButton(
                         onClick = {
                             if (textInput.isNotBlank()) {
-                                val newMsg = MessageUiModel(
-                                    senderId = myId,
-                                    body = textInput,
-                                    imageUrl = null,
-                                    syncStatus = MessageSyncStatus.PENDING,
-                                    timeLabel = "Vừa xong",
-                                    dateLabel = "Hôm nay"
-                                )
-                                messageList = listOf(newMsg) + messageList
+                                onSendMessage(textInput)
                                 textInput = ""
                             }
                         },
@@ -197,6 +201,27 @@ fun ChatScreen(
 @Composable
 fun ChatScreenPreview() {
     FoodTrackerTheme {
-        ChatScreen(conversationId = "1")
+        ChatScreenContent(
+            conversationName = "Azun (Data)",
+            myId = "vy_id",
+            messageList = listOf(
+                MessageUiModel(
+                    senderId = "azun_id",
+                    body = "Ăn bún bò Huế đi",
+                    imageUrl = null,
+                    dateLabel = "Hôm nay"
+                ),
+                MessageUiModel(
+                    senderId = "vy_id",
+                    body = "Oki chốt kèo luôn nha!",
+                    imageUrl = null,
+                    dateLabel = "Hôm nay"
+                )
+            ).reversed(),
+            onBackClick = {},
+            onSendMessage = {},
+            onSendImage = {},
+            onRetryMessage = {}
+        )
     }
 }

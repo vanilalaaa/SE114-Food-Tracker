@@ -32,8 +32,16 @@ fun LocalDonutChartCard(
         shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(text = title, style = StatSectionTitleStyle, color = TextPrimaryStat, fontSize = 14.sp)
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = title,
+                style = StatSectionTitleStyle,
+                color = TextPrimaryStat,
+                fontSize = 14.sp
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -59,9 +67,17 @@ fun LocalDonutChartCard(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     categories.forEach { segment ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(12.dp).background(segment.color, RoundedCornerShape(3.dp)))
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(segment.color, RoundedCornerShape(3.dp))
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "${segment.label} (${(segment.value/total*100).toInt()}%)", fontSize = 12.sp, color = TextLabelGray)
+                            Text(
+                                text = "${segment.label} (${(segment.value / total * 100).toInt()}%)",
+                                fontSize = 12.sp,
+                                color = TextLabelGray
+                            )
                         }
                     }
                 }
