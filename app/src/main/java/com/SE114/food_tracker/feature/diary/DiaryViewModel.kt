@@ -3,6 +3,8 @@ package com.SE114.food_tracker.feature.diary
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -180,7 +182,7 @@ class DiaryViewModel @Inject constructor(
                     context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 } ?: return@launch
 
-                _pendingImageBytes = compressToJpeg(rawBytes, maxBytes = 1_024 * 1_024)
+                _pendingImageBytes = compressToJpeg(rawBytes, uri, maxBytes = 1_024 * 1_024)
                 Timber.d("[DiaryVM] Ảnh đã chuẩn bị xong: ${_pendingImageBytes?.size?.div(1024)} KB")
             }.onFailure { e ->
                 Timber.e(e, "[DiaryVM] Lỗi đọc/nén ảnh")
@@ -327,11 +329,46 @@ class DiaryViewModel @Inject constructor(
         return streak
     }
 
-    private suspend fun compressToJpeg(rawBytes: ByteArray, maxBytes: Int): ByteArray =
+    private suspend fun compressToJpeg(rawBytes: ByteArray, uri: Uri, maxBytes: Int): ByteArray =
         withContext(Dispatchers.Default) {
-            val bitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size)
+            // 1. Giải mã mảng bytes thành Bitmap gốc
+            var bitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size)
                 ?: return@withContext rawBytes
 
+            // 2. Đọc thông tin EXIF trực tiếp từ URI để kiểm tra hướng xoay
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val exif = ExifInterface(inputStream)
+                    val orientation = exif.getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL
+                    )
+
+                    // Tính toán góc cần xoay lại
+                    val degrees = when (orientation) {
+                        ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                        ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                        ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                        else -> 0f
+                    }
+
+                    // Nếu có góc xoay, thực hiện xoay lại Bitmap
+                    if (degrees != 0f) {
+                        val matrix = Matrix().apply { postRotate(degrees) }
+                        val rotatedBitmap = Bitmap.createBitmap(
+                            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+                        )
+                        if (rotatedBitmap != bitmap) {
+                            bitmap.recycle() // Giải phóng bộ nhớ của bitmap cũ
+                            bitmap = rotatedBitmap
+                        }
+                    }
+                }
+            }.onFailure { t ->
+                Timber.e(t, "[DiaryVM] Lỗi đọc thông tin góc xoay EXIF")
+            }
+
+            // 3. Tiến hành nén ảnh theo chu kỳ giảm chất lượng như cũ
             for (quality in listOf(80, 60, 40)) {
                 val out = ByteArrayOutputStream()
                 bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)

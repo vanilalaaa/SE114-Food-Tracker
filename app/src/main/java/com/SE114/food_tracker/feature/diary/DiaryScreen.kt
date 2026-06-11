@@ -35,6 +35,7 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.core.designsystem.components.DiaryTopBar
+import com.SE114.food_tracker.core.designsystem.components.DraggableFoodItem
 import com.SE114.food_tracker.core.designsystem.components.NutritionCard
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
@@ -156,7 +157,14 @@ fun DiaryScreenContent(
             onMonthClick = { datePickerDialog.show() }
         )
         NutritionCard(
-            onMenuClick  = { }
+            onMenuClick = { },
+            items = uiState.items.map { item ->
+                DraggableFoodItem(
+                    id       = item.itemId,
+                    imageUrl = item.imageUrl,
+                    emoji    = item.categoryIconUrl.ifBlank { "🍱" }
+                )
+            }
         )
         Spacer(modifier = Modifier.height(16.dp))
         CalendarCard(
