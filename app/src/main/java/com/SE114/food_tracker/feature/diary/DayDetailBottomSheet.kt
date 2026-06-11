@@ -167,12 +167,13 @@ fun DayDetailBottomSheetContent(
                         ?: item.categoryName
                     val catIcon = matchedCategory?.iconUrl ?: getEmojiByName(catName)
                     DayItem(
-                        name = item.name,
-                        category = catName,
+                        name         = item.name,
+                        category     = catName,
                         categoryIcon = catIcon,
-                        price = item.price,
-                        time = item.timeLabel.ifBlank { item.timeType.toSessionLabel() },
-                        onClick = { onEditItemClick(item) }
+                        imageUrl     = item.imageUrl,
+                        price        = item.price,
+                        time         = item.timeLabel.ifBlank { item.timeType.toSessionLabel() },
+                        onClick      = { onEditItemClick(item) }
                     )
                 }
                 Spacer(Modifier.height(12.dp))
