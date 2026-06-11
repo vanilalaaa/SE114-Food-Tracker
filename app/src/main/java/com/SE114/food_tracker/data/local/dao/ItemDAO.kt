@@ -25,6 +25,9 @@ interface ItemDAO {
     @Query("SELECT * FROM item WHERE is_deleted = 0 ORDER BY created_at DESC")
     fun getAllItems(): Flow<List<Item>>
 
+    @Query("SELECT * FROM item WHERE item_id = :id")
+    suspend fun getItemByIdOneShot(id: String): Item?
+
     @Query("SELECT * FROM item WHERE category_id = :catId AND is_deleted = 0")
     fun getItemsByCategory(catId: String): Flow<List<Item>>
 
@@ -45,8 +48,8 @@ interface ItemDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertItemsFromServer(items: List<Item>)
 
-    @Query("UPDATE item SET sync_status = 'SYNCED' WHERE item_id = :itemId")
-    suspend fun markSynced(itemId: String)
+    @Query("UPDATE item SET sync_status = 'SYNCED' WHERE item_id = :itemId AND updated_at = :uploadedUpdatedAt")
+    suspend fun markSyncedIfUnchanged(itemId: String, uploadedUpdatedAt: Long): Int
 
     @Query("UPDATE item SET sync_status = 'FAILED' WHERE item_id = :itemId")
     suspend fun markFailed(itemId: String)

@@ -51,22 +51,24 @@ fun DiaryScreen(
 ) {
     val diaryViewModel    = hiltViewModel<DiaryViewModel>()
     val categoryViewModel = hiltViewModel<CategoryViewModel>()
-    val uiState      by diaryViewModel.uiState.collectAsStateWithLifecycle()
-    val categoryState by categoryViewModel.visibleCategories.collectAsStateWithLifecycle()
+    val uiState           by diaryViewModel.uiState.collectAsStateWithLifecycle()
+    val categoryState     by categoryViewModel.visibleCategories.collectAsStateWithLifecycle()
+    val pendingImageUri   by diaryViewModel.pendingImageUri.collectAsStateWithLifecycle()
 
     val categories = categoryState.ifEmpty { uiState.categories }
 
     DiaryScreenContent(
-        uiState = uiState,
-        categories = categories,
-        triggerAdd = triggerAdd,
-        onAddTriggered = onAddTriggered,
-        onLoadDate = { diaryViewModel.loadDate(it) },
+        uiState         = uiState,
+        pendingImageUri = pendingImageUri,
+        categories      = categories,
+        triggerAdd      = triggerAdd,
+        onAddTriggered  = onAddTriggered,
+        onLoadDate      = { diaryViewModel.loadDate(it) },
         onImageSelected = { diaryViewModel.onImageSelected(it) },
-        onSaveItem = { n, p, c, r, no, t -> diaryViewModel.saveItem(n, p, c, r, no, t) },
-        onUpdateItem = { id, n, p, c, r, no, t -> diaryViewModel.updateItem(id, n, p, c, r, no, t) },
-        onDeleteItem = { diaryViewModel.deleteItem(it) },
-        onDeleteCategory = { categoryViewModel.deleteCategory(it) },
+        onSaveItem      = { n, p, c, r, no, t -> diaryViewModel.saveItem(n, p, c, r, no, t) },
+        onUpdateItem    = { id, n, p, c, r, no, t -> diaryViewModel.updateItem(id, n, p, c, r, no, t) },
+        onDeleteItem    = { diaryViewModel.deleteItem(it) },
+        onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) }
     )
 }
@@ -75,6 +77,7 @@ fun DiaryScreen(
 @Composable
 fun DiaryScreenContent(
     uiState: DiaryUiState,
+    pendingImageUri: Uri?,
     categories: List<DiaryCategory>,
     triggerAdd: Boolean,
     onAddTriggered: () -> Unit,
@@ -227,7 +230,7 @@ fun DiaryScreenContent(
         FoodEntryScreen(
             existingItem    = editingItem,
             categories      = categories,
-            pendingImageUri = uiState.pendingImageUri, // <-- TRUYỀN THÊM BIẾN NÀY VÀO ĐÂY
+            pendingImageUri = pendingImageUri,
             onDismiss       = {
                 showEntryScreen     = false
                 selectedItemForEdit = null
@@ -305,6 +308,7 @@ fun DiaryScreenPreview() {
                 totalSpend = 45000.0,
                 itemCount = 2
             ),
+            pendingImageUri = null,
             categories = listOf(
                 DiaryCategory("1", "Cơm", "🍚", isSystem = true),
                 DiaryCategory("2", "Mì & Phở", "🍜", isSystem = true)
@@ -332,7 +336,7 @@ private fun createTempImageUri(context: Context): Uri {
     }
     return FileProvider.getUriForFile(
         context,
-        "${context.packageName}.fileprovider", // Authority trùng với cấu hình Manifest
+        "${context.packageName}.fileprovider",
         tempFile
     )
 }

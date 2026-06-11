@@ -120,8 +120,18 @@ class Sync @AssistedInject constructor(
 
                 supabaseItemService.uploadItem(item, ownerId)
                     .onSuccess {
-                        itemRepository.markSynced(item.itemId)
-                        Timber.d("[Sync] ✓ item synced: ${item.name}")
+                        val markedSynced = itemRepository.markSyncedIfUnchanged(
+                            item.itemId,
+                            item.updatedAt
+                        )
+                        if (markedSynced) {
+                            Timber.d("[Sync] item synced: ${item.name}")
+                        } else {
+                            Timber.d(
+                                "[Sync] item changed while upload was running; " +
+                                        "leaving pending for next sync: ${item.name}"
+                            )
+                        }
                     }
                     .onFailure { err ->
                         Timber.e(err, "[Sync] ✗ item FAILED: ${item.name} — ${err.message}")
