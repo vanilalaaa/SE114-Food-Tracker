@@ -23,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,6 +34,10 @@ import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CalendarCard
 import com.SE114.food_tracker.feature.diary.components.CategoryRowItem
 import kotlinx.datetime.LocalDate
+import com.SE114.food_tracker.feature.diary.components.MonthYearPickerDialog
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material3.Surface
 
 @Composable
 fun DiaryScreen(
@@ -58,7 +61,8 @@ fun DiaryScreen(
         onUpdateItem = { id, n, p, c, r, no, t -> diaryViewModel.updateItem(id, n, p, c, r, no, t) },
         onDeleteItem = { diaryViewModel.deleteItem(it) },
         onDeleteCategory = { categoryViewModel.deleteCategory(it) },
-        onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) }
+        onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
+        onSelectCategoryFilter = { catId -> diaryViewModel.selectCategoryFilter(catId) }
     )
 }
 
@@ -74,16 +78,26 @@ fun DiaryScreenContent(
     onUpdateItem: (String, String, Double, String, Int, String, Int) -> Unit,
     onDeleteItem: (String) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
-    onToggleCategoryVisibility: (DiaryCategory) -> Unit
+    onToggleCategoryVisibility: (DiaryCategory) -> Unit,
+    onSelectCategoryFilter: (String?) -> Unit
 ) {
     var showDetailSheet     by remember { mutableStateOf(false) }
     var showEntryScreen     by remember { mutableStateOf(false) }
     var showSourceScreen    by remember { mutableStateOf(false) }
     var selectedItemForEdit by remember { mutableStateOf<DiaryItem?>(null) }
     var showManageCategories by remember { mutableStateOf(false) }
-
+    var showDatePicker       by remember { mutableStateOf(false) }
+    var stickerScale by remember { mutableStateOf(1f) }
+    var boxScale by remember { mutableStateOf(1f) }
+    var calendarScale by remember { mutableStateOf(1f) }
     val scrollState = rememberScrollState()
-    val context = LocalContext.current
+    var preSelectedCategory by remember { mutableStateOf<DiaryCategory?>(null) }
+
+    val filteredItems = remember(uiState.items, uiState.selectedCategoryId) {
+        uiState.selectedCategoryId?.let { catId ->
+            uiState.items.filter { it.categoryId == catId }
+        } ?: uiState.items
+    }
 
     LaunchedEffect(triggerAdd) {
         if (triggerAdd) {
@@ -93,17 +107,17 @@ fun DiaryScreenContent(
         }
     }
 
-    val datePickerDialog = remember(uiState.selectedYear, uiState.selectedMonth, uiState.selectedDayOfMonth) {
-        DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                runCatching { LocalDate(year, month + 1, dayOfMonth) }
+    if (showDatePicker) {
+        MonthYearPickerDialog(
+            currentMonth = uiState.selectedMonth,
+            currentYear = uiState.selectedYear,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { month, year ->
+                runCatching { LocalDate(year, month, 1) }
                     .getOrNull()
                     ?.let { onLoadDate(it) }
-            },
-            uiState.selectedYear,
-            uiState.selectedMonth - 1,
-            uiState.selectedDayOfMonth
+                showDatePicker = false
+            }
         )
     }
 
@@ -116,11 +130,30 @@ fun DiaryScreenContent(
         DiaryTopBar(
             streakCount  = uiState.streak.toString(),
             currentMonth = "Tháng ${uiState.selectedMonth} ${uiState.selectedYear}",
-            onMonthClick = { datePickerDialog.show() }
+            onMonthClick = { showDatePicker = true },
+            onPreviousClick = {
+                val newMonth = if (uiState.selectedMonth == 1) 12 else uiState.selectedMonth - 1
+                val newYear = if (uiState.selectedMonth == 1) uiState.selectedYear - 1 else uiState.selectedYear
+                runCatching { LocalDate(newYear, newMonth, 1) }.getOrNull()?.let { onLoadDate(it) }
+            },
+            onNextClick = {
+                val newMonth = if (uiState.selectedMonth == 12) 1 else uiState.selectedMonth + 1
+                val newYear = if (uiState.selectedMonth == 12) uiState.selectedYear + 1 else uiState.selectedYear
+                runCatching { LocalDate(newYear, newMonth, 1) }.getOrNull()?.let { onLoadDate(it) }
+            }
         )
         NutritionCard(
-            onMenuClick  = { }
+            unfilteredItems = uiState.items,
+            filteredItemCount = filteredItems.size,
+            categories = categories,
+            selectedCategoryId = uiState.selectedCategoryId,
+            onCategorySelect = onSelectCategoryFilter,
+            boxScale = boxScale,
+            calendarScale = calendarScale,
+            onBoxScaleChange = { boxScale = it },
+            onCalendarScaleChange = { calendarScale = it }
         )
+
         Spacer(modifier = Modifier.height(16.dp))
         CalendarCard(
             selectedYear  = uiState.selectedYear,
@@ -133,12 +166,12 @@ fun DiaryScreenContent(
                     showDetailSheet = true
                 }
             },
-            hasDataDates = uiState.datesWithData.toList()
+            hasDataDates = uiState.datesWithData.toList(),
+            scale = calendarScale
         )
         Spacer(modifier = Modifier.height(32.dp))
     }
 
-    // ── Toàn bộ các hệ thống Popups / Overlays ──────────────────────────────
 
     if (showDetailSheet) {
         DayDetailBottomSheet(
@@ -161,49 +194,74 @@ fun DiaryScreenContent(
     }
 
     if (showSourceScreen) {
-        AddFoodSourceScreen(
-            onBack = { showSourceScreen = false },
-            onCameraSelected = {
-                showSourceScreen = false
-                showEntryScreen  = true
-            },
-            onGallerySelected = {
-                showSourceScreen = false
-                showEntryScreen  = true
-            },
-            onManualSelected = {
-                showSourceScreen = false
-                showEntryScreen  = true
-            }
-        )
+        Dialog(
+            onDismissRequest = { showSourceScreen = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            AddFoodSourceScreen(
+                categories = categories,
+                onBack = { showSourceScreen = false },
+                onCameraSelected = {
+                    showSourceScreen = false
+                    preSelectedCategory = null
+                    showEntryScreen = true
+                },
+                onGallerySelected = {
+                    showSourceScreen = false
+                    preSelectedCategory = null
+                    showEntryScreen = true
+                },
+                onPresetSelected = { category ->
+                    preSelectedCategory = category
+                },
+                onManualSelected = {
+                    showSourceScreen = false
+                    showEntryScreen = true
+                }
+            )
+        }
     }
 
     if (showEntryScreen) {
-        val editingItem = selectedItemForEdit
-        FoodEntryScreen(
-            existingItem = editingItem,
-            categories   = categories,
-            onDismiss    = {
-                showEntryScreen     = false
+        Dialog(
+            onDismissRequest = {
+                showEntryScreen = false
                 selectedItemForEdit = null
             },
-            onSave = { name, price, categoryId, rating, note, timeType ->
-                if (editingItem == null) {
-                    onSaveItem(name, price, categoryId, rating, note, timeType)
-                } else {
-                    onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType)
-                }
-                showEntryScreen     = false
-                selectedItemForEdit = null
-                showDetailSheet     = true
-            },
-            onDelete = { itemId ->
-                onDeleteItem(itemId)
-                showEntryScreen     = false
-                selectedItemForEdit = null
-            },
-            onManageCategories = { showManageCategories = true }
-        )
+            properties = DialogProperties(usePlatformDefaultWidth = false) // ÉP FULL MÀN HÌNH
+        ) {
+            // Bọc Surface để cản lại mọi thứ từ màn hình dưới
+            Surface(modifier = Modifier.fillMaxSize(), color = MainBackground) {
+                val editingItem = selectedItemForEdit
+                FoodEntryScreen(
+                    existingItem = editingItem,
+                    preSelectedCategory = preSelectedCategory,
+                    categories   = categories,
+                    onDismiss    = {
+                        showEntryScreen     = false
+                        selectedItemForEdit = null
+                        preSelectedCategory = null
+                    },
+                    onSave = { name, price, categoryId, rating, note, timeType ->
+                        if (editingItem == null) {
+                            onSaveItem(name, price, categoryId, rating, note, timeType)
+                        } else {
+                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType)
+                        }
+                        showEntryScreen     = false
+                        selectedItemForEdit = null
+                        showDetailSheet     = true
+                        preSelectedCategory = null
+                    },
+                    onDelete = { itemId ->
+                        onDeleteItem(itemId)
+                        showEntryScreen     = false
+                        selectedItemForEdit = null
+                    },
+                    onManageCategories = { showManageCategories = true }
+                )
+            }
+        }
     }
 
     if (showManageCategories) {
@@ -271,7 +329,8 @@ fun DiaryScreenPreview() {
             onUpdateItem = { _, _, _, _, _, _, _ -> },
             onDeleteItem = {},
             onDeleteCategory = {},
-            onToggleCategoryVisibility = {}
+            onToggleCategoryVisibility = {},
+            onSelectCategoryFilter = {}
         )
     }
 }

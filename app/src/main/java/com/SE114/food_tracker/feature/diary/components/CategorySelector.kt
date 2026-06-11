@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -14,18 +16,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.feature.diary.DiaryCategory
+import com.SE114.food_tracker.core.designsystem.theme.StatRed
+import com.SE114.food_tracker.core.designsystem.theme.LightPeach
 
 @Composable
 fun CategorySelector(
@@ -39,7 +48,8 @@ fun CategorySelector(
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "LOẠI",
@@ -47,19 +57,17 @@ fun CategorySelector(
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
-            // GAP: "QUẢN LÝ" now calls onManageClick, which DiaryScreen routes to a
-            // category management bottom sheet. The sheet UI is TODO Sprint 2 —
-            // CategoryRowItem in CategoryItem.kt already has the row design ready.
+            // GAP: "QUẢN LÝ" now calls onManageClick
             Text(
                 text = "QUẢN LÝ",
                 fontSize = 11.sp,
-                color = Color(0xFFC98989),
+                color = StatRed,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.clickable { onManageClick() }
             )
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
         if (categories.isEmpty()) {
             Box(
@@ -85,34 +93,30 @@ fun CategorySelector(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(5),
                 modifier = Modifier.heightIn(max = 250.dp),
-                contentPadding = PaddingValues(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(
-                    //items = categories,
                     items = categories,
                     key = { it.categoryId }
                 ) { category ->
-                    CategorySquareItem(
-                        category = category,
-                        isSelected = category.categoryId == selectedCategoryId,
+                    val isSelected = category.categoryId == selectedCategoryId
+
+                    CategoryCard(
+                        name = category.name,
+                        icon = category.iconUrl ?: "🍽️",
+                        isSelected = isSelected,
                         onClick = { onCategorySelected(category.categoryId) }
                     )
                 }
 
-                // GAP: onAddClick routes to onManageCategories in FoodEntryScreen,
-                // which will open the add-category form. TODO Sprint 2.
                 item {
-                    CategorySquareItem(
-                        category = DiaryCategory(
-                            categoryId = "__add__",
-                            name = "Thêm",
-                            iconUrl = "➕",
-                            isHidden = false,
-                            isSystem = true
-                        ),
+                    CategoryCard(
+                        name = "Thêm",
+                        icon = "+",
                         isSelected = false,
+                        isAddButton = true,
                         onClick = onAddClick
                     )
                 }
@@ -121,11 +125,55 @@ fun CategorySelector(
     }
 }
 
+@Composable
+fun CategoryCard(
+    name: String,
+    icon: String,
+    isSelected: Boolean,
+    isAddButton: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .aspectRatio(0.85f)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() },
+        color = if (isSelected) LightPeach else Color.White,
+        shadowElevation = 3.dp,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize().padding(4.dp)
+        ) {
+            if (isAddButton) {
+                Text(
+                    text = icon,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Light,
+                    color = Color.DarkGray
+                )
+            } else {
+                Text(text = icon, fontSize = 24.sp)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = name,
+                fontSize = 10.sp,
+                color = Color.DarkGray,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
 @Preview(showBackground = true, backgroundColor = 0xFFFFF5E4)
 @Composable
 fun CategorySelectorPreview() {
-    // Hardcoded preview categories use "preview-N" IDs to clearly signal they are
-    // NOT real UUIDs. This block is compile-time only and has zero effect at runtime.
     val previewCategories = listOf(
         DiaryCategory("sys-cat-1", "Cơm",        "🍚", isSystem = true),
         DiaryCategory("sys-cat-2", "Mì & Phở",   "🍜", isSystem = true),
