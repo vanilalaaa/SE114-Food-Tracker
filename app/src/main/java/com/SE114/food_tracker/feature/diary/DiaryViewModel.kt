@@ -59,16 +59,13 @@ class DiaryViewModel @Inject constructor(
     private val _streak             = MutableStateFlow(0)
     private val _mutationTrigger    = MutableStateFlow(0)
 
-    // ── Pending image state ───────────────────────────────────────────────────
+    // ── Trạng thái ảnh tạm thời ──────────────────────────────────────────────
     private val _pendingImageUri = MutableStateFlow<Uri?>(null)
     val pendingImageUri: StateFlow<Uri?> = _pendingImageUri.asStateFlow()
 
-    // Compressed bytes waiting to be uploaded. Written by onImageSelected(),
-    // read by saveItem()/updateItem() after joining _imageCompressionJob.
     private var _pendingImageBytes: ByteArray? = null
 
-    // Handle to the compression coroutine so save/update can await it before
-    // reading _pendingImageBytes — prevents the bytes-still-null race.
+    // Giữ lại biến theo dõi Job nén ảnh để tránh User bấm Lưu quá nhanh
     private var _imageCompressionJob: Job? = null
 
     private val categories: Flow<List<DiaryCategory>> =
@@ -173,26 +170,21 @@ class DiaryViewModel @Inject constructor(
     }
 
     fun onImageSelected(uri: Uri) {
-        // Show thumbnail immediately; clear any stale bytes from a previous selection.
         _pendingImageUri.value = uri
         _pendingImageBytes     = null
 
-        // Save the Job so saveItem/updateItem can join() it before reading bytes.
+        // Gán Job để các hàm Save/Update có thể await() khi cần thiết
         _imageCompressionJob = viewModelScope.launch {
             runCatching {
                 val rawBytes = withContext(Dispatchers.IO) {
-                    context.contentResolver
-                        .openInputStream(uri)
-                        ?.use { it.readBytes() }
-                } ?: return@runCatching
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } ?: return@launch
 
-                val compressed = compressToJpeg(rawBytes, maxBytes = 1_024 * 1_024)
-                _pendingImageBytes = compressed
-                Timber.d("[DiaryVM] image ready, compressed to ${compressed.size / 1024} KB")
+                _pendingImageBytes = compressToJpeg(rawBytes, maxBytes = 1_024 * 1_024)
+                Timber.d("[DiaryVM] Ảnh đã chuẩn bị xong: ${_pendingImageBytes?.size?.div(1024)} KB")
             }.onFailure { e ->
-                Timber.e(e, "[DiaryVM] failed to read/compress image")
-                _pendingImageBytes     = null
-                _pendingImageUri.value = null
+                Timber.e(e, "[DiaryVM] Lỗi đọc/nén ảnh")
+                clearPendingImage()
                 _error.value = "Không đọc được ảnh: ${e.message}"
             }
         }
@@ -213,23 +205,41 @@ class DiaryViewModel @Inject constructor(
         timeType: Int
     ) {
         viewModelScope.launch {
-            // Wait for compression to finish so imageBytes is never null when an
-            // image was selected.
+            _isLoading.value = true
+            _error.value     = null
+
+            // Đợi tiến trình nén ảnh hoàn thành (nếu có) trước khi đọc bytes
             _imageCompressionJob?.join()
             val imageBytes = _pendingImageBytes
 
-            // ── STEP 1: save the item to Room and sync it (without imageUrl yet
-            //           if an image is attached — that comes in Step 2).
-            // runMutation finishes → triggerImmediateSync fires → Sync worker upserts
-            // the item row (image_url still null at this point, which is fine).
+            val itemId = java.util.UUID.randomUUID().toString()
+            var finalImageUrl: String? = null
+
+            // Upload ảnh lên Storage (Đảm bảo imageBytes đã có đủ dữ liệu)
+            imageBytes?.let { bytes ->
+                val ownerId = itemRepository.getCurrentUserId()
+                if (ownerId != null) {
+                    imageRepository.uploadItemImage(ownerId, itemId, bytes)
+                        .onSuccess { publicUrl ->
+                            finalImageUrl = publicUrl
+                            Timber.d("[DiaryVM] Upload ảnh thành công lên Storage: $publicUrl")
+                        }
+                        .onFailure { e ->
+                            Timber.e(e, "[DiaryVM] Lỗi upload ảnh Storage nhưng vẫn lưu thông tin chữ")
+                        }
+                }
+            }
+
             val now = Clock.System.now().toEpochMilliseconds()
             val item = Item(
+                itemId     = itemId,
                 categoryId = categoryId,
                 name       = name,
                 timeType   = timeType,
                 price      = price,
                 rating     = rating.takeIf { it > 0 },
                 note       = note.ifBlank { null },
+                imageUrl   = finalImageUrl,
                 syncStatus = SyncStatus.PENDING.name,
                 entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
                 createdAt  = now,
@@ -238,13 +248,7 @@ class DiaryViewModel @Inject constructor(
 
             runMutation {
                 itemRepository.insert(item)
-            }
-
-            // ── STEP 2: upload the image AFTER runMutation (and its sync) returns.
-            // uploadImageAndPatchItem writes imageUrl back to Room then calls
-            // triggerImmediateSync itself, so the second sync carries the real URL.
-            if (imageBytes != null) {
-                uploadImageAndPatchItem(item.itemId, imageBytes)
+                clearPendingImage()
             }
         }
     }
@@ -259,17 +263,32 @@ class DiaryViewModel @Inject constructor(
         timeType: Int
     ) {
         viewModelScope.launch {
+            _isLoading.value = true
+            _error.value     = null
+
+            // Đợi nén ảnh xong trước khi check ảnh cập nhật
             _imageCompressionJob?.join()
             val imageBytes = _pendingImageBytes
 
-            // ── STEP 1: update the item fields in Room and sync.
-            runMutation {
-                val currentItem = itemRepository.getItemByIdOneShot(itemId)
-                if (currentItem == null) {
-                    Timber.e("[DiaryVM] updateItem: item $itemId not found in Room")
-                    _error.value = "Không tìm thấy món ăn"
-                    return@runMutation
+            val currentItem = itemRepository.getItemByIdOneShot(itemId)
+            if (currentItem == null) {
+                _error.value = "Không tìm thấy món ăn để cập nhật"
+                _isLoading.value = false
+                return@launch
+            }
+
+            var finalImageUrl = currentItem.imageUrl
+
+            imageBytes?.let { bytes ->
+                val ownerId = itemRepository.getCurrentUserId()
+                if (ownerId != null) {
+                    imageRepository.uploadItemImage(ownerId, itemId, bytes)
+                        .onSuccess { publicUrl -> finalImageUrl = publicUrl }
+                        .onFailure { e -> Timber.e(e, "[DiaryVM] Lỗi cập nhật ảnh mới") }
                 }
+            }
+
+            runMutation {
                 itemRepository.update(
                     currentItem.copy(
                         categoryId = categoryId,
@@ -277,14 +296,11 @@ class DiaryViewModel @Inject constructor(
                         timeType   = timeType,
                         price      = price,
                         rating     = rating.takeIf { it > 0 },
-                        note       = note.ifBlank { null }
+                        note       = note.ifBlank { null },
+                        imageUrl   = finalImageUrl
                     )
                 )
-            }
-
-            // ── STEP 2: upload image and patch imageUrl with its own sync trigger.
-            if (imageBytes != null) {
-                uploadImageAndPatchItem(itemId, imageBytes)
+                clearPendingImage()
             }
         }
     }
@@ -311,43 +327,6 @@ class DiaryViewModel @Inject constructor(
         return streak
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    private suspend fun uploadImageAndPatchItem(itemId: String, bytes: ByteArray) {
-        val ownerId = itemRepository.getCurrentUserId()
-        if (ownerId == null) {
-            Timber.w("[DiaryVM] no auth session — skipping image upload for item $itemId")
-            clearPendingImage()
-            return
-        }
-
-        imageRepository.uploadItemImage(ownerId, itemId, bytes)
-            .onSuccess { publicUrl ->
-                Timber.d("[DiaryVM] image uploaded → $publicUrl")
-
-                val storedItem = itemRepository.getItemByIdOneShot(itemId)
-                if (storedItem != null) {
-                    // Write imageUrl into Room. ItemRepository.update() marks the
-                    // item PENDING again, so the next sync will carry the real URL.
-                    itemRepository.update(storedItem.copy(imageUrl = publicUrl))
-                    Timber.d("[DiaryVM] imageUrl patched in Room for item $itemId")
-
-                    // FIX: trigger a dedicated sync NOW so the patched imageUrl
-                    // reaches Supabase. Without this second trigger the item stays
-                    // PENDING in Room but no worker ever picks it up.
-                    SyncScheduler.triggerImmediateSync(context)
-                    Timber.d("[DiaryVM] immediate sync triggered after imageUrl patch")
-                } else {
-                    Timber.e("[DiaryVM] item $itemId disappeared from Room before imageUrl patch")
-                }
-                clearPendingImage()
-            }
-            .onFailure { e ->
-                Timber.e(e, "[DiaryVM] image upload failed for item $itemId — saved without image")
-                clearPendingImage()
-            }
-    }
-
     private suspend fun compressToJpeg(rawBytes: ByteArray, maxBytes: Int): ByteArray =
         withContext(Dispatchers.Default) {
             val bitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size)
@@ -372,7 +351,7 @@ class DiaryViewModel @Inject constructor(
             SyncScheduler.triggerImmediateSync(context)
         } catch (t: Throwable) {
             _error.value = t.message
-            Timber.e(t, "[DiaryVM] mutation failed")
+            Timber.e(t, "[DiaryVM] Thao tác thất bại")
         } finally {
             _isLoading.value = false
         }

@@ -20,7 +20,7 @@ interface ItemDAO {
     suspend fun softDeleteItem(itemId: String, updatedAt: Long = System.currentTimeMillis())
 
     @Query("SELECT * FROM item WHERE item_id = :id AND is_deleted = 0")
-    fun getItemById(id: String): Flow<Item?> 
+    fun getItemById(id: String): Flow<Item?>
 
     @Query("SELECT * FROM item WHERE is_deleted = 0 ORDER BY created_at DESC")
     fun getAllItems(): Flow<List<Item>>
@@ -48,8 +48,8 @@ interface ItemDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertItemsFromServer(items: List<Item>)
 
-    @Query("UPDATE item SET sync_status = 'SYNCED' WHERE item_id = :itemId AND updated_at = :uploadedUpdatedAt")
-    suspend fun markSyncedIfUnchanged(itemId: String, uploadedUpdatedAt: Long): Int
+    @Query("UPDATE item SET sync_status = 'SYNCED' WHERE item_id = :itemId")
+    suspend fun markSynced(itemId: String)
 
     @Query("UPDATE item SET sync_status = 'FAILED' WHERE item_id = :itemId")
     suspend fun markFailed(itemId: String)
@@ -59,7 +59,7 @@ interface ItemDAO {
     fun getItemCountForDay(startDate: Long, endDate: Long): Flow<Int>
 
     @Query("SELECT SUM(price) FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0")
-    fun getTotalExpenseForDay(startDate: Long, endDate: Long): Flow<Double?> 
+    fun getTotalExpenseForDay(startDate: Long, endDate: Long): Flow<Double?>
 
     // Lấy chi tiêu gom nhóm theo danh mục phục vụ vẽ biểu đồ Donut của Vico Chart
     @Query("SELECT category_id, SUM(price) as total FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0 GROUP BY category_id ORDER BY total DESC")

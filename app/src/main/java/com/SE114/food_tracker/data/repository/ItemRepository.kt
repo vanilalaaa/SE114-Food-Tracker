@@ -65,7 +65,7 @@ class ItemRepository @Inject constructor(
     suspend fun insert(item: Item) {
         val pendingItem = item.copy(
             syncStatus = SyncStatus.PENDING.name,
-            updatedAt = nextUpdatedAt(item.updatedAt)
+            updatedAt = System.currentTimeMillis()
         )
         itemDAO.insertItem(pendingItem)
     }
@@ -73,7 +73,7 @@ class ItemRepository @Inject constructor(
     suspend fun update(item: Item) {
         val pendingItem = item.copy(
             syncStatus = SyncStatus.PENDING.name,
-            updatedAt  = nextUpdatedAt(item.updatedAt)
+            updatedAt  = System.currentTimeMillis()
         )
         itemDAO.updateItem(pendingItem)
     }
@@ -86,8 +86,7 @@ class ItemRepository @Inject constructor(
 
     suspend fun upsertItemsFromServer(items: List<Item>) = itemDAO.upsertItemsFromServer(items)
 
-    suspend fun markSyncedIfUnchanged(itemId: String, uploadedUpdatedAt: Long): Boolean =
-        itemDAO.markSyncedIfUnchanged(itemId, uploadedUpdatedAt) > 0
+    suspend fun markSynced(itemId: String) = itemDAO.markSynced(itemId)
 
     suspend fun markFailed(itemId: String) = itemDAO.markFailed(itemId)
 
@@ -99,11 +98,6 @@ class ItemRepository @Inject constructor(
 
     fun getPersonalExpenseByCategory(start: Long, end: Long): Flow<List<CategoryExpense>> =
         itemDAO.getPersonalExpenseByCategory(start, end)
-}
-
-private fun nextUpdatedAt(currentUpdatedAt: Long): Long {
-    val now = System.currentTimeMillis()
-    return if (now > currentUpdatedAt) now else currentUpdatedAt + 1
 }
 
 private fun Int.toDiaryTimeLabel(): String =
