@@ -57,5 +57,8 @@ data class Item(
     var updatedAt: Long = System.currentTimeMillis(), // Dùng so sánh Last-Write-Wins khi sync
 
     @ColumnInfo(name = "created_at")
-    var createdAt: Long = System.currentTimeMillis()
+    var createdAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "is_deleted")
+    val isDeleted: Boolean = false
 )

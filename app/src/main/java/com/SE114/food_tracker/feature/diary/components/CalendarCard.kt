@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,25 +22,47 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.*
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
+import kotlinx.datetime.todayIn
 
 @Composable
 fun CalendarCard(
+    selectedYear: Int,
+    selectedMonth: Int,
     onDateClick: (Int) -> Unit,
-    hasDataDates: List<Int> = listOf(23)
+    hasDataDates: List<Int> = emptyList(),
+    scale: Float = 1f
 ) {
-     val days = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
-    val dates = (1..30).toList()
+    val days = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+    val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
+
+    val calendarGridItems = remember(selectedYear, selectedMonth) {
+        val firstDayOfMonth = LocalDate(selectedYear, selectedMonth, 1)
+        val emptySlotsBefore = firstDayOfMonth.dayOfWeek.isoDayNumber - 1
+
+        val nextMonth = if (selectedMonth == 12) 1 else selectedMonth + 1
+        val nextMonthYear = if (selectedMonth == 12) selectedYear + 1 else selectedYear
+        val firstDayOfNextMonth = LocalDate(nextMonthYear, nextMonth, 1)
+        val lastDayOfMonth = firstDayOfNextMonth.minus(kotlinx.datetime.DatePeriod(days = 1)).dayOfMonth
+
+        List(emptySlotsBefore) { null } + (1..lastDayOfMonth).toList()
+    }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 16.dp)
-            .height(400.dp),
-        shape = RoundedCornerShape(25.dp),
-        color = CalendarHighlight,
-        shadowElevation = 10.dp
+            .height(410.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White,
+        shadowElevation = 8.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
@@ -48,8 +71,8 @@ fun CalendarCard(
                     Text(
                         text = it,
                         color = DarkPink,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -62,63 +85,67 @@ fun CalendarCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                items(dates) { date ->
-                    val isToday = (date == 23)
-                    val hasData = hasDataDates.contains(date)
+                items(calendarGridItems) { date ->
+                    if (date != null) {
+                        val isToday = (date == today.dayOfMonth && selectedMonth == today.monthNumber && selectedYear == today.year)
+                        val hasData = hasDataDates.contains(date)
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clickable { onDateClick(date) }
-                    ) {
-                        // Số ngày
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(32.dp)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (hasData) CalendarHighlight else Color.Transparent)
+                                .clickable { onDateClick(date) }
+                                .padding(vertical = 4.dp)
                         ) {
-                            if (isToday) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .background(LightGreen, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                if (isToday) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(MintGreen, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = date.toString(),
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                } else {
                                     Text(
-                                        date.toString(),
-                                        color = Color.White,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold
+                                        text = date.toString(),
+                                        color = TextPrimary,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Normal
                                     )
                                 }
-                            } else {
-                                Text(
-                                    date.toString(),
-                                    color = TextSecondary,
-                                    fontSize = 14.sp
-                                )
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .size((24 * scale).dp)
+                                    .background(if (hasData) Color.White else Color.Transparent, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (hasData) {
+                                    Icon(
+                                        Icons.Default.Restaurant,
+                                        null,
+                                        modifier = Modifier.size((12 * scale).dp),
+                                        tint = OrangeMain
+                                    )
+                                }
                             }
                         }
-
-                        Spacer(Modifier.height(4.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(
-                                    if (hasData) Color.White else Color.Transparent,
-                                    CircleShape
-                                )
-                                .clip(CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (hasData) {
-                                Icon(
-                                    Icons.Default.Restaurant,
-                                    null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = OrangeMain
-                                )
-                            }
-                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(36.dp))
                     }
                 }
             }
@@ -130,6 +157,10 @@ fun CalendarCard(
 @Composable
 fun CalendarCardPreview() {
     FoodTrackerTheme {
-        CalendarCard(onDateClick = {})
+        CalendarCard(
+            selectedYear = 2026,
+            selectedMonth = 6,
+            onDateClick = {}
+        )
     }
 }

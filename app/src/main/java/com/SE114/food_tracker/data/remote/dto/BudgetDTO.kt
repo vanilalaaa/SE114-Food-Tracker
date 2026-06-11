@@ -10,5 +10,6 @@ data class BudgetDTO(
     @SerialName("weekly") val weekly: Double? = null,
     @SerialName("monthly") val monthly: Double? = null,
     @SerialName("yearly") val yearly: Double? = null,
-    @SerialName("updated_at") val updatedAt: String
+    @SerialName("updated_at") val updatedAt: String,
+    @SerialName("is_deleted") val isDeleted: Boolean = false
 )
