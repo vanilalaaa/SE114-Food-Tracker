@@ -77,7 +77,17 @@ fun AppNavGraph(
                 )
             }
             composable(AppDestinations.Stats.route)    { StatisticsScreen() }
-            composable(AppDestinations.Feed.route)     { Text("TODO: Feed (TV3)") }
+            // ĐẤU NỐI TẠM THỜI: Bẻ hướng Tab Feed (Tab 3) để hiển thị danh sách chat
+            composable(AppDestinations.Feed.route)     {
+                val chatTestViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>()
+                ConversationListScreen(
+                    viewModel = chatTestViewModel,
+                    onConversationClick = { conversationId, conversationName ->
+                        navController.navigate("chat_screen/$conversationId/$conversationName")
+                    },
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
             composable(AppDestinations.Chat.route)     {
                 ConversationListScreen(
                     onConversationClick = { conversationId, conversationName ->
@@ -89,9 +99,13 @@ fun AppNavGraph(
             composable("chat_screen/{conversationId}/{conversationName}") { backStackEntry ->
                 val id = backStackEntry.arguments?.getString("conversationId") ?: ""
                 val name = backStackEntry.arguments?.getString("conversationName") ?: "Người dùng"
+
+                val chatDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>()
+
                 ChatScreen(
                     conversationId = id,
                     conversationName = name,
+                    viewModel = chatDetailViewModel,
                     onBackClick = { navController.popBackStack() }
                 )
             }

@@ -108,8 +108,10 @@ fun ChatScreenContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp, top = 16.dp)
             ) {
-                items(messageList.size, key = { messageList[it].localId }) { index ->
-                    val message = messageList[index]
+                val reversedList = messageList.reversed()
+
+                items(reversedList.size, key = { reversedList[it].localId }) { index ->
+                    val message = reversedList[index]
 
                     MessageBubble(
                         message = message,
@@ -119,8 +121,8 @@ fun ChatScreenContent(
                         }
                     )
 
-                    val hasOlderMessage = index + 1 < messageList.size
-                    val olderMessage = if (hasOlderMessage) messageList[index + 1] else null
+                    val hasOlderMessage = index + 1 < reversedList.size
+                    val olderMessage = if (hasOlderMessage) reversedList[index + 1] else null
 
                     if (olderMessage == null || message.dateLabel != olderMessage.dateLabel) {
                         Box(

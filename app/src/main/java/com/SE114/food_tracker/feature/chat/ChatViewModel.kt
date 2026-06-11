@@ -10,6 +10,7 @@ import com.SE114.food_tracker.data.repository.ChatRepository
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -24,48 +25,56 @@ class ChatViewModel @Inject constructor(
 
     val currentUserId = "vy_id"
 
-    // KHỐI KHỞI TẠO MỒI DỮ LIỆU (SEED DATA) ĐỂ TRÁNH TRẮNG MÀN HÌNH KHI TEST
+    // KHỐI KHỞI TẠO ĐÃ ĐƯỢC TỐI ƯU TRÁNH GHI ĐÈ DUPLICATE DATA KHI RE-OPEN VIEWMODEL
     init {
         viewModelScope.launch {
-            // 1. Tạo sẵn một cuộc trò chuyện mẫu với ID cố định là "1"
+            // 1. Tạo sẵn một cuộc trò chuyện mẫu với ID cố định là "1" nếu chưa tồn tại
             chatDAO.insertConversation(
                 Conversation(
                     id = "1",
                     isGroup = false,
                     name = "Azun (Data)",
-                    walletId = "mock_wallet_id_1" //
+                    walletId = "mock_wallet_id_1"
                 )
             )
 
-            // 2. Chèn 2 tin nhắn mẫu ban đầu nếu cuộc trò chuyện này đang trống
-            // Thao tác này giúp màn hình hiển thị sinh động ngay khi vừa cài app
-            chatDAO.insertMessage(
-                Message(
-                    localId = "mock_msg_init_1",
-                    serverId = "srv_init_1",
-                    conversationId = "1",
-                    senderId = "azun_id",
-                    body = "Ăn bún bò Huế đi zz",
-                    imageUrl = null,
-                    isSystem = false,
-                    syncStatus = MessageSyncStatus.SENT,
-                    createdAt = System.currentTimeMillis() - 60000 // Gửi trước đó 1 phút
-                )
-            )
+            // 2. CHỈ MỒI TIN NHẮN KHI PHÒNG CHAT ĐANG TRỐNG TRƠN
+            // Lấy danh sách tin nhắn hiện tại của cuộc trò chuyện "1" để kiểm tra
+            val currentMessages = chatRepository.getMessagesStream("1").first()
 
-            chatDAO.insertMessage(
-                Message(
-                    localId = "mock_msg_init_2",
-                    serverId = "srv_init_2",
-                    conversationId = "1",
-                    senderId = "system",
-                    body = "Hệ thống: Vy đã nộp 100k vào quỹ nhóm",
-                    imageUrl = null,
-                    isSystem = true,
-                    syncStatus = MessageSyncStatus.SENT,
-                    createdAt = System.currentTimeMillis() - 30000 // Gửi trước đó 30 giây
+            if (currentMessages.isEmpty()) {
+                // Cố định mốc thời gian lịch sử cụ thể để tin nhắn cũ không bị nhảy giờ lung tung
+                val oneMinuteAgo = System.currentTimeMillis() - 60000
+                val thirtySecondsAgo = System.currentTimeMillis() - 30000
+
+                chatDAO.insertMessage(
+                    Message(
+                        localId = "mock_msg_init_1",
+                        serverId = "srv_init_1",
+                        conversationId = "1",
+                        senderId = "azun_id",
+                        body = "Ăn bún bò Huế đi zz",
+                        imageUrl = null,
+                        isSystem = false,
+                        syncStatus = MessageSyncStatus.SENT,
+                        createdAt = oneMinuteAgo
+                    )
                 )
-            )
+
+                chatDAO.insertMessage(
+                    Message(
+                        localId = "mock_msg_init_2",
+                        serverId = "srv_init_2",
+                        conversationId = "1",
+                        senderId = "system",
+                        body = "Hệ thống: Vy đã nộp 100k vào quỹ nhóm",
+                        imageUrl = null,
+                        isSystem = true,
+                        syncStatus = MessageSyncStatus.SENT,
+                        createdAt = thirtySecondsAgo
+                    )
+                )
+            }
         }
     }
 
@@ -112,7 +121,8 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun getConversationsFlow(): kotlinx.coroutines.flow.Flow<List<Conversation>> {
+    // 5. Lấy dòng chảy danh sách hội thoại đổ lên màn hình List
+    fun getConversationsFlow(): Flow<List<Conversation>> {
         return chatDAO.getAllConversations()
     }
 
@@ -124,9 +134,8 @@ class ChatViewModel @Inject constructor(
     private fun formatToDate(timestamp: Long): String {
         val target = Calendar.getInstance().apply { timeInMillis = timestamp }
         val now = Calendar.getInstance()
-        return if (target.get(Calendar.YEAR) == now.get(Calendar.YEAR) && target.get(Calendar.DAY_OF_YEAR) == now.get(
-                Calendar.DAY_OF_YEAR
-            )
+        return if (target.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
+            target.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
         ) {
             "Hôm nay"
         } else {
