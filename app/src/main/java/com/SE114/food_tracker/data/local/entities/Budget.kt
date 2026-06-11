@@ -1,4 +1,5 @@
 package com.SE114.food_tracker.data.local.entities
+import com.SE114.food_tracker.core.sync.SyncStatus
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -15,6 +16,12 @@ data class Budget(
     val monthly: Double? = null,
     val yearly: Double? = null,
 
+    @ColumnInfo(name = "sync_status")
+    var syncStatus: String = SyncStatus.PENDING.name,
+
     @ColumnInfo(name = "updated_at")
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "is_deleted")
+    val isDeleted: Boolean = false
 )

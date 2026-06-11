@@ -1,3 +1,44 @@
 <resources>
     <string name="app_name">Food-Tracker</string>
+
+    <!-- Splash -->
+    <string name="auth_app_tagline">Ghi lại từng bữa ăn của bạn</string>
+
+    <!-- Login -->
+    <string name="auth_login_title">Đăng nhập</string>
+    <string name="auth_login_email">Email</string>
+    <string name="auth_login_password">Mật khẩu</string>
+    <string name="auth_login_submit">Đăng nhập</string>
+    <string name="auth_login_forgot">Quên mật khẩu?</string>
+    <string name="auth_login_no_account">Chưa có tài khoản?</string>
+    <string name="auth_login_register_cta">Đăng ký</string>
+    <string name="auth_login_error">Email hoặc mật khẩu không đúng. Vui lòng thử lại.</string>
+
+    <!-- Register -->
+    <string name="auth_register_title">Tạo tài khoản</string>
+    <string name="auth_register_email">Email</string>
+    <string name="auth_register_password">Mật khẩu</string>
+    <string name="auth_register_display_name">Tên hiển thị</string>
+    <string name="auth_register_user_id">Tên đăng nhập</string>
+    <string name="auth_register_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
+    <string name="auth_register_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
+    <string name="auth_register_user_id_checking">Đang kiểm tra…</string>
+    <string name="auth_register_user_id_available">Tên đăng nhập khả dụng</string>
+    <string name="auth_register_user_id_taken">Tên đăng nhập đã được sử dụng</string>
+    <string name="auth_register_user_id_error">Không kiểm tra được, vui lòng thử lại</string>
+    <string name="auth_register_user_id_available_desc">Khả dụng</string>
+    <string name="auth_register_user_id_taken_desc">Đã được dùng</string>
+    <string name="auth_register_submit">Đăng ký</string>
+    <string name="auth_register_error">Đăng ký không thành công. Vui lòng thử lại.</string>
+    <string name="auth_register_have_account">Đã có tài khoản?</string>
+    <string name="auth_register_login_cta">Đăng nhập</string>
+
+    <!-- Forgot password -->
+    <string name="auth_forgot_title">Đặt lại mật khẩu</string>
+    <string name="auth_forgot_subtitle">Nhập email của bạn, chúng tôi sẽ gửi liên kết đặt lại mật khẩu.</string>
+    <string name="auth_forgot_email">Email</string>
+    <string name="auth_forgot_submit">Gửi liên kết</string>
+    <string name="auth_forgot_success">Đã gửi liên kết đặt lại. Vui lòng kiểm tra email của bạn.</string>
+    <string name="auth_forgot_error">Không gửi được liên kết. Vui lòng thử lại.</string>
+    <string name="auth_forgot_back">Quay lại đăng nhập</string>
 </resources>

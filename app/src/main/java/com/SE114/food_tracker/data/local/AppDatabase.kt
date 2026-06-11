@@ -15,7 +15,7 @@ import com.SE114.food_tracker.data.local.dao.ChatDAO
 
 @Database(
     entities = [Category::class, Item::class, Budget::class, Conversation::class, ConversationParticipant::class, Message::class],
-    version = 3,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
