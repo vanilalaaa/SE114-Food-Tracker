@@ -1,8 +1,8 @@
 package com.SE114.food_tracker.feature.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -29,17 +29,17 @@ fun ChatScreen(
     onBackClick: () -> Unit = {}
 ) {
     val myId = "vy_id"
-
     var messageList by remember {
         mutableStateOf(
             listOf(
-                MessageUiModel(senderId = "azun_id", body = "Tớ bật cờ Realtime cho bảng message rồi á Vy!", imageUrl = null),
-                MessageUiModel(senderId = "system", body = "Vy đã nộp 100k vào quỹ nhóm", imageUrl = null, isSystem = true),
-                MessageUiModel(senderId = "vy_id", body = "Oki để tớ up cái giao diện khung chat lên luôn nè", imageUrl = null),
-                MessageUiModel(senderId = "vy_id", body = null, imageUrl = "MOCK_URL_IMAGE", syncStatus = MessageSyncStatus.SENT),
-                MessageUiModel(senderId = "vy_id", body = "Ủa cái ảnh này gửi lên chưa ta?", imageUrl = null, syncStatus = MessageSyncStatus.PENDING),
-                MessageUiModel(senderId = "vy_id", body = "Tin nhắn này bị lỗi mạng rồi nè", imageUrl = null, syncStatus = MessageSyncStatus.FAILED)
-            ).reversed()
+                MessageUiModel(senderId = "azun_id", body = "Ăn bún bò Huế đi", imageUrl = null, timeLabel = "10:12 PM", dateLabel = "07/06/2026"),
+                MessageUiModel(senderId = "system", body = "Vy đã nộp 100k vào quỹ nhóm", imageUrl = null, isSystem = true, timeLabel = "10:13 PM", dateLabel = "07/06/2026"),
+
+                MessageUiModel(senderId = "vy_id", body = "Oki lên kèo. Ăn chỗ này đi", imageUrl = null, timeLabel = "10:15 PM", dateLabel = "Hôm nay"),
+                MessageUiModel(senderId = "vy_id", body = null, imageUrl = "MOCK_URL_IMAGE", syncStatus = MessageSyncStatus.SENT, timeLabel = "10:15 PM", dateLabel = "Hôm nay"),
+                MessageUiModel(senderId = "vy_id", body = "Ủa cái ảnh này gửi lên chưa ta?", imageUrl = null, syncStatus = MessageSyncStatus.PENDING, timeLabel = "10:16 PM", dateLabel = "Hôm nay"),
+                MessageUiModel(senderId = "vy_id", body = "Tin nhắn này bị lỗi mạng rồi nè", imageUrl = null, syncStatus = MessageSyncStatus.FAILED, timeLabel = "10:17 PM", dateLabel = "Hôm nay")
+            ).reversed() // Đảo ngược mảng để tin mới nhất nằm dưới đáy
         )
     }
 
@@ -69,17 +69,21 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 1. Vùng hiển thị nội dung tin nhắn
+            // 1. Vùng hiển thị nội dung tin nhắn kèm dòng phân cách ngày tháng động
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                reverseLayout = true,
+                reverseLayout = true, // Đảo ngược layout
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp, top = 16.dp)
             ) {
-                items(messageList, key = { it.localId }) { message ->
+                // Duyệt danh sách theo index để xử lý logic so sánh ngày giữa các phần tử liền kề
+                items(messageList.size, key = { messageList[it].localId }) { index ->
+                    val message = messageList[index]
+
+                    // Vẽ bong bóng chat bình thường
                     MessageBubble(
                         message = message,
                         isMine = message.senderId == myId,
@@ -89,6 +93,30 @@ fun ChatScreen(
                             }
                         }
                     )
+
+                    // LOGIC TỰ ĐỘNG CHÈN DÒNG PHÂN CÁCH NGÀY THÁNG:
+                    // Vì danh sách reverse nên phần tử phía sau trong mảng (index + 1) thực chất lại là tin nhắn cũ hơn
+                    val hasOlderMessage = index + 1 < messageList.size
+                    val olderMessage = if (hasOlderMessage) messageList[index + 1] else null
+
+                    // Điều kiện hiện dòng ngày:
+                    // Nếu nó là tin nhắn đầu tiên của cuộc trò chuyện (olderMessage == null)
+                    // HOẶC ngày của tin nhắn hiện tại khác hoàn toàn với ngày của tin nhắn cũ hơn trước đó
+                    if (olderMessage == null || message.dateLabel != olderMessage.dateLabel) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "— ${message.dateLabel} —",
+                                color = TextLabelGray,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
             }
 
@@ -111,7 +139,8 @@ fun ChatScreen(
                             body = null,
                             imageUrl = "LOCAL_GALLERY_URI",
                             syncStatus = MessageSyncStatus.PENDING,
-                            timeLabel = "Vừa xong"
+                            timeLabel = "Vừa xong",
+                            dateLabel = "Hôm nay"
                         )
                         messageList = listOf(newImageMessage) + messageList
                     }) {
@@ -143,7 +172,8 @@ fun ChatScreen(
                                     body = textInput,
                                     imageUrl = null,
                                     syncStatus = MessageSyncStatus.PENDING,
-                                    timeLabel = "Vừa xong"
+                                    timeLabel = "Vừa xong",
+                                    dateLabel = "Hôm nay"
                                 )
                                 messageList = listOf(newMsg) + messageList
                                 textInput = ""

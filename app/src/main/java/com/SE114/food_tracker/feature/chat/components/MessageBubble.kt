@@ -32,7 +32,8 @@ data class MessageUiModel(
     val imageUrl: String?,
     val isSystem: Boolean = false,
     val syncStatus: MessageSyncStatus = MessageSyncStatus.SENT,
-    val timeLabel: String = "10:15 PM"
+    val timeLabel: String = "10:15 PM",
+    val dateLabel: String = "Hôm nay"
 )
 
 @Composable
@@ -166,7 +167,7 @@ fun MessageBubblePeerPreview() {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "azun_id",
-                    body = "Tớ bật cờ Realtime cho bảng message rồi á Vy!",
+                    body = "Ăn bún bò Huế đi zz",
                     imageUrl = null
                 ),
                 isMine = false,
@@ -184,7 +185,7 @@ fun MessageBubbleMineSentPreview() {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
-                    body = "Oki để tớ up cái giao diện khung chat lên luôn nè",
+                    body = "Oki lên kèo. Ăn quán này đi",
                     imageUrl = null,
                     syncStatus = MessageSyncStatus.SENT
                 ),
