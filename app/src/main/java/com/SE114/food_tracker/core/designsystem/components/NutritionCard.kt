@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.diary.DiaryCategory
 import com.SE114.food_tracker.feature.diary.DiaryItem
@@ -33,17 +35,6 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 enum class MenuState { MAIN, FILTER, SIZE }
-
-/**
- * Lightweight model for one food item — kept for compatibility with older call sites.
- * The current NutritionCard renders generic "stickers" instead of per-item avatars,
- * but this type may still be used elsewhere (e.g. diary lists).
- */
-data class DraggableFoodItem(
-    val id: String,
-    val imageUrl: String?,
-    val emoji: String          // e.g. "🍚"  — shown when imageUrl is null/blank
-)
 
 @Composable
 fun NutritionCard(
@@ -65,6 +56,13 @@ fun NutritionCard(
     }
     val availableCategories = categories.filter { categoryCounts.containsKey(it.categoryId) }
 
+    // Lọc danh sách món ăn theo Category đang chọn để map trực tiếp vào Engine vật lý
+    val filteredItems = remember(unfilteredItems, selectedCategoryId) {
+        selectedCategoryId?.let { catId ->
+            unfilteredItems.filter { it.categoryId == catId }
+        } ?: unfilteredItems
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth().height(180.dp).padding(horizontal = 24.dp),
         color = LightPinkBG,
@@ -73,6 +71,7 @@ fun NutritionCard(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
 
+            // ── Menu Dropdown Options ──────────────────────────────────────────
             Box(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).zIndex(2f)) {
                 IconButton(onClick = {
                     expanded = true
@@ -205,6 +204,7 @@ fun NutritionCard(
                 }
             }
 
+            // ── Physics Engine Configurations ─────────────────────────────────
             val density = LocalDensity.current
             val baseSizePx = with(density) { 44.dp.toPx() }
             val stickerSizePx = baseSizePx * boxScale
@@ -212,19 +212,30 @@ fun NutritionCard(
             val stickers = remember { mutableStateListOf<StickerNode>() }
             var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
-            LaunchedEffect(filteredItemCount, boxSize) {
+            // Lắng nghe thay đổi danh sách món ăn để map hình ảnh/emoji tương ứng
+            LaunchedEffect(filteredItems, boxSize, selectedCategoryId, unfilteredItems) {
                 if (boxSize == IntSize.Zero) return@LaunchedEffect
-                if (stickers.size != filteredItemCount) {
-                    stickers.clear()
-                    repeat(filteredItemCount) {
-                        stickers.add(StickerNode(
-                            initialX = (0..(boxSize.width - baseSizePx.toInt())).random().toFloat(),
-                            initialY = -100f
-                        ))
-                    }
+
+                stickers.clear()
+                filteredItems.forEach { item ->
+                    // Khớp ID để lấy đúng emoji của Category làm Fallback khi không có ảnh
+                    val matchedCategory = categories.find { it.categoryId == item.categoryId }
+                    val categoryEmoji = matchedCategory?.iconUrl ?: "🍱"
+
+                    val spawnWidthRange = (boxSize.width - stickerSizePx.toInt()).coerceAtLeast(0)
+                    stickers.add(
+                        StickerNode(
+                            id = item.itemId,
+                            initialX = if (spawnWidthRange > 0) (0..spawnWidthRange).random().toFloat() else 0f,
+                            initialY = -100f, // Rơi từ trên đỉnh hộp xuống
+                            emoji = categoryEmoji,
+                            imageUrl = item.imageUrl
+                        )
+                    )
                 }
             }
 
+            // Vòng lặp vật lý (Rơi tự do + Va chạm các cạnh + Va chạm lẫn nhau)
             LaunchedEffect(boxSize, boxScale) {
                 if (boxSize == IntSize.Zero) return@LaunchedEffect
                 while (isActive) {
@@ -258,6 +269,7 @@ fun NutritionCard(
                 }
             }
 
+            // ── Render Stickers Layout ────────────────────────────────────────
             Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
                 stickers.forEach { node ->
                     Box(
@@ -276,10 +288,16 @@ fun NutritionCard(
                                 )
                             }
                             .size((44 * boxScale).dp)
-                            .clip(CircleShape).background(Color.White),
+                            .clip(CircleShape)
+                            .background(Color.White),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Restaurant, null, tint = OrangeMain, modifier = Modifier.size((22 * boxScale).dp))
+                        // Gọi cụm Component giải mã hình ảnh từ Supabase (giống code cũ của bạn)
+                        FoodStickerAvatar(
+                            imageUrl = node.imageUrl,
+                            emoji = node.emoji,
+                            scale = boxScale
+                        )
                     }
                 }
             }
@@ -287,7 +305,36 @@ fun NutritionCard(
     }
 }
 
-class StickerNode(initialX: Float, initialY: Float) {
+// ── Sub-component render Avatar hình ảnh từ Supabase hoặc Emoji ───────────────
+@Composable
+private fun FoodStickerAvatar(imageUrl: String?, emoji: String, scale: Float) {
+    if (!imageUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = emoji,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = emoji.ifBlank { "🍱" }, fontSize = (22 * scale).sp)
+        }
+    }
+}
+
+// ── Physics Node Class ────────────────────────────────────────────────────────
+class StickerNode(
+    val id: String,
+    initialX: Float,
+    initialY: Float,
+    val emoji: String,
+    val imageUrl: String?
+) {
     var x by mutableFloatStateOf(initialX)
     var y by mutableFloatStateOf(initialY)
     var vx = 0f; var vy = 0f; var isDragging = false
