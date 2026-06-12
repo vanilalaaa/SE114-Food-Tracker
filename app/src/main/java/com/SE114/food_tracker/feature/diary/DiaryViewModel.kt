@@ -175,7 +175,6 @@ class DiaryViewModel @Inject constructor(
         _pendingImageUri.value = uri
         _pendingImageBytes     = null
 
-        // Gán Job để các hàm Save/Update có thể await() khi cần thiết
         _imageCompressionJob = viewModelScope.launch {
             runCatching {
                 val rawBytes = withContext(Dispatchers.IO) {
@@ -210,14 +209,12 @@ class DiaryViewModel @Inject constructor(
             _isLoading.value = true
             _error.value     = null
 
-            // Đợi tiến trình nén ảnh hoàn thành (nếu có) trước khi đọc bytes
             _imageCompressionJob?.join()
             val imageBytes = _pendingImageBytes
 
             val itemId = java.util.UUID.randomUUID().toString()
             var finalImageUrl: String? = null
 
-            // Upload ảnh lên Storage (Đảm bảo imageBytes đã có đủ dữ liệu)
             imageBytes?.let { bytes ->
                 val ownerId = itemRepository.getCurrentUserId()
                 if (ownerId != null) {
@@ -268,7 +265,6 @@ class DiaryViewModel @Inject constructor(
             _isLoading.value = true
             _error.value     = null
 
-            // Đợi nén ảnh xong trước khi check ảnh cập nhật
             _imageCompressionJob?.join()
             val imageBytes = _pendingImageBytes
 
@@ -315,7 +311,8 @@ class DiaryViewModel @Inject constructor(
         }
     }
 
-    suspend fun computeStreak(): Int {
+    // Tối ưu hóa: Chạy tính toán Streak trên luồng IO phụ để tránh block UI thread
+    suspend fun computeStreak(): Int = withContext(Dispatchers.IO) {
         var cursor = Clock.System.todayIn(TimeZone.currentSystemDefault())
         var streak = 0
         while (true) {
@@ -326,16 +323,14 @@ class DiaryViewModel @Inject constructor(
             cursor  = cursor.plus(DatePeriod(days = -1))
         }
         _streak.value = streak
-        return streak
+        return@withContext streak
     }
 
     private suspend fun compressToJpeg(rawBytes: ByteArray, uri: Uri, maxBytes: Int): ByteArray =
         withContext(Dispatchers.Default) {
-            // 1. Giải mã mảng bytes thành Bitmap gốc
             var bitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size)
                 ?: return@withContext rawBytes
 
-            // 2. Đọc thông tin EXIF trực tiếp từ URI để kiểm tra hướng xoay
             runCatching {
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
                     val exif = ExifInterface(inputStream)
@@ -344,7 +339,6 @@ class DiaryViewModel @Inject constructor(
                         ExifInterface.ORIENTATION_NORMAL
                     )
 
-                    // Tính toán góc cần xoay lại
                     val degrees = when (orientation) {
                         ExifInterface.ORIENTATION_ROTATE_90 -> 90f
                         ExifInterface.ORIENTATION_ROTATE_180 -> 180f
@@ -352,14 +346,13 @@ class DiaryViewModel @Inject constructor(
                         else -> 0f
                     }
 
-                    // Nếu có góc xoay, thực hiện xoay lại Bitmap
                     if (degrees != 0f) {
                         val matrix = Matrix().apply { postRotate(degrees) }
                         val rotatedBitmap = Bitmap.createBitmap(
                             bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
                         )
                         if (rotatedBitmap != bitmap) {
-                            bitmap.recycle() // Giải phóng bộ nhớ của bitmap cũ
+                            bitmap.recycle()
                             bitmap = rotatedBitmap
                         }
                     }
@@ -368,7 +361,6 @@ class DiaryViewModel @Inject constructor(
                 Timber.e(t, "[DiaryVM] Lỗi đọc thông tin góc xoay EXIF")
             }
 
-            // 3. Tiến hành nén ảnh theo chu kỳ giảm chất lượng như cũ
             for (quality in listOf(80, 60, 40)) {
                 val out = ByteArrayOutputStream()
                 bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)

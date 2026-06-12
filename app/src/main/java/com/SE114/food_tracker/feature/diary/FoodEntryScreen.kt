@@ -47,7 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage // <-- BỔ SUNG THƯ VIỆN COIL
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
@@ -105,31 +105,29 @@ fun FoodEntryScreen(
     }
     var showTimePicker by remember { mutableStateOf(false) }
 
+    // timeType bắt buộc là 0, 1, hoặc 2 — Khớp hoàn toàn với DB CHECK constraint trên Supabase.
+    // 0 = Sáng, 1 = Trưa/Chiều, 2 = Tối
     val autoTimeType = when (selectedHour) {
-        in 0..10 -> 0
-        in 11..12 -> 1
-        in 13..16 -> 2
-        else -> 3
+        in 5..10 -> 0
+        in 11..16 -> 1
+        else -> 2
     }
 
-    val sessionLabel = when (autoTimeType) {
-        0 -> "Sáng"
-        1 -> "Trưa"
-        2 -> "Chiều"
+    // Nhãn hiển thị chia nhỏ hơn (4 mốc) để UX thân thiện, nhưng gom chung đầu ra logic ở trên.
+    val sessionLabel = when (selectedHour) {
+        in 5..10 -> "Sáng"
+        in 11..12 -> "Trưa"
+        in 13..16 -> "Chiều"
         else -> "Tối"
     }
 
-    val sessionIcon = when (autoTimeType) {
-        0 -> "🌅"
-        1 -> "☀️"
-        2 -> "⛅"
+    val sessionIcon = when (selectedHour) {
+        in 5..10 -> "🌅"
+        in 11..12 -> "☀️"
+        in 13..16 -> "⛅"
         else -> "🌙"
     }
 
-    // Polish 1: show a real clock time rather than "15:20".
-    // For a new entry we use the current system time; for an edit we keep the same
-    // display (the item entity stores entryDate as a date-only epoch, not a time-of-day,
-    // so we still fall back to now — a proper TimePicker is TODO Sprint 2).
     val displayTime = String.format("%02d:%02d", selectedHour, selectedMinute)
 
     val selectedCategoryObj = categories.find { it.categoryId == selectedCategoryId }
@@ -238,20 +236,17 @@ fun FoodEntryScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Avatar: shows the picked/uploaded photo if there is one,
-        // otherwise falls back to the selected category's icon (TV3's design). ──
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Surface(
                 modifier = Modifier
                     .size(140.dp)
                     .clickable {
-                        // TODO Sprint 2: allow changing/removing the photo from here
+                        // TODO Sprint 2: Cho phép đổi/gỡ ảnh từ đây
                     },
                 shape = RoundedCornerShape(70.dp),
                 color = Color(0xFFFFE9DD),
                 shadowElevation = 4.dp
             ) {
-                // Thứ tự ưu tiên: 1. Ảnh mới chụp/chọn -> 2. Ảnh cũ từ server -> 3. Icon danh mục
                 val imageSource = pendingImageUri ?: existingItem?.imageUrl
 
                 if (imageSource != null) {
@@ -300,8 +295,6 @@ fun FoodEntryScreen(
         )
         FieldError(priceError)
 
-        // GAP: onManageClick and onAddClick both route to onManageCategories —
-        // a full management sheet (CategoryRowItem list + add form) is TODO Sprint 2.
         CategorySelector(
             categories = categories,
             selectedCategoryId = selectedCategoryId,
@@ -316,7 +309,6 @@ fun FoodEntryScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // TODO Sprint 2: replace with a real TimePickerDialog improvements (date+time).
         TimeSelector(
             time = displayTime,
             session = sessionLabel,
@@ -391,8 +383,9 @@ private fun FieldError(error: String?) {
 fun Int.toSessionLabel(): String =
     when (this) {
         0    -> "Sáng"
+        1    -> "Trưa/Chiều"
         2    -> "Tối"
-        else -> "Chiều"
+        else -> "Không xác định"
     }
 
 @Preview(showSystemUi = true, device = "spec:width=411dp,height=891dp")
