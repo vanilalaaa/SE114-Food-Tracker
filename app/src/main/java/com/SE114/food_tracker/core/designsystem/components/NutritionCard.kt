@@ -63,6 +63,9 @@ fun NutritionCard(
         } ?: unfilteredItems
     }
 
+    // TỐI ƯU 1: Tạo map tra cứu một lần duy nhất khi danh mục thay đổi, tránh vòng lặp O(n*m) .find()
+    val categoriesById = remember(categories) { categories.associateBy { it.categoryId } }
+
     Surface(
         modifier = Modifier.fillMaxWidth().height(180.dp).padding(horizontal = 24.dp),
         color = LightPinkBG,
@@ -212,26 +215,32 @@ fun NutritionCard(
             val stickers = remember { mutableStateListOf<StickerNode>() }
             var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
-            // Lắng nghe thay đổi danh sách món ăn để map hình ảnh/emoji tương ứng
-            LaunchedEffect(filteredItems, boxSize, selectedCategoryId, unfilteredItems) {
+            // TỐI ƯU 2: áp dụng cơ chế So sánh sự thay đổi (Diff-based)
+            LaunchedEffect(filteredItems, boxSize, selectedCategoryId) {
                 if (boxSize == IntSize.Zero) return@LaunchedEffect
 
-                stickers.clear()
-                filteredItems.forEach { item ->
-                    // Khớp ID để lấy đúng emoji của Category làm Fallback khi không có ảnh
-                    val matchedCategory = categories.find { it.categoryId == item.categoryId }
-                    val categoryEmoji = matchedCategory?.iconUrl ?: "🍱"
+                val currentIds = filteredItems.map { it.itemId }.toSet()
 
-                    val spawnWidthRange = (boxSize.width - stickerSizePx.toInt()).coerceAtLeast(0)
-                    stickers.add(
-                        StickerNode(
-                            id = item.itemId,
-                            initialX = if (spawnWidthRange > 0) (0..spawnWidthRange).random().toFloat() else 0f,
-                            initialY = -100f, // Rơi từ trên đỉnh hộp xuống
-                            emoji = categoryEmoji,
-                            imageUrl = item.imageUrl
+                // Bước A: Xóa những sticker không còn nằm trong danh sách được lọc (Filter thay đổi hoặc bị xóa món)
+                stickers.removeAll { node -> node.id !in currentIds }
+
+                val existingIds = stickers.map { node -> node.id }.toSet()
+                val spawnWidthRange = (boxSize.width - stickerSizePx.toInt()).coerceAtLeast(0)
+
+                // Bước B: Chỉ khởi tạo hiệu ứng rơi cho các món ăn CHƯA xuất hiện trên màn hình
+                filteredItems.forEach { item ->
+                    if (item.itemId !in existingIds) {
+                        val categoryEmoji = categoriesById[item.categoryId]?.iconUrl ?: "🍱"
+                        stickers.add(
+                            StickerNode(
+                                id = item.itemId,
+                                initialX = if (spawnWidthRange > 0) (0..spawnWidthRange).random().toFloat() else 0f,
+                                initialY = -100f,
+                                emoji = categoryEmoji,
+                                imageUrl = item.imageUrl
+                            )
                         )
-                    )
+                    }
                 }
             }
 
@@ -292,7 +301,6 @@ fun NutritionCard(
                             .background(Color.White),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Gọi cụm Component giải mã hình ảnh từ Supabase (giống code cũ của bạn)
                         FoodStickerAvatar(
                             imageUrl = node.imageUrl,
                             emoji = node.emoji,
