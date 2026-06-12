@@ -1,11 +1,6 @@
 package com.SE114.food_tracker.feature.diary
 
-import android.app.DatePickerDialog
 import android.net.Uri
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -29,16 +24,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.core.designsystem.components.DiaryTopBar
-import com.SE114.food_tracker.core.designsystem.components.DraggableFoodItem
 import com.SE114.food_tracker.core.designsystem.components.NutritionCard
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
@@ -46,8 +38,6 @@ import com.SE114.food_tracker.feature.diary.components.CalendarCard
 import com.SE114.food_tracker.feature.diary.components.CategoryRowItem
 import com.SE114.food_tracker.feature.diary.components.MonthYearPickerDialog
 import kotlinx.datetime.LocalDate
-import timber.log.Timber
-import java.io.File
 
 @Composable
 fun DiaryScreen(
@@ -102,41 +92,15 @@ fun DiaryScreenContent(
     var selectedItemForEdit  by remember { mutableStateOf<DiaryItem?>(null) }
     var showManageCategories by remember { mutableStateOf(false) }
     var showDatePicker       by remember { mutableStateOf(false) }
-    var boxScale by remember { mutableStateOf(1f) }
-    var calendarScale by remember { mutableStateOf(1f) }
-    val scrollState = rememberScrollState()
-    var preSelectedCategory by remember { mutableStateOf<DiaryCategory?>(null) }
-
-    val context = LocalContext.current
+    var boxScale             by remember { mutableStateOf(1f) }
+    var calendarScale        by remember { mutableStateOf(1f) }
+    val scrollState          = rememberScrollState()
+    var preSelectedCategory  by remember { mutableStateOf<DiaryCategory?>(null) }
 
     val filteredItems = remember(uiState.items, uiState.selectedCategoryId) {
         uiState.selectedCategoryId?.let { catId ->
             uiState.items.filter { it.categoryId == catId }
         } ?: uiState.items
-    }
-
-    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
-
-    // Bộ chọn Gallery hiện đại
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            onImageSelected(uri)
-            showEntryScreen = true // Cài đặt ảnh xong chuyển hướng thẳng sang màn nhập liệu
-        }
-    }
-
-    // Bộ kích hoạt Camera chụp hình
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { isSuccess: Boolean ->
-        if (isSuccess) {
-            tempCameraUri?.let { uri ->
-                onImageSelected(uri)
-                showEntryScreen = true // Chụp ảnh thành công chuyển sang màn nhập liệu
-            }
-        }
     }
 
     LaunchedEffect(triggerAdd) {
@@ -213,7 +177,7 @@ fun DiaryScreenContent(
         Spacer(modifier = Modifier.height(32.dp))
     }
 
-    // ── Toàn bộ các hệ thống Popups / Overlays ──────────────────────────────
+    // ── POPUPS / OVERLAYS ──────────────────────────────────────────────────
 
     if (showDetailSheet) {
         DayDetailBottomSheet(
@@ -243,25 +207,11 @@ fun DiaryScreenContent(
             AddFoodSourceScreen(
                 categories = categories,
                 onBack = { showSourceScreen = false },
-                onCameraSelected = {
+                onImageCaptured = { uri ->
+                    onImageSelected(uri) // Gửi Uri lên ViewModel lưu giữ
                     showSourceScreen = false
                     preSelectedCategory = null
-                    runCatching { createTempImageUri(context) }
-                        .onSuccess { uri ->
-                            tempCameraUri = uri
-                            cameraLauncher.launch(uri) // Gọi app Camera hệ thống
-                        }
-                        .onFailure { e ->
-                            Timber.e(e, "Không tạo được file tạm để chụp ảnh")
-                        }
-                },
-                onGallerySelected = {
-                    showSourceScreen = false
-                    preSelectedCategory = null
-                    // Gọi bộ chọn ảnh hệ thống (Chỉ hiển thị tệp Định dạng hình ảnh)
-                    galleryLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
+                    showEntryScreen = true // Mở màn hình nhập liệu
                 },
                 onPresetSelected = { category ->
                     preSelectedCategory = category
@@ -283,9 +233,8 @@ fun DiaryScreenContent(
                 selectedItemForEdit = null
                 preSelectedCategory = null
             },
-            properties = DialogProperties(usePlatformDefaultWidth = false) // ÉP FULL MÀN HÌNH
+            properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            // Bọc Surface để cản lại mọi thứ từ màn hình dưới
             Surface(modifier = Modifier.fillMaxSize(), color = MainBackground) {
                 val editingItem = selectedItemForEdit
                 FoodEntryScreen(
@@ -361,50 +310,4 @@ fun DiaryScreenContent(
             }
         }
     }
-}
-
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun DiaryScreenPreview() {
-    FoodTrackerTheme {
-        DiaryScreenContent(
-            uiState = DiaryUiState(
-                streak = 5,
-                datesWithData = setOf(4, 5, 6),
-                totalSpend = 45000.0,
-                itemCount = 2
-            ),
-            pendingImageUri = null,
-            categories = listOf(
-                DiaryCategory("1", "Cơm", "🍚", isSystem = true),
-                DiaryCategory("2", "Mì & Phở", "🍜", isSystem = true)
-            ),
-            triggerAdd = false,
-            onAddTriggered = {},
-            onLoadDate = {},
-            onImageSelected = {},
-            onSaveItem = { _, _, _, _, _, _ -> },
-            onUpdateItem = { _, _, _, _, _, _, _ -> },
-            onDeleteItem = {},
-            onDeleteCategory = {},
-            onToggleCategoryVisibility = {},
-            onSelectCategoryFilter = {}
-        )
-    }
-}
-
-private fun createTempImageUri(context: Context): Uri {
-    val tempFile = File.createTempFile(
-        "JPEG_${System.currentTimeMillis()}_",
-        ".jpg",
-        context.cacheDir // Lưu trong thư mục cache của app để tự động dọn dẹp
-    ).apply {
-        createNewFile()
-        deleteOnExit()
-    }
-    return FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        tempFile
-    )
 }
