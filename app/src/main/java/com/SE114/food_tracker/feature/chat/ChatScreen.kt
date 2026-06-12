@@ -22,7 +22,6 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 
-// --- CHAT SCREEN CHÍNH (DÙNG KHI CHẠY APP THẬT - LIÊN KẾT VIEWMODEL) ---
 @Composable
 fun ChatScreen(
     conversationId: String,

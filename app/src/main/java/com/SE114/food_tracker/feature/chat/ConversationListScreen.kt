@@ -18,7 +18,6 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.Conversation
 import com.SE114.food_tracker.feature.chat.components.ConversationItem
 
-// --- MÀN HÌNH CHÍNH (DÙNG KHI CHẠY APP THẬT - LIÊN KẾT VIEWMODEL) ---
 @Composable
 fun ConversationListScreen(
     viewModel: ChatViewModel = viewModel(),
