@@ -9,15 +9,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
 fun TimeSelector(
     time: String,
     session: String,
+    icon: String,
     onTimeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -35,7 +34,6 @@ fun TimeSelector(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Ô hiển thị giờ
             Surface(
                 modifier = Modifier.clickable { onTimeClick() },
                 color = Color.White,
@@ -59,7 +57,7 @@ fun TimeSelector(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (session == "Chiều") "⛅ $session" else "☀️ $session",
+                        text = "$icon $session",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -69,10 +67,4 @@ fun TimeSelector(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFFF5E4)
-@Composable
-fun TimeSelectorPreview() {
-    FoodTrackerTheme {
-        TimeSelector(time = "15:20", session = "Chiều", onTimeClick = {})
-    }
-}
+

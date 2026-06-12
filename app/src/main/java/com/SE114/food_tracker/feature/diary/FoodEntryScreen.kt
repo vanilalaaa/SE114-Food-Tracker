@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.diary
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -51,12 +54,13 @@ import com.SE114.food_tracker.feature.diary.components.CategorySelector
 import com.SE114.food_tracker.feature.diary.components.FoodInputField
 import com.SE114.food_tracker.feature.diary.components.StarRatingBar
 import com.SE114.food_tracker.feature.diary.components.TimeSelector
-import kotlinx.datetime.toLocalDateTime
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FoodEntryScreen(
     existingItem: DiaryItem? = null,
+    preSelectedCategory: DiaryCategory? = null,
     categories: List<DiaryCategory> = emptyList(),
     pendingImageUri: Uri? = null,
     onDismiss: () -> Unit,
@@ -64,10 +68,14 @@ fun FoodEntryScreen(
     onDelete: ((String) -> Unit)? = null,
     onManageCategories: () -> Unit = {}
 ) {
-    var foodName by remember(existingItem?.itemId) { mutableStateOf(existingItem?.name.orEmpty()) }
+    var foodName by remember(existingItem?.itemId, preSelectedCategory) {
+        mutableStateOf(existingItem?.name ?: preSelectedCategory?.name.orEmpty())
+    }
+
     var price by remember(existingItem?.itemId) {
         mutableStateOf(existingItem?.price?.takeIf { it > 0.0 }?.toString().orEmpty())
     }
+
     var note by remember(existingItem?.itemId) { mutableStateOf(existingItem?.note.orEmpty()) }
 
     var selectedCategoryId by remember(existingItem?.itemId, categories) {
@@ -76,25 +84,56 @@ fun FoodEntryScreen(
         }
         mutableStateOf(
             existingItem?.categoryId
+                ?: preSelectedCategory?.categoryId
                 ?: fallbackCategories.firstOrNull()?.categoryId
                 ?: ""
         )
     }
 
     var rating by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
-    var timeType by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.timeType ?: 1) }
     var nameError by remember { mutableStateOf<String?>(null) }
     var priceError by remember { mutableStateOf<String?>(null) }
     var categoryError by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    val displayTime = remember(existingItem?.itemId) {
-        val now = kotlinx.datetime.Clock.System.now()
-        val localDateTime = now.toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault())
-        val hourStr = localDateTime.hour.toString().padStart(2, '0')
-        val minuteStr = localDateTime.minute.toString().padStart(2, '0')
-        "$hourStr:$minuteStr"
+    // ── Time picker state (TV3) ────────────────────────────────────────────
+    var selectedHour by remember(existingItem?.itemId) {
+        mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
     }
+    var selectedMinute by remember(existingItem?.itemId) {
+        mutableIntStateOf(Calendar.getInstance().get(Calendar.MINUTE))
+    }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val autoTimeType = when (selectedHour) {
+        in 0..10 -> 0
+        in 11..12 -> 1
+        in 13..16 -> 2
+        else -> 3
+    }
+
+    val sessionLabel = when (autoTimeType) {
+        0 -> "Sáng"
+        1 -> "Trưa"
+        2 -> "Chiều"
+        else -> "Tối"
+    }
+
+    val sessionIcon = when (autoTimeType) {
+        0 -> "🌅"
+        1 -> "☀️"
+        2 -> "⛅"
+        else -> "🌙"
+    }
+
+    // Polish 1: show a real clock time rather than "15:20".
+    // For a new entry we use the current system time; for an edit we keep the same
+    // display (the item entity stores entryDate as a date-only epoch, not a time-of-day,
+    // so we still fall back to now — a proper TimePicker is TODO Sprint 2).
+    val displayTime = String.format("%02d:%02d", selectedHour, selectedMinute)
+
+    val selectedCategoryObj = categories.find { it.categoryId == selectedCategoryId }
+    val displayIcon = selectedCategoryObj?.iconUrl ?: "🍱"
 
     fun submit() {
         val trimmedName = foodName.trim()
@@ -109,7 +148,7 @@ fun FoodEntryScreen(
         categoryError = if (selectedCategoryId.isBlank()) "Vui lòng chọn loại món" else null
 
         if (nameError == null && priceError == null && categoryError == null && parsedPrice != null) {
-            onSave(trimmedName, parsedPrice, selectedCategoryId, rating, note.trim(), timeType)
+            onSave(trimmedName, parsedPrice, selectedCategoryId, rating, note.trim(), autoTimeType)
         }
     }
 
@@ -131,6 +170,32 @@ fun FoodEntryScreen(
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Huỷ")
+                }
+            }
+        )
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = selectedHour,
+            initialMinute = selectedMinute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedHour = timePickerState.hour
+                    selectedMinute = timePickerState.minute
+                    showTimePicker = false
+                }) { Text("Xong") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Hủy") }
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    TimePicker(state = timePickerState)
                 }
             }
         )
@@ -173,13 +238,20 @@ fun FoodEntryScreen(
 
         Spacer(Modifier.height(16.dp))
 
+        // ── Avatar: shows the picked/uploaded photo if there is one,
+        // otherwise falls back to the selected category's icon (TV3's design). ──
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Surface(
-                modifier = Modifier.size(140.dp),
+                modifier = Modifier
+                    .size(140.dp)
+                    .clickable {
+                        // TODO Sprint 2: allow changing/removing the photo from here
+                    },
                 shape = RoundedCornerShape(70.dp),
-                color = Color(0xFFFFE9DD)
+                color = Color(0xFFFFE9DD),
+                shadowElevation = 4.dp
             ) {
-                // Thứ tự ưu tiên: 1. Ảnh mới chụp/chọn -> 2. Ảnh cũ từ mạng -> 3. Không có gì (Null)
+                // Thứ tự ưu tiên: 1. Ảnh mới chụp/chọn -> 2. Ảnh cũ từ server -> 3. Icon danh mục
                 val imageSource = pendingImageUri ?: existingItem?.imageUrl
 
                 if (imageSource != null) {
@@ -192,11 +264,13 @@ fun FoodEntryScreen(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Text(
-                        text = "🍱",
-                        fontSize = 54.sp,
-                        modifier = Modifier.wrapContentSize()
-                    )
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Text(
+                            text = displayIcon,
+                            fontSize = 64.sp,
+                            modifier = Modifier.wrapContentSize()
+                        )
+                    }
                 }
             }
         }
@@ -226,6 +300,8 @@ fun FoodEntryScreen(
         )
         FieldError(priceError)
 
+        // GAP: onManageClick and onAddClick both route to onManageCategories —
+        // a full management sheet (CategoryRowItem list + add form) is TODO Sprint 2.
         CategorySelector(
             categories = categories,
             selectedCategoryId = selectedCategoryId,
@@ -240,12 +316,13 @@ fun FoodEntryScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TimeTypeButton(label = "Sáng",       selected = timeType == 0, onClick = { timeType = 0 })
-            TimeTypeButton(label = "Trưa/Chiều", selected = timeType == 1, onClick = { timeType = 1 })
-            TimeTypeButton(label = "Tối",        selected = timeType == 2, onClick = { timeType = 2 })
-        }
-        TimeSelector(time = displayTime, session = timeType.toSessionLabel(), onTimeClick = { })
+        // TODO Sprint 2: replace with a real TimePickerDialog improvements (date+time).
+        TimeSelector(
+            time = displayTime,
+            session = sessionLabel,
+            icon = sessionIcon,
+            onTimeClick = { showTimePicker = true }
+        )
 
         Spacer(Modifier.height(16.dp))
 
@@ -311,26 +388,11 @@ private fun FieldError(error: String?) {
     }
 }
 
-@Composable
-private fun TimeTypeButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    TextButton(onClick = onClick) {
-        Text(
-            text = label,
-            color = if (selected) Color(0xFFC98989) else Color(0xFF666666),
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-        )
-    }
-}
-
 fun Int.toSessionLabel(): String =
     when (this) {
-        0    -> "Sang"
-        2    -> "Toi"
-        else -> "Chieu"
+        0    -> "Sáng"
+        2    -> "Tối"
+        else -> "Chiều"
     }
 
 @Preview(showSystemUi = true, device = "spec:width=411dp,height=891dp")
