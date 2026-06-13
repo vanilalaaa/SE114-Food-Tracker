@@ -6,7 +6,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CategoryDAO {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // Thay thế REPLACE bằng Upsert để tránh kích hoạt cascade delete ngầm
+    @Upsert
     suspend fun insert(category: Category)
 
     @Update
@@ -28,7 +29,7 @@ interface CategoryDAO {
     @Query("SELECT * FROM category WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingCategories(): List<Category>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertCategoriesFromServer(categories: List<Category>)
 
     @Query("UPDATE category SET sync_status = 'SYNCED' WHERE category_id = :categoryId")

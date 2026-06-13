@@ -3,11 +3,10 @@ package com.SE114.food_tracker.data.local.dao
 import androidx.room.*
 import com.SE114.food_tracker.data.local.entities.Item
 import kotlinx.coroutines.flow.Flow
-
 @Dao
 interface ItemDAO {
     // CRUD
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertItem(item: Item)
 
     @Update
@@ -45,7 +44,8 @@ interface ItemDAO {
     @Query("SELECT * FROM item WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingItems(): List<Item>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // 🛠️ SỬA TẠI ĐÂY: Dùng @Upsert để tối ưu hóa hiệu năng, cập nhật tại chỗ không delete dòng cũ
+    @Upsert
     suspend fun upsertItemsFromServer(items: List<Item>)
 
     @Query("UPDATE item SET sync_status = 'SYNCED' WHERE item_id = :itemId")
