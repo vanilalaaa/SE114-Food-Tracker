@@ -21,6 +21,7 @@ kotlinxDatetime = "0.6.1"
 timber = "5.0.1"
 supabaseBom = "3.0.2"
 ktor = "3.0.1"
+emoji2 = "1.4.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -72,6 +73,7 @@ ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-emoji2-emojipicker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emoji2" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

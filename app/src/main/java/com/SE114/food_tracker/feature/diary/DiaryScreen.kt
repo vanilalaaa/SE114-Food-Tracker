@@ -62,6 +62,7 @@ fun DiaryScreen(
         onDeleteItem = { diaryViewModel.deleteItem(it) },
         onDeleteCategory = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
+        onCreateCategory = { name, emoji -> categoryViewModel.addCategory(name, emoji) },
         onSelectCategoryFilter = { catId -> diaryViewModel.selectCategoryFilter(catId) }
     )
 }
@@ -79,13 +80,13 @@ fun DiaryScreenContent(
     onDeleteItem: (String) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
+    onCreateCategory: (String, String) -> Unit,
     onSelectCategoryFilter: (String?) -> Unit
 ) {
     var showDetailSheet     by remember { mutableStateOf(false) }
     var showEntryScreen     by remember { mutableStateOf(false) }
     var showSourceScreen    by remember { mutableStateOf(false) }
     var selectedItemForEdit by remember { mutableStateOf<DiaryItem?>(null) }
-    var showManageCategories by remember { mutableStateOf(false) }
     var showDatePicker       by remember { mutableStateOf(false) }
     var stickerScale by remember { mutableStateOf(1f) }
     var boxScale by remember { mutableStateOf(1f) }
@@ -172,7 +173,6 @@ fun DiaryScreenContent(
         Spacer(modifier = Modifier.height(32.dp))
     }
 
-
     if (showDetailSheet) {
         DayDetailBottomSheet(
             onDismiss    = { showDetailSheet = false },
@@ -258,50 +258,10 @@ fun DiaryScreenContent(
                         showEntryScreen     = false
                         selectedItemForEdit = null
                     },
-                    onManageCategories = { showManageCategories = true }
+                    onToggleCategoryVisibility = onToggleCategoryVisibility,
+                    onDeleteCategory = onDeleteCategory,
+                    onCreateCategory = onCreateCategory
                 )
-            }
-        }
-    }
-
-    if (showManageCategories) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { showManageCategories = false },
-            sheetState = sheetState
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = "Quản lý danh mục",
-                    modifier = Modifier.padding(vertical = 16.dp),
-                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge
-                )
-                LazyColumn {
-                    items(
-                        items = categories,
-                        key   = { it.categoryId }
-                    ) { category ->
-                        CategoryRowItem(
-                            category = category,
-                            onEdit   = { },
-                            onDelete = { onDeleteCategory(category) },
-                            onVisibilityToggle = { onToggleCategoryVisibility(category) }
-                        )
-                    }
-                    item {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "＋ Thêm danh mục mới (Sprint 2)",
-                            modifier = Modifier.padding(12.dp),
-                            color = androidx.compose.ui.graphics.Color(0xFFC98989)
-                        )
-                    }
-                }
             }
         }
     }
@@ -330,6 +290,7 @@ fun DiaryScreenPreview() {
             onDeleteItem = {},
             onDeleteCategory = {},
             onToggleCategoryVisibility = {},
+            onCreateCategory = { _, _ -> },
             onSelectCategoryFilter = {}
         )
     }
