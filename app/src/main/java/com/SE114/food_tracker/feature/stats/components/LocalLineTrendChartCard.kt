@@ -29,10 +29,20 @@ fun LocalLineTrendChartCard(
         shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(text = title, style = StatSectionTitleStyle, color = TextPrimaryStat, fontSize = 14.sp)
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = StatSectionTitleStyle,
+                color = TextPrimaryStat,
+                fontSize = 14.sp
+            )
 
-            Canvas(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+            Canvas(modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp)) {
                 val widthInterval = size.width / (points.size - 1)
                 val maxVal = points.maxOrNull() ?: 100f
 
@@ -49,7 +59,8 @@ fun LocalLineTrendChartCard(
                         var currentY = startY
                         val deltaX = endX - startX
                         val deltaY = endY - startY
-                        val distance = Math.sqrt((deltaX * deltaX + deltaY * deltaY).toDouble()).toFloat()
+                        val distance =
+                            Math.sqrt((deltaX * deltaX + deltaY * deltaY).toDouble()).toFloat()
                         val segments = (distance / (dashLength + gapLength)).toInt()
 
                         val stepX = deltaX / segments
@@ -77,7 +88,11 @@ fun LocalLineTrendChartCard(
                     }
                 }
             }
-            Text(text = "👉 Đường nét đứt màu hồng biểu thị xu hướng dự báo tuyến tính kỳ sau.", fontSize = 11.sp, color = TextLabelGray)
+            Text(
+                text = "👉 Đường nét đứt màu hồng biểu thị xu hướng dự báo tuyến tính kỳ sau.",
+                fontSize = 11.sp,
+                color = TextLabelGray
+            )
         }
     }
 }

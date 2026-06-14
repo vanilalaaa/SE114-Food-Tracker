@@ -38,9 +38,19 @@ fun InsightDashboardGrid(
                 elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("💥 Món chi nhiều nhất", fontSize = 11.sp, color = TextLabelGray, fontWeight = FontWeight.Bold)
+                    Text(
+                        "💥 Món chi nhiều nhất",
+                        fontSize = 11.sp,
+                        color = TextLabelGray,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = topFood, fontSize = 15.sp, color = StatPinkDark, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = topFood,
+                        fontSize = 15.sp,
+                        color = StatPinkDark,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
@@ -51,9 +61,19 @@ fun InsightDashboardGrid(
                 elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🗂️ Danh mục cao nhất", fontSize = 11.sp, color = TextLabelGray, fontWeight = FontWeight.Bold)
+                    Text(
+                        "🗂️ Danh mục cao nhất",
+                        fontSize = 11.sp,
+                        color = TextLabelGray,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = topCategory, fontSize = 15.sp, color = TextPrimaryStat, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = topCategory,
+                        fontSize = 15.sp,
+                        color = TextPrimaryStat,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -65,14 +85,25 @@ fun InsightDashboardGrid(
             elevation = CardDefaults.cardElevation(2.dp)
         ) {
             Row(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("📈 So sánh với kỳ trước", fontSize = 11.sp, color = TextLabelGray, fontWeight = FontWeight.Bold)
+                    Text(
+                        "📈 So sánh với kỳ trước",
+                        fontSize = 11.sp,
+                        color = TextLabelGray,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Tổng chi tiêu hệ thống biến động", fontSize = 12.sp, color = TextLabelGray)
+                    Text(
+                        "Tổng chi tiêu hệ thống biến động",
+                        fontSize = 12.sp,
+                        color = TextLabelGray
+                    )
                 }
                 Text(
                     text = variationText,
