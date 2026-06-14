@@ -37,7 +37,6 @@ fun DayItem(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Hình tròn đại diện cho ảnh món ăn (Màu hồng cam nhạt của em)
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -61,7 +60,6 @@ fun DayItem(
                     Text(text = category, style = AppTypography.labelMedium)
                     Spacer(Modifier.width(12.dp))
 
-                    // Tag thời gian (Sáng/Chiều)
                     Surface(
                         color = Color(0xFFE2E2E2),
                         shape = RoundedCornerShape(8.dp)
@@ -76,7 +74,6 @@ fun DayItem(
                 }
             }
 
-            // Giá tiền định dạng k đ
             Text(
                 text = "${(price / 1000).toInt()}k đ",
                 color = OrangeMain,

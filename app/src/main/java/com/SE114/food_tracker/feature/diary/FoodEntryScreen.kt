@@ -48,6 +48,7 @@ import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
 import com.SE114.food_tracker.feature.diary.components.FoodInputField
+import com.SE114.food_tracker.feature.diary.components.ManageCategoryBottomSheet
 import com.SE114.food_tracker.feature.diary.components.StarRatingBar
 import com.SE114.food_tracker.feature.diary.components.TimeSelector
 import java.util.Calendar
@@ -63,7 +64,10 @@ fun FoodEntryScreen(
     onDelete: ((String) -> Unit)? = null,
     // GAP: onManageCategories is wired here so DiaryScreen can open a category
     // management sheet. Not implemented yet — TODO in Sprint 2.
-    onManageCategories: () -> Unit = {}
+    onManageCategories: () -> Unit = {},
+    onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
+    onDeleteCategory: (DiaryCategory) -> Unit = {},
+    onCreateCategory: (String, String) -> Unit = { _, _ -> }
 ) {
     var foodName by remember(existingItem?.itemId, preSelectedCategory) {
         mutableStateOf(existingItem?.name ?: preSelectedCategory?.name.orEmpty())
@@ -92,6 +96,7 @@ fun FoodEntryScreen(
     var priceError by remember { mutableStateOf<String?>(null) }
     var categoryError by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showManageCategoriesSheet by remember { mutableStateOf(false) }
 
     var selectedHour by remember(existingItem?.itemId) {
         mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
@@ -197,6 +202,20 @@ fun FoodEntryScreen(
         )
     }
 
+    if (showManageCategoriesSheet) {
+        ManageCategoryBottomSheet(
+            categories = categories,
+            onDismiss = { showManageCategoriesSheet = false },
+            onToggleVisibility = onToggleCategoryVisibility,
+            onDeleteCategory = onDeleteCategory,
+            onEditCategory = { },
+            onCreateNew = { name, emoji ->
+                onCreateCategory(name, emoji)
+                showManageCategoriesSheet = false
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -291,8 +310,8 @@ fun FoodEntryScreen(
                 selectedCategoryId = it
                 categoryError = null
             },
-            onManageClick = onManageCategories,
-            onAddClick = onManageCategories
+            onManageClick = { showManageCategoriesSheet = true },
+            onAddClick = { showManageCategoriesSheet = true }
         )
         FieldError(categoryError)
 
