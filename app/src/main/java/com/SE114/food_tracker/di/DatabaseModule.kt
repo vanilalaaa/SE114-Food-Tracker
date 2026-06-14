@@ -8,6 +8,7 @@ import com.SE114.food_tracker.data.local.dao.BudgetDAO
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.dao.ChatDAO
 import com.SE114.food_tracker.data.local.dao.ItemDAO
+import com.SE114.food_tracker.data.local.dao.FriendDAO
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -53,5 +54,6 @@ object DatabaseModule {
     fun provideBudgetDao(db: AppDatabase): BudgetDAO = db.budgetDAO()
 
     @Provides @Singleton
+    fun provideFriendDao(db: AppDatabase): FriendDAO = db.friendDao()
     fun provideChatDao(db: AppDatabase): ChatDAO = db.chatDAO()
 }

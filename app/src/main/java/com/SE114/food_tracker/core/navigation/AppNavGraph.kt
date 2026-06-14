@@ -13,6 +13,8 @@ import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
 import com.SE114.food_tracker.feature.stats.StatisticsScreen
+import com.SE114.food_tracker.feature.feed.FeedScreen
+import com.SE114.food_tracker.feature.friend.FriendScreen
 import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
 
@@ -77,15 +79,16 @@ fun AppNavGraph(
                 )
             }
             composable(AppDestinations.Stats.route)    { StatisticsScreen() }
-            // ĐẤU NỐI TẠM THỜI: Bẻ hướng Tab Feed (Tab 3) để hiển thị danh sách chat
-            composable(AppDestinations.Feed.route)     {
-                val chatTestViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>()
-                ConversationListScreen(
-                    viewModel = chatTestViewModel,
-                    onConversationClick = { conversationId, conversationName ->
-                        navController.navigate("chat_screen/$conversationId/$conversationName")
-                    },
-                    onBackClick = { navController.popBackStack() }
+
+            composable(AppDestinations.Feed.route) {
+                FeedScreen(
+                    onNavigateToFriend = { navController.navigate(AppDestinations.Friend.route) }
+                )
+            }
+
+            composable(AppDestinations.Friend.route) {
+                FriendScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable(AppDestinations.Chat.route)     {
@@ -109,6 +112,7 @@ fun AppNavGraph(
                     onBackClick = { navController.popBackStack() }
                 )
             }
+
             composable(AppDestinations.Settings.route) { Text("TODO: Settings (TV5)") }
         }
     }
