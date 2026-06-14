@@ -28,8 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.DayOfWeek
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.AppTypography
@@ -38,6 +36,7 @@ import com.SE114.food_tracker.feature.diary.components.DayItem
 import com.SE114.food_tracker.feature.diary.components.PrimaryButton
 import com.SE114.food_tracker.feature.diary.components.StatBox
 import com.SE114.food_tracker.feature.diary.components.getEmojiByName
+import kotlinx.datetime.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,8 +83,14 @@ fun DayDetailBottomSheetContent(
     onDeleteItem: (String) -> Unit
 ) {
     val scrollState = rememberScrollState()
-    val totalEntry = items.sumOf { it.price }.toInt()
-    // Format: "Thứ X, DD tháng MM, YYYY"
+
+    val totalEntry = items.sumOf { it.price }
+    val displayTotal = if (totalEntry >= 1000) {
+        "${(totalEntry / 1000).toInt()}k đ"
+    } else {
+        "${totalEntry.toInt()}k đ"
+    }
+
     val dayOfWeekLabel = when (selectedDate.dayOfWeek.ordinal) {
         0 -> "Thứ Hai"
         1 -> "Thứ Ba"
@@ -111,7 +116,7 @@ fun DayDetailBottomSheetContent(
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             StatBox(label = "Món", value = "${items.size}", modifier = Modifier.weight(1f))
-            StatBox(label = "Chi", value = "${totalEntry / 1000}k d", modifier = Modifier.weight(1f))
+            StatBox(label = "Chi", value = displayTotal, modifier = Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(24.dp))
@@ -163,9 +168,9 @@ fun DayDetailBottomSheetContent(
                     enableDismissFromEndToStart = true
                 ) {
                     val matchedCategory = categories.find { it.categoryId == item.categoryId }
-                    val catName = categories.find { it.categoryId == item.categoryId }?.name
-                        ?: item.categoryName
+                    val catName = matchedCategory?.name ?: item.categoryName
                     val catIcon = matchedCategory?.iconUrl ?: getEmojiByName(catName)
+
                     DayItem(
                         name = item.name,
                         category = catName,

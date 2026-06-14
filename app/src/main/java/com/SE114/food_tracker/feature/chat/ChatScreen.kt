@@ -103,7 +103,7 @@ fun ChatScreenContent(
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                reverseLayout = true,
+                reverseLayout = true, // Đảo ngược layout
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp, top = 16.dp)
             ) {
