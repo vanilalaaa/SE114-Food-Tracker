@@ -55,5 +55,7 @@ object DatabaseModule {
 
     @Provides @Singleton
     fun provideFriendDao(db: AppDatabase): FriendDAO = db.friendDao()
-    fun provideChatDao(db: AppDatabase): ChatDAO = db.chatDAO()
+
+    @Provides @Singleton
+    fun provideChatDao(db: AppDatabase): ChatDAO = db.chatDao()
 }

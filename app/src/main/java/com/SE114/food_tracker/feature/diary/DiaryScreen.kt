@@ -29,7 +29,10 @@ import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CalendarCard
 import com.SE114.food_tracker.feature.diary.components.MonthYearPickerDialog
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 
 @Composable
 fun DiaryScreen(
@@ -50,6 +53,7 @@ fun DiaryScreen(
         categories                 = categories,
         triggerAdd                 = triggerAdd,
         onAddTriggered             = onAddTriggered,
+        onClearPendingImage        = { diaryViewModel.clearPendingImage() },
         onLoadDate                 = { diaryViewModel.loadDate(it) },
         onImageSelected            = { diaryViewModel.onImageSelected(it) },
         onSaveItem                 = { n, p, c, r, no, t -> diaryViewModel.saveItem(n, p, c, r, no, t) },
@@ -72,6 +76,7 @@ fun DiaryScreenContent(
     onAddTriggered: () -> Unit,
     onLoadDate: (LocalDate) -> Unit,
     onImageSelected: (Uri) -> Unit,
+    onClearPendingImage: () -> Unit,
     onSaveItem: (String, Double, String, Int, String, Int) -> Unit,
     onUpdateItem: (String, String, Double, String, Int, String, Int) -> Unit,
     onDeleteItem: (String) -> Unit,
@@ -90,6 +95,7 @@ fun DiaryScreenContent(
     val scrollState         = rememberScrollState()
     var preSelectedCategory by remember { mutableStateOf<DiaryCategory?>(null) }
 
+    // Tính toán danh sách món ăn đã lọc theo Danh mục đang chọn
     val filteredItems = remember(uiState.items, uiState.selectedCategoryId) {
         uiState.selectedCategoryId?.let { catId ->
             uiState.items.filter { it.categoryId == catId }
@@ -106,8 +112,9 @@ fun DiaryScreenContent(
 
     if (showDatePicker) {
         MonthYearPickerDialog(
-            currentMonth = uiState.selectedMonth,
-            currentYear  = uiState.selectedYear,
+            // TỐI ƯU 1: Lấy trực tiếp trường dữ liệu từ uiState.selectedDate
+            currentMonth = uiState.selectedDate.monthNumber,
+            currentYear  = uiState.selectedDate.year,
             onDismiss    = { showDatePicker = false },
             onConfirm    = { month, year ->
                 runCatching { LocalDate(year, month, 1) }
@@ -126,22 +133,22 @@ fun DiaryScreenContent(
     ) {
         DiaryTopBar(
             streakCount  = uiState.streak.toString(),
-            currentMonth = "Tháng ${uiState.selectedMonth} ${uiState.selectedYear}",
+            currentMonth = "Tháng ${uiState.selectedDate.monthNumber} ${uiState.selectedDate.year}",
             onMonthClick = { showDatePicker = true },
             onPreviousClick = {
-                val newMonth = if (uiState.selectedMonth == 1) 12 else uiState.selectedMonth - 1
-                val newYear  = if (uiState.selectedMonth == 1) uiState.selectedYear - 1 else uiState.selectedYear
-                runCatching { LocalDate(newYear, newMonth, 1) }.getOrNull()?.let { onLoadDate(it) }
+                val previousMonthDate = uiState.selectedDate.minus(DatePeriod(months = 1))
+                runCatching { LocalDate(previousMonthDate.year, previousMonthDate.monthNumber, 1) }
+                    .getOrNull()?.let { onLoadDate(it) }
             },
             onNextClick = {
-                val newMonth = if (uiState.selectedMonth == 12) 1 else uiState.selectedMonth + 1
-                val newYear  = if (uiState.selectedMonth == 12) uiState.selectedYear + 1 else uiState.selectedYear
-                runCatching { LocalDate(newYear, newMonth, 1) }.getOrNull()?.let { onLoadDate(it) }
+                val nextMonthDate = uiState.selectedDate.plus(DatePeriod(months = 1))
+                runCatching { LocalDate(nextMonthDate.year, nextMonthDate.monthNumber, 1) }
+                    .getOrNull()?.let { onLoadDate(it) }
             }
         )
 
         NutritionCard(
-            unfilteredItems    = uiState.items,
+            unfilteredItems    = uiState.monthlyItems,
             filteredItemCount  = filteredItems.size,
             categories         = categories,
             selectedCategoryId = uiState.selectedCategoryId,
@@ -155,11 +162,11 @@ fun DiaryScreenContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         CalendarCard(
-            selectedYear  = uiState.selectedYear,
-            selectedMonth = uiState.selectedMonth,
+            selectedYear  = uiState.selectedDate.year,
+            selectedMonth = uiState.selectedDate.monthNumber,
             onDateClick   = { day ->
                 runCatching {
-                    LocalDate(uiState.selectedYear, uiState.selectedMonth, day)
+                    LocalDate(uiState.selectedDate.year, uiState.selectedDate.monthNumber, day)
                 }.getOrNull()?.let { selectedDate ->
                     onLoadDate(selectedDate)
                     showDetailSheet = true
@@ -178,7 +185,7 @@ fun DiaryScreenContent(
         DayDetailBottomSheet(
             onDismiss    = { showDetailSheet = false },
             selectedDate = uiState.selectedDate,
-            items        = uiState.filteredItems,
+            items        = filteredItems,
             categories   = categories,
             onEditItem   = { item ->
                 selectedItemForEdit = item
@@ -241,6 +248,7 @@ fun DiaryScreenContent(
                         showEntryScreen     = false
                         selectedItemForEdit = null
                         preSelectedCategory = null
+                        onClearPendingImage()
                     },
                     onSave = { name, price, categoryId, rating, note, timeType ->
                         if (editingItem == null) {
@@ -273,10 +281,10 @@ fun DiaryScreenPreview() {
     FoodTrackerTheme {
         DiaryScreenContent(
             uiState = DiaryUiState(
-                streak       = 5,
+                streak        = 5,
                 datesWithData = setOf(4, 5, 6),
-                totalSpend   = 45000.0,
-                itemCount    = 2
+                totalSpend    = 45000.0,
+                itemCount     = 2
             ),
             pendingImageUri = null,
             categories = listOf(
@@ -284,6 +292,7 @@ fun DiaryScreenPreview() {
                 DiaryCategory("2", "Mì & Phở", "🍜", isSystem = true)
             ),
             triggerAdd             = false,
+            onClearPendingImage    = {},
             onAddTriggered         = {},
             onLoadDate             = {},
             onImageSelected        = {},

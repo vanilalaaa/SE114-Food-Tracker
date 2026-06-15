@@ -29,8 +29,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -67,7 +67,6 @@ fun FoodEntryScreen(
     onDismiss: () -> Unit,
     onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int) -> Unit,
     onDelete: ((String) -> Unit)? = null,
-    // TV3: category management is now handled inline via ManageCategoryBottomSheet
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
     onCreateCategory: (String, String) -> Unit = { _, _ -> }
@@ -77,7 +76,7 @@ fun FoodEntryScreen(
     }
 
     var price by remember(existingItem?.itemId) {
-        mutableStateOf(existingItem?.price?.takeIf { it > 0.0 }?.toString().orEmpty())
+        mutableStateOf(existingItem?.price?.takeIf { it > 0.0 }?.toLong()?.toString().orEmpty())
     }
 
     var note by remember(existingItem?.itemId) { mutableStateOf(existingItem?.note.orEmpty()) }
@@ -94,32 +93,35 @@ fun FoodEntryScreen(
         )
     }
 
-    var rating              by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
-    var nameError           by remember { mutableStateOf<String?>(null) }
-    var priceError          by remember { mutableStateOf<String?>(null) }
-    var categoryError       by remember { mutableStateOf<String?>(null) }
+    var rating        by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
+    var nameError     by remember { mutableStateOf<String?>(null) }
+    var priceError    by remember { mutableStateOf<String?>(null) }
+    var categoryError by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog    by remember { mutableStateOf(false) }
-    // TV3: manage-categories sheet is owned here, not by parent
     var showManageCategoriesSheet by remember { mutableStateOf(false) }
 
-    // ── Time picker state (TV3) ────────────────────────────────────────────
     var selectedHour by remember(existingItem?.itemId) {
-        mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
+        val initialHour = when (existingItem?.timeType) {
+            0 -> 8   // Nếu là món Sáng cũ -> đưa về 8 giờ mặc định
+            1 -> 12  // Nếu là món Trưa cũ -> đưa về 12 giờ mặc định
+            2 -> 19  // Nếu là món Tối cũ -> đưa về 19 giờ mặc định
+            else -> Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        }
+        mutableIntStateOf(initialHour)
     }
     var selectedMinute by remember(existingItem?.itemId) {
-        mutableIntStateOf(Calendar.getInstance().get(Calendar.MINUTE))
+        mutableIntStateOf(if (existingItem != null) 0 else Calendar.getInstance().get(Calendar.MINUTE))
     }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    // timeType must be 0, 1, or 2 — matches Supabase DB CHECK constraint
-    // 0 = Sáng, 1 = Trưa/Chiều, 2 = Tối
+    // Tự động phân loại timeType khớp với constraint của Database (0: Sáng, 1: Trưa/Chiều, 2: Tối)
     val autoTimeType = when (selectedHour) {
         in 5..10  -> 0
         in 11..16 -> 1
         else      -> 2
     }
 
-    // Finer display label (4 slots) for UX, collapsed to 3-value timeType above
+    // Nhãn hiển thị chi tiết cho UI người dùng
     val sessionLabel = when (selectedHour) {
         in 5..10  -> "Sáng"
         in 11..12 -> "Trưa"
@@ -304,8 +306,9 @@ fun FoodEntryScreen(
         FoodInputField(
             label         = "GIÁ",
             value         = price,
-            onValueChange = {
-                price      = it
+            onValueChange = { input ->
+                val digitsOnly = input.filter { it.isDigit() }
+                price      = digitsOnly
                 priceError = null
             },
             placeholder  = "0",
@@ -397,14 +400,6 @@ private fun FieldError(error: String?) {
         )
     }
 }
-
-fun Int.toSessionLabel(): String =
-    when (this) {
-        0    -> "Sáng"
-        1    -> "Trưa/Chiều"
-        2    -> "Tối"
-        else -> "Không xác định"
-    }
 
 @Preview(showSystemUi = true, device = "spec:width=411dp,height=891dp")
 @Composable

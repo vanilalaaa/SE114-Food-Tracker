@@ -177,7 +177,7 @@ fun DayDetailBottomSheetContent(
                         categoryIcon = catIcon,
                         imageUrl     = item.imageUrl,
                         price        = item.price,
-                        time         = item.timeLabel.ifBlank { item.timeType.toSessionLabel() },
+                        time         = item.timeLabel.ifBlank { item.timeType.toTimeLabel() },
                         onClick      = { onEditItemClick(item) }
                     )
                 }
@@ -185,6 +185,13 @@ fun DayDetailBottomSheetContent(
             }
         }
     }
+}
+
+private fun Int.toTimeLabel(): String = when (this) {
+    0    -> "Sáng"
+    1    -> "Trưa/Chiều"
+    2    -> "Tối"
+    else -> "Khác"
 }
 
 @Preview(showBackground = true)
