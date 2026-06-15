@@ -5,18 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,7 +28,6 @@ import com.SE114.food_tracker.core.designsystem.components.NutritionCard
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CalendarCard
-import com.SE114.food_tracker.feature.diary.components.CategoryRowItem
 import com.SE114.food_tracker.feature.diary.components.MonthYearPickerDialog
 import kotlinx.datetime.LocalDate
 
@@ -53,18 +45,19 @@ fun DiaryScreen(
     val categories = categoryState.ifEmpty { uiState.categories }
 
     DiaryScreenContent(
-        uiState            = uiState,
-        pendingImageUri    = pendingImageUri,
-        categories         = categories,
-        triggerAdd         = triggerAdd,
-        onAddTriggered     = onAddTriggered,
-        onLoadDate         = { diaryViewModel.loadDate(it) },
-        onImageSelected    = { diaryViewModel.onImageSelected(it) },
-        onSaveItem         = { n, p, c, r, no, t -> diaryViewModel.saveItem(n, p, c, r, no, t) },
-        onUpdateItem       = { id, n, p, c, r, no, t -> diaryViewModel.updateItem(id, n, p, c, r, no, t) },
-        onDeleteItem       = { diaryViewModel.deleteItem(it) },
-        onDeleteCategory   = { categoryViewModel.deleteCategory(it) },
+        uiState                    = uiState,
+        pendingImageUri            = pendingImageUri,
+        categories                 = categories,
+        triggerAdd                 = triggerAdd,
+        onAddTriggered             = onAddTriggered,
+        onLoadDate                 = { diaryViewModel.loadDate(it) },
+        onImageSelected            = { diaryViewModel.onImageSelected(it) },
+        onSaveItem                 = { n, p, c, r, no, t -> diaryViewModel.saveItem(n, p, c, r, no, t) },
+        onUpdateItem               = { id, n, p, c, r, no, t -> diaryViewModel.updateItem(id, n, p, c, r, no, t) },
+        onDeleteItem               = { diaryViewModel.deleteItem(it) },
+        onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
+        onCreateCategory           = { name, emoji -> categoryViewModel.addCategory(name, emoji) },
         onSelectCategoryFilter     = { catId -> diaryViewModel.selectCategoryFilter(catId) }
     )
 }
@@ -84,18 +77,18 @@ fun DiaryScreenContent(
     onDeleteItem: (String) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
+    onCreateCategory: (String, String) -> Unit,
     onSelectCategoryFilter: (String?) -> Unit
 ) {
-    var showDetailSheet      by remember { mutableStateOf(false) }
-    var showEntryScreen      by remember { mutableStateOf(false) }
-    var showSourceScreen     by remember { mutableStateOf(false) }
-    var selectedItemForEdit  by remember { mutableStateOf<DiaryItem?>(null) }
-    var showManageCategories by remember { mutableStateOf(false) }
-    var showDatePicker       by remember { mutableStateOf(false) }
-    var boxScale             by remember { mutableStateOf(1f) }
-    var calendarScale        by remember { mutableStateOf(1f) }
-    val scrollState          = rememberScrollState()
-    var preSelectedCategory  by remember { mutableStateOf<DiaryCategory?>(null) }
+    var showDetailSheet     by remember { mutableStateOf(false) }
+    var showEntryScreen     by remember { mutableStateOf(false) }
+    var showSourceScreen    by remember { mutableStateOf(false) }
+    var selectedItemForEdit by remember { mutableStateOf<DiaryItem?>(null) }
+    var showDatePicker      by remember { mutableStateOf(false) }
+    var boxScale            by remember { mutableStateOf(1f) }
+    var calendarScale       by remember { mutableStateOf(1f) }
+    val scrollState         = rememberScrollState()
+    var preSelectedCategory by remember { mutableStateOf<DiaryCategory?>(null) }
 
     val filteredItems = remember(uiState.items, uiState.selectedCategoryId) {
         uiState.selectedCategoryId?.let { catId ->
@@ -114,9 +107,9 @@ fun DiaryScreenContent(
     if (showDatePicker) {
         MonthYearPickerDialog(
             currentMonth = uiState.selectedMonth,
-            currentYear = uiState.selectedYear,
-            onDismiss = { showDatePicker = false },
-            onConfirm = { month, year ->
+            currentYear  = uiState.selectedYear,
+            onDismiss    = { showDatePicker = false },
+            onConfirm    = { month, year ->
                 runCatching { LocalDate(year, month, 1) }
                     .getOrNull()
                     ?.let { onLoadDate(it) }
@@ -137,33 +130,34 @@ fun DiaryScreenContent(
             onMonthClick = { showDatePicker = true },
             onPreviousClick = {
                 val newMonth = if (uiState.selectedMonth == 1) 12 else uiState.selectedMonth - 1
-                val newYear = if (uiState.selectedMonth == 1) uiState.selectedYear - 1 else uiState.selectedYear
+                val newYear  = if (uiState.selectedMonth == 1) uiState.selectedYear - 1 else uiState.selectedYear
                 runCatching { LocalDate(newYear, newMonth, 1) }.getOrNull()?.let { onLoadDate(it) }
             },
             onNextClick = {
                 val newMonth = if (uiState.selectedMonth == 12) 1 else uiState.selectedMonth + 1
-                val newYear = if (uiState.selectedMonth == 12) uiState.selectedYear + 1 else uiState.selectedYear
+                val newYear  = if (uiState.selectedMonth == 12) uiState.selectedYear + 1 else uiState.selectedYear
                 runCatching { LocalDate(newYear, newMonth, 1) }.getOrNull()?.let { onLoadDate(it) }
             }
         )
 
         NutritionCard(
-            unfilteredItems = uiState.items,
-            filteredItemCount = filteredItems.size,
-            categories = categories,
+            unfilteredItems    = uiState.items,
+            filteredItemCount  = filteredItems.size,
+            categories         = categories,
             selectedCategoryId = uiState.selectedCategoryId,
-            onCategorySelect = onSelectCategoryFilter,
-            boxScale = boxScale,
-            calendarScale = calendarScale,
-            onBoxScaleChange = { boxScale = it },
+            onCategorySelect   = onSelectCategoryFilter,
+            boxScale           = boxScale,
+            calendarScale      = calendarScale,
+            onBoxScaleChange   = { boxScale = it },
             onCalendarScaleChange = { calendarScale = it }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
         CalendarCard(
             selectedYear  = uiState.selectedYear,
             selectedMonth = uiState.selectedMonth,
-            onDateClick = { day ->
+            onDateClick   = { day ->
                 runCatching {
                     LocalDate(uiState.selectedYear, uiState.selectedMonth, day)
                 }.getOrNull()?.let { selectedDate ->
@@ -172,8 +166,9 @@ fun DiaryScreenContent(
                 }
             },
             hasDataDates = uiState.datesWithData.toList(),
-            scale = calendarScale
+            scale        = calendarScale
         )
+
         Spacer(modifier = Modifier.height(32.dp))
     }
 
@@ -202,21 +197,21 @@ fun DiaryScreenContent(
     if (showSourceScreen) {
         Dialog(
             onDismissRequest = { showSourceScreen = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+            properties       = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             AddFoodSourceScreen(
-                categories = categories,
-                onBack = { showSourceScreen = false },
+                categories  = categories,
+                onBack      = { showSourceScreen = false },
                 onImageCaptured = { uri ->
-                    onImageSelected(uri) // Gửi Uri lên ViewModel lưu giữ
-                    showSourceScreen = false
+                    onImageSelected(uri)
+                    showSourceScreen    = false
                     preSelectedCategory = null
-                    showEntryScreen = true // Mở màn hình nhập liệu
+                    showEntryScreen     = true
                 },
                 onPresetSelected = { category ->
                     preSelectedCategory = category
-                    showSourceScreen = false
-                    showEntryScreen = true
+                    showSourceScreen    = false
+                    showEntryScreen     = true
                 },
                 onManualSelected = {
                     showSourceScreen = false
@@ -263,51 +258,42 @@ fun DiaryScreenContent(
                         showEntryScreen     = false
                         selectedItemForEdit = null
                     },
-                    onManageCategories = { showManageCategories = true }
+                    onToggleCategoryVisibility = onToggleCategoryVisibility,
+                    onDeleteCategory           = onDeleteCategory,
+                    onCreateCategory           = onCreateCategory
                 )
             }
         }
     }
+}
 
-    if (showManageCategories) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { showManageCategories = false },
-            sheetState = sheetState
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = "Quản lý danh mục",
-                    modifier = Modifier.padding(vertical = 16.dp),
-                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge
-                )
-                LazyColumn {
-                    items(
-                        items = categories,
-                        key   = { it.categoryId }
-                    ) { category ->
-                        CategoryRowItem(
-                            category = category,
-                            onEdit   = { },
-                            onDelete = { onDeleteCategory(category) },
-                            onVisibilityToggle = { onToggleCategoryVisibility(category) }
-                        )
-                    }
-                    item {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "＋ Thêm danh mục mới (Sprint 2)",
-                            modifier = Modifier.padding(12.dp),
-                            color = androidx.compose.ui.graphics.Color(0xFFC98989)
-                        )
-                    }
-                }
-            }
-        }
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+fun DiaryScreenPreview() {
+    FoodTrackerTheme {
+        DiaryScreenContent(
+            uiState = DiaryUiState(
+                streak       = 5,
+                datesWithData = setOf(4, 5, 6),
+                totalSpend   = 45000.0,
+                itemCount    = 2
+            ),
+            pendingImageUri = null,
+            categories = listOf(
+                DiaryCategory("1", "Cơm",      "🍚", isSystem = true),
+                DiaryCategory("2", "Mì & Phở", "🍜", isSystem = true)
+            ),
+            triggerAdd             = false,
+            onAddTriggered         = {},
+            onLoadDate             = {},
+            onImageSelected        = {},
+            onSaveItem             = { _, _, _, _, _, _ -> },
+            onUpdateItem           = { _, _, _, _, _, _, _ -> },
+            onDeleteItem           = {},
+            onDeleteCategory       = {},
+            onToggleCategoryVisibility = {},
+            onCreateCategory       = { _, _ -> },
+            onSelectCategoryFilter = {}
+        )
     }
 }

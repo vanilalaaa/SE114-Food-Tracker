@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage // <-- Thêm Coil AsyncImage
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
@@ -41,7 +41,6 @@ fun DayItem(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Box hình tròn chứa ảnh món ăn hoặc Emoji
             Box(
                 modifier = Modifier
                     .size(48.dp)

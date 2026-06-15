@@ -13,6 +13,10 @@ import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
 import com.SE114.food_tracker.feature.stats.StatisticsScreen
+import com.SE114.food_tracker.feature.feed.FeedScreen
+import com.SE114.food_tracker.feature.friend.FriendScreen
+import com.SE114.food_tracker.feature.chat.ChatScreen
+import com.SE114.food_tracker.feature.chat.ConversationListScreen
 
 object NavGraphs {
     const val AUTH = "auth_graph"
@@ -75,8 +79,40 @@ fun AppNavGraph(
                 )
             }
             composable(AppDestinations.Stats.route)    { StatisticsScreen() }
-            composable(AppDestinations.Feed.route)     { Text("TODO: Feed (TV3)") }
-            composable(AppDestinations.Chat.route)     { Text("TODO: Chat (TV4)") }
+
+            composable(AppDestinations.Feed.route) {
+                FeedScreen(
+                    onNavigateToFriend = { navController.navigate(AppDestinations.Friend.route) }
+                )
+            }
+
+            composable(AppDestinations.Friend.route) {
+                FriendScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(AppDestinations.Chat.route)     {
+                ConversationListScreen(
+                    onConversationClick = { conversationId, conversationName ->
+                        navController.navigate("chat_screen/$conversationId/$conversationName")
+                    },
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+            composable("chat_screen/{conversationId}/{conversationName}") { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("conversationId") ?: ""
+                val name = backStackEntry.arguments?.getString("conversationName") ?: "Người dùng"
+
+                val chatDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>()
+
+                ChatScreen(
+                    conversationId = id,
+                    conversationName = name,
+                    viewModel = chatDetailViewModel,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
             composable(AppDestinations.Settings.route) { Text("TODO: Settings (TV5)") }
         }
     }

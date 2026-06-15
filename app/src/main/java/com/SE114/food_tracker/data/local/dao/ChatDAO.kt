@@ -31,4 +31,7 @@ interface ChatDAO {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertParticipants(participants: List<ConversationParticipant>)
+
+    @Query("SELECT * FROM conversations ORDER BY id DESC")
+    fun getAllConversations(): Flow<List<Conversation>>
 }

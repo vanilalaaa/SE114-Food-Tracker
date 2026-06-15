@@ -52,6 +52,7 @@ import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
 import com.SE114.food_tracker.feature.diary.components.FoodInputField
+import com.SE114.food_tracker.feature.diary.components.ManageCategoryBottomSheet
 import com.SE114.food_tracker.feature.diary.components.StarRatingBar
 import com.SE114.food_tracker.feature.diary.components.TimeSelector
 import java.util.Calendar
@@ -66,7 +67,10 @@ fun FoodEntryScreen(
     onDismiss: () -> Unit,
     onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int) -> Unit,
     onDelete: ((String) -> Unit)? = null,
-    onManageCategories: () -> Unit = {}
+    // TV3: category management is now handled inline via ManageCategoryBottomSheet
+    onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
+    onDeleteCategory: (DiaryCategory) -> Unit = {},
+    onCreateCategory: (String, String) -> Unit = { _, _ -> }
 ) {
     var foodName by remember(existingItem?.itemId, preSelectedCategory) {
         mutableStateOf(existingItem?.name ?: preSelectedCategory?.name.orEmpty())
@@ -90,11 +94,13 @@ fun FoodEntryScreen(
         )
     }
 
-    var rating by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
-    var nameError by remember { mutableStateOf<String?>(null) }
-    var priceError by remember { mutableStateOf<String?>(null) }
-    var categoryError by remember { mutableStateOf<String?>(null) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var rating              by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
+    var nameError           by remember { mutableStateOf<String?>(null) }
+    var priceError          by remember { mutableStateOf<String?>(null) }
+    var categoryError       by remember { mutableStateOf<String?>(null) }
+    var showDeleteDialog    by remember { mutableStateOf(false) }
+    // TV3: manage-categories sheet is owned here, not by parent
+    var showManageCategoriesSheet by remember { mutableStateOf(false) }
 
     // ── Time picker state (TV3) ────────────────────────────────────────────
     var selectedHour by remember(existingItem?.itemId) {
@@ -105,40 +111,40 @@ fun FoodEntryScreen(
     }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    // timeType bắt buộc là 0, 1, hoặc 2 — Khớp hoàn toàn với DB CHECK constraint trên Supabase.
+    // timeType must be 0, 1, or 2 — matches Supabase DB CHECK constraint
     // 0 = Sáng, 1 = Trưa/Chiều, 2 = Tối
     val autoTimeType = when (selectedHour) {
-        in 5..10 -> 0
+        in 5..10  -> 0
         in 11..16 -> 1
-        else -> 2
+        else      -> 2
     }
 
-    // Nhãn hiển thị chia nhỏ hơn (4 mốc) để UX thân thiện, nhưng gom chung đầu ra logic ở trên.
+    // Finer display label (4 slots) for UX, collapsed to 3-value timeType above
     val sessionLabel = when (selectedHour) {
-        in 5..10 -> "Sáng"
+        in 5..10  -> "Sáng"
         in 11..12 -> "Trưa"
         in 13..16 -> "Chiều"
-        else -> "Tối"
+        else      -> "Tối"
     }
 
     val sessionIcon = when (selectedHour) {
-        in 5..10 -> "🌅"
+        in 5..10  -> "🌅"
         in 11..12 -> "☀️"
         in 13..16 -> "⛅"
-        else -> "🌙"
+        else      -> "🌙"
     }
 
     val displayTime = String.format("%02d:%02d", selectedHour, selectedMinute)
 
     val selectedCategoryObj = categories.find { it.categoryId == selectedCategoryId }
-    val displayIcon = selectedCategoryObj?.iconUrl ?: "🍱"
+    val displayIcon         = selectedCategoryObj?.iconUrl ?: "🍱"
 
     fun submit() {
         val trimmedName = foodName.trim()
         val parsedPrice = price.trim().toDoubleOrNull()
 
-        nameError = if (trimmedName.isBlank()) "Tên món không được để trống" else null
-        priceError = when {
+        nameError     = if (trimmedName.isBlank()) "Tên món không được để trống" else null
+        priceError    = when {
             parsedPrice == null -> "Vui lòng nhập giá hợp lệ"
             parsedPrice <= 0.0  -> "Giá phải lớn hơn 0"
             else                -> null
@@ -150,40 +156,38 @@ fun FoodEntryScreen(
         }
     }
 
+    // ── Delete confirmation dialog ─────────────────────────────────────────
     if (showDeleteDialog && existingItem != null && onDelete != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Xoá món này?") },
-            text = { Text("Món ăn sẽ bị xoá khỏi nhật ký của bạn.") },
+            title   = { Text("Xoá món này?") },
+            text    = { Text("Món ăn sẽ bị xoá khỏi nhật ký của bạn.") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete(existingItem.itemId)
-                    }
-                ) {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    onDelete(existingItem.itemId)
+                }) {
                     Text("Xoá", color = Color(0xFFE57373))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Huỷ")
-                }
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Huỷ") }
             }
         )
     }
 
+    // ── Time picker dialog (TV3) ───────────────────────────────────────────
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState(
-            initialHour = selectedHour,
+            initialHour   = selectedHour,
             initialMinute = selectedMinute,
-            is24Hour = true
+            is24Hour      = true
         )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    selectedHour = timePickerState.hour
+                    selectedHour   = timePickerState.hour
                     selectedMinute = timePickerState.minute
                     showTimePicker = false
                 }) { Text("Xong") }
@@ -199,6 +203,22 @@ fun FoodEntryScreen(
         )
     }
 
+    // ── Manage categories bottom sheet (TV3) ──────────────────────────────
+    if (showManageCategoriesSheet) {
+        ManageCategoryBottomSheet(
+            categories          = categories,
+            onDismiss           = { showManageCategoriesSheet = false },
+            onToggleVisibility  = onToggleCategoryVisibility,
+            onDeleteCategory    = onDeleteCategory,
+            onEditCategory      = { /* TODO Sprint 2 */ },
+            onCreateNew         = { name, emoji ->
+                onCreateCategory(name, emoji)
+                showManageCategoriesSheet = false
+            }
+        )
+    }
+
+    // ── Main content ──────────────────────────────────────────────────────
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -212,21 +232,21 @@ fun FoodEntryScreen(
                 .padding(top = 16.dp)
         ) {
             Text(
-                text = if (existingItem == null) "Thêm món" else "Sửa món",
+                text     = if (existingItem == null) "Thêm món" else "Sửa món",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Center),
-                color = Color(0xFF333333)
+                modifier   = Modifier.align(Alignment.Center),
+                color      = Color(0xFF333333)
             )
             IconButton(
-                onClick = onDismiss,
+                onClick  = onDismiss,
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Đóng", tint = Color.Black)
             }
             if (existingItem != null && onDelete != null) {
                 IconButton(
-                    onClick = { showDeleteDialog = true },
+                    onClick  = { showDeleteDialog = true },
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = "Xoá", tint = Color(0xFFE57373))
@@ -240,20 +260,18 @@ fun FoodEntryScreen(
             Surface(
                 modifier = Modifier
                     .size(140.dp)
-                    .clickable {
-                        // TODO Sprint 2: Cho phép đổi/gỡ ảnh từ đây
-                    },
-                shape = RoundedCornerShape(70.dp),
-                color = Color(0xFFFFE9DD),
+                    .clickable { /* TODO Sprint 2: swap/remove image */ },
+                shape          = RoundedCornerShape(70.dp),
+                color          = Color(0xFFFFE9DD),
                 shadowElevation = 4.dp
             ) {
                 val imageSource = pendingImageUri ?: existingItem?.imageUrl
 
                 if (imageSource != null) {
                     AsyncImage(
-                        model = imageSource,
+                        model              = imageSource,
                         contentDescription = "Ảnh món ăn",
-                        modifier = Modifier
+                        modifier           = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(70.dp)),
                         contentScale = ContentScale.Crop
@@ -261,7 +279,7 @@ fun FoodEntryScreen(
                 } else {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Text(
-                            text = displayIcon,
+                            text     = displayIcon,
                             fontSize = 64.sp,
                             modifier = Modifier.wrapContentSize()
                         )
@@ -273,10 +291,10 @@ fun FoodEntryScreen(
         Spacer(Modifier.height(24.dp))
 
         FoodInputField(
-            label = "TÊN MÓN",
-            value = foodName,
+            label         = "TÊN MÓN",
+            value         = foodName,
             onValueChange = {
-                foodName = it
+                foodName  = it
                 nameError = null
             },
             placeholder = "VD: Phở Bò"
@@ -284,43 +302,43 @@ fun FoodEntryScreen(
         FieldError(nameError)
 
         FoodInputField(
-            label = "GIÁ",
-            value = price,
+            label         = "GIÁ",
+            value         = price,
             onValueChange = {
-                price = it
+                price      = it
                 priceError = null
             },
-            placeholder = "0",
+            placeholder  = "0",
             trailingText = "đ"
         )
         FieldError(priceError)
 
         CategorySelector(
-            categories = categories,
+            categories         = categories,
             selectedCategoryId = selectedCategoryId,
             onCategorySelected = {
                 selectedCategoryId = it
-                categoryError = null
+                categoryError      = null
             },
-            onManageClick = onManageCategories,
-            onAddClick = onManageCategories
+            onManageClick = { showManageCategoriesSheet = true },
+            onAddClick    = { showManageCategoriesSheet = true }
         )
         FieldError(categoryError)
 
         Spacer(Modifier.height(16.dp))
 
         TimeSelector(
-            time = displayTime,
-            session = sessionLabel,
-            icon = sessionIcon,
+            time        = displayTime,
+            session     = sessionLabel,
+            icon        = sessionIcon,
             onTimeClick = { showTimePicker = true }
         )
 
         Spacer(Modifier.height(16.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier              = Modifier.fillMaxWidth(),
+            verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -329,38 +347,38 @@ fun FoodEntryScreen(
                 Text("⭐", fontSize = 12.sp)
             }
             StarRatingBar(
-                rating = rating,
+                rating         = rating,
                 onRatingChange = { rating = it },
-                modifier = Modifier.width(180.dp)
+                modifier       = Modifier.width(180.dp)
             )
         }
 
         Spacer(Modifier.height(8.dp))
 
         FoodInputField(
-            label = "Ghi chú",
-            labelIcon = "📝",
-            value = note,
+            label         = "Ghi chú",
+            labelIcon     = "📝",
+            value         = note,
             onValueChange = { note = it },
-            placeholder = "VD: Món này ngon quá!",
-            isSingleLine = false
+            placeholder   = "VD: Món này ngon quá!",
+            isSingleLine  = false
         )
 
         Spacer(Modifier.height(24.dp))
 
         Button(
-            onClick = ::submit,
+            onClick  = ::submit,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape  = RoundedCornerShape(28.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA8D5BA))
         ) {
             Text(
-                text = if (existingItem == null) "Thêm món" else "Lưu thay đổi",
-                fontSize = 16.sp,
+                text       = if (existingItem == null) "Thêm món" else "Lưu thay đổi",
+                fontSize   = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color      = Color.White
             )
         }
 
@@ -372,8 +390,8 @@ fun FoodEntryScreen(
 private fun FieldError(error: String?) {
     if (error != null) {
         Text(
-            text = error,
-            color = Color(0xFFE57373),
+            text     = error,
+            color    = Color(0xFFE57373),
             fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
         )
@@ -392,18 +410,18 @@ fun Int.toSessionLabel(): String =
 @Composable
 fun FoodEntryScreenPreview() {
     val previewCategories = listOf(
-        DiaryCategory("preview-1", "Cơm",       "🍚", isSystem = true),
-        DiaryCategory("preview-2", "Mì & Phở",  "🍜", isSystem = true),
-        DiaryCategory("preview-3", "Bánh mì",   "🥖", isSystem = true),
-        DiaryCategory("preview-4", "Đồ uống",   "🥤", isSystem = true),
+        DiaryCategory("preview-1", "Cơm",        "🍚", isSystem = true),
+        DiaryCategory("preview-2", "Mì & Phở",   "🍜", isSystem = true),
+        DiaryCategory("preview-3", "Bánh mì",    "🥖", isSystem = true),
+        DiaryCategory("preview-4", "Đồ uống",    "🥤", isSystem = true),
         DiaryCategory("preview-5", "Tráng miệng","🍰", isSystem = true),
     )
     FoodTrackerTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MainBackground) {
             FoodEntryScreen(
                 categories = previewCategories,
-                onDismiss = {},
-                onSave = { _, _, _, _, _, _ -> }
+                onDismiss  = {},
+                onSave     = { _, _, _, _, _, _ -> }
             )
         }
     }
