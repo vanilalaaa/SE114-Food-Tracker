@@ -59,15 +59,12 @@ class DiaryViewModel @Inject constructor(
     private val _isLoading          = MutableStateFlow(false)
     private val _error              = MutableStateFlow<String?>(null)
     private val _streak             = MutableStateFlow(0)
-    private val _mutationTrigger    = MutableStateFlow(0)
 
     // ── Trạng thái ảnh tạm thời ──────────────────────────────────────────────
     private val _pendingImageUri = MutableStateFlow<Uri?>(null)
     val pendingImageUri: StateFlow<Uri?> = _pendingImageUri.asStateFlow()
 
     private var _pendingImageBytes: ByteArray? = null
-
-    // Giữ lại biến theo dõi Job nén ảnh để tránh User bấm Lưu quá nhanh
     private var _imageCompressionJob: Job? = null
 
     private val categories: Flow<List<DiaryCategory>> =
@@ -84,48 +81,62 @@ class DiaryViewModel @Inject constructor(
                 }
             }
 
+    // TỐI ƯU: Loại bỏ mutationTrigger, để Room Flow tự động cập nhật bất cứ khi nào DB thay đổi
     private val selectedDayItems: Flow<List<DiaryItem>> =
-        combine(_selectedDate, _mutationTrigger) { date, _ -> date }
-            .flatMapLatest { date ->
-                val range = date.utcDayRange()
-                itemRepository.getDiaryItemsByDay(range.start, range.end)
-            }
+        _selectedDate.flatMapLatest { date ->
+            val range = date.utcDayRange()
+            itemRepository.getDiaryItemsByDay(range.start, range.end)
+        }
 
+    // Dữ liệu tháng hiện tại để hiển thị lên NutritionCard (sticker vật lý)
+    private val selectedMonthItems: Flow<List<DiaryItem>> =
+        _selectedDate.flatMapLatest { date ->
+            val monthStart     = LocalDate(date.year, date.monthNumber, 1)
+            val nextMonthStart = monthStart.plus(DatePeriod(months = 1))
+            itemRepository.getDiaryItemsByDay(
+                monthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
+                nextMonthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+            )
+        }
+
+    // TỐI ƯU: Loại bỏ mutationTrigger tại đây luôn
     private val datesWithData: Flow<Set<Int>> =
-        combine(_selectedDate, _mutationTrigger) { date, _ -> date }
-            .flatMapLatest { date ->
-                val monthStart     = LocalDate(date.year, date.monthNumber, 1)
-                val nextMonthStart = monthStart.plus(DatePeriod(months = 1))
-                val range = DateRange(
-                    start = monthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
-                    end   = nextMonthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
-                )
-                itemRepository.getItemsByDateRange(range.start, range.end)
-                    .map { items ->
-                        items.map { item ->
-                            Instant.fromEpochMilliseconds(item.entryDate)
-                                .toLocalDateTime(TimeZone.UTC)
-                                .date
-                                .dayOfMonth
-                        }.toSet()
-                    }
-            }
+        _selectedDate.flatMapLatest { date ->
+            val monthStart     = LocalDate(date.year, date.monthNumber, 1)
+            val nextMonthStart = monthStart.plus(DatePeriod(months = 1))
+            val range = DateRange(
+                start = monthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
+                end   = nextMonthStart.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+            )
+            itemRepository.getItemsByDateRange(range.start, range.end)
+                .map { items ->
+                    items.map { item ->
+                        Instant.fromEpochMilliseconds(item.entryDate)
+                            .toLocalDateTime(TimeZone.UTC)
+                            .date
+                            .dayOfMonth
+                    }.toSet()
+                }
+        }
 
     val uiState: StateFlow<DiaryUiState> =
         combine(
             _selectedDate,
             _selectedCategoryId,
             selectedDayItems,
-            categories,
-            datesWithData
-        ) { selectedDate, selectedCategoryId, items, categories, datesWithData ->
+            selectedMonthItems,
+            categories
+        ) { selectedDate, selectedCategoryId, items, monthlyItems, categories ->
             DiaryContent(
                 selectedDate       = selectedDate,
                 selectedCategoryId = selectedCategoryId,
                 items              = items,
+                monthlyItems       = monthlyItems,
                 categories         = categories,
-                datesWithData      = datesWithData
+                datesWithData      = emptySet() // filled in the next combine
             )
+        }.combine(datesWithData) { content, datesWithData ->
+            content.copy(datesWithData = datesWithData)
         }.let { content ->
             combine(content, _isLoading, _error, _streak, _pendingImageUri) {
                     diaryContent, isLoading, error, streak, pendingImageUri ->
@@ -135,6 +146,7 @@ class DiaryViewModel @Inject constructor(
 
                 DiaryUiState(
                     items              = diaryContent.items,
+                    monthlyItems       = diaryContent.monthlyItems,
                     categories         = diaryContent.categories,
                     selectedDate       = diaryContent.selectedDate,
                     selectedCategoryId = diaryContent.selectedCategoryId,
@@ -209,45 +221,54 @@ class DiaryViewModel @Inject constructor(
             _isLoading.value = true
             _error.value     = null
 
-            _imageCompressionJob?.join()
-            val imageBytes = _pendingImageBytes
+            try {
+                _imageCompressionJob?.join()
+                val imageBytes = _pendingImageBytes
 
-            val itemId = java.util.UUID.randomUUID().toString()
-            var finalImageUrl: String? = null
+                val itemId = java.util.UUID.randomUUID().toString()
+                var finalImageUrl: String? = null
 
-            imageBytes?.let { bytes ->
-                val ownerId = itemRepository.getCurrentUserId()
-                if (ownerId != null) {
-                    imageRepository.uploadItemImage(ownerId, itemId, bytes)
-                        .onSuccess { publicUrl ->
-                            finalImageUrl = publicUrl
-                            Timber.d("[DiaryVM] Upload ảnh thành công lên Storage: $publicUrl")
-                        }
-                        .onFailure { e ->
-                            Timber.e(e, "[DiaryVM] Lỗi upload ảnh Storage nhưng vẫn lưu thông tin chữ")
-                        }
+                imageBytes?.let { bytes ->
+                    val ownerId = itemRepository.getCurrentUserId()
+                    if (ownerId != null) {
+                        imageRepository.uploadItemImage(ownerId, itemId, bytes)
+                            .onSuccess { publicUrl ->
+                                finalImageUrl = publicUrl
+                                Timber.d("[DiaryVM] Upload ảnh thành công: $publicUrl")
+                            }
+                            .onFailure { e ->
+                                Timber.e(e, "[DiaryVM] Lỗi upload ảnh Storage nhưng vẫn giữ thông tin chữ")
+                            }
+                    }
                 }
-            }
 
-            val now = Clock.System.now().toEpochMilliseconds()
-            val item = Item(
-                itemId     = itemId,
-                categoryId = categoryId,
-                name       = name,
-                timeType   = timeType,
-                price      = price,
-                rating     = rating.takeIf { it > 0 },
-                note       = note.ifBlank { null },
-                imageUrl   = finalImageUrl,
-                syncStatus = SyncStatus.PENDING.name,
-                entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
-                createdAt  = now,
-                updatedAt  = now
-            )
+                val now = Clock.System.now().toEpochMilliseconds()
+                val item = Item(
+                    itemId     = itemId,
+                    categoryId = categoryId,
+                    name       = name,
+                    timeType   = timeType,
+                    price      = price,
+                    rating     = rating.takeIf { it > 0 },
+                    note       = note.ifBlank { null },
+                    imageUrl   = finalImageUrl,
+                    syncStatus = SyncStatus.PENDING.name,
+                    entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
+                    createdAt  = now,
+                    updatedAt  = now
+                )
 
-            runMutation {
+                // Thực hiện ghi vào DB và dọn dẹp
                 itemRepository.insert(item)
                 clearPendingImage()
+                computeStreak()
+                SyncScheduler.triggerImmediateSync(context)
+
+            } catch (t: Throwable) {
+                _error.value = t.message
+                Timber.e(t, "[DiaryVM] Thao tác lưu thất bại")
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -265,28 +286,28 @@ class DiaryViewModel @Inject constructor(
             _isLoading.value = true
             _error.value     = null
 
-            _imageCompressionJob?.join()
-            val imageBytes = _pendingImageBytes
+            try {
+                _imageCompressionJob?.join()
+                val imageBytes = _pendingImageBytes
 
-            val currentItem = itemRepository.getItemByIdOneShot(itemId)
-            if (currentItem == null) {
-                _error.value = "Không tìm thấy món ăn để cập nhật"
-                _isLoading.value = false
-                return@launch
-            }
-
-            var finalImageUrl = currentItem.imageUrl
-
-            imageBytes?.let { bytes ->
-                val ownerId = itemRepository.getCurrentUserId()
-                if (ownerId != null) {
-                    imageRepository.uploadItemImage(ownerId, itemId, bytes)
-                        .onSuccess { publicUrl -> finalImageUrl = publicUrl }
-                        .onFailure { e -> Timber.e(e, "[DiaryVM] Lỗi cập nhật ảnh mới") }
+                val currentItem = itemRepository.getItemByIdOneShot(itemId)
+                if (currentItem == null) {
+                    _error.value = "Không tìm thấy món ăn để cập nhật"
+                    _isLoading.value = false
+                    return@launch
                 }
-            }
 
-            runMutation {
+                var finalImageUrl = currentItem.imageUrl
+
+                imageBytes?.let { bytes ->
+                    val ownerId = itemRepository.getCurrentUserId()
+                    if (ownerId != null) {
+                        imageRepository.uploadItemImage(ownerId, itemId, bytes)
+                            .onSuccess { publicUrl -> finalImageUrl = publicUrl }
+                            .onFailure { e -> Timber.e(e, "[DiaryVM] Lỗi cập nhật ảnh mới") }
+                    }
+                }
+
                 itemRepository.update(
                     currentItem.copy(
                         categoryId = categoryId,
@@ -295,23 +316,41 @@ class DiaryViewModel @Inject constructor(
                         price      = price,
                         rating     = rating.takeIf { it > 0 },
                         note       = note.ifBlank { null },
-                        imageUrl   = finalImageUrl
+                        imageUrl   = finalImageUrl,
+                        syncStatus = SyncStatus.PENDING.name, // Đưa về trạng thái cần sync lại lên server
+                        updatedAt  = Clock.System.now().toEpochMilliseconds()
                     )
                 )
                 clearPendingImage()
+                computeStreak()
+                SyncScheduler.triggerImmediateSync(context)
+
+            } catch (t: Throwable) {
+                _error.value = t.message
+                Timber.e(t, "[DiaryVM] Thao tác cập nhật thất bại")
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
     fun deleteItem(itemId: String) {
         viewModelScope.launch {
-            runMutation {
+            _isLoading.value = true
+            _error.value     = null
+            try {
                 itemRepository.softDeleteDiaryItem(itemId)
+                computeStreak()
+                SyncScheduler.triggerImmediateSync(context)
+            } catch (t: Throwable) {
+                _error.value = t.message
+                Timber.e(t, "[DiaryVM] Xóa món thất bại")
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
-    // Tối ưu hóa: Chạy tính toán Streak trên luồng IO phụ để tránh block UI thread
     suspend fun computeStreak(): Int = withContext(Dispatchers.IO) {
         var cursor = Clock.System.todayIn(TimeZone.currentSystemDefault())
         var streak = 0
@@ -370,22 +409,6 @@ class DiaryViewModel @Inject constructor(
             return@withContext rawBytes
         }
 
-    private suspend fun runMutation(block: suspend () -> Unit) {
-        _isLoading.value = true
-        _error.value     = null
-        try {
-            block()
-            computeStreak()
-            _mutationTrigger.value += 1
-            SyncScheduler.triggerImmediateSync(context)
-        } catch (t: Throwable) {
-            _error.value = t.message
-            Timber.e(t, "[DiaryVM] Thao tác thất bại")
-        } finally {
-            _isLoading.value = false
-        }
-    }
-
     private fun LocalDate.utcDayRange(): DateRange {
         val start = atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
         val end   = plus(DatePeriod(days = 1)).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
@@ -398,6 +421,7 @@ class DiaryViewModel @Inject constructor(
         val selectedDate: LocalDate,
         val selectedCategoryId: String?,
         val items: List<DiaryItem>,
+        val monthlyItems: List<DiaryItem>,
         val categories: List<DiaryCategory>,
         val datesWithData: Set<Int>
     )

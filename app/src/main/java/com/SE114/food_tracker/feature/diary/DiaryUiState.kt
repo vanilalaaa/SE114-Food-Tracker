@@ -36,6 +36,7 @@ data class DiaryItem(
 
 data class DiaryUiState(
     val items: List<DiaryItem> = emptyList(),
+    val monthlyItems: List<DiaryItem> = emptyList(),
     val categories: List<DiaryCategory> = emptyList(),
     val selectedDate: LocalDate = currentLocalDate(),
     val selectedCategoryId: String? = null,
