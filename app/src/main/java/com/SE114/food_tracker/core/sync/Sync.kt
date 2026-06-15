@@ -84,6 +84,23 @@ class Sync @AssistedInject constructor(
                     continue
                 }
 
+                // Soft-deleted custom category: push is_deleted=true to server, keep row locally
+                if (category.isDeleted) {
+                    val dto = with(DataMapper) { category.toDto() }
+                    Timber.d("[Sync] soft-deleting category '${category.name}' id=${category.categoryId} on server")
+                    runCatching {
+                        supabaseClient.postgrest.from("category").upsert(dto)
+                    }.onSuccess {
+                        categoryRepository.markSynced(category.categoryId)
+                        Timber.d("[Sync] ✓ category soft-deleted on server: ${category.name}")
+                    }.onFailure { err ->
+                        Timber.e(err, "[Sync] ✗ category soft-delete FAILED: ${category.name} — ${err.message}")
+                        categoryRepository.markFailed(category.categoryId)
+                        anyError = true
+                    }
+                    continue
+                }
+
                 val dto = with(DataMapper) { category.toDto() }
                 Timber.d("[Sync] upserting category '${category.name}' id=${category.categoryId}")
 

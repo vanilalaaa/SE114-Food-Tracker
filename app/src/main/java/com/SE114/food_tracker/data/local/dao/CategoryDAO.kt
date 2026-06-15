@@ -6,29 +6,34 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CategoryDAO {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insert(category: Category)
 
     @Update
     suspend fun update(category: Category)
 
-    @Delete
-    suspend fun delete(category: Category)
+    // Soft-delete: marks is_deleted = 1 and queues for sync. Only for custom (is_system = false).
+    @Query("UPDATE category SET is_deleted = 1, sync_status = 'PENDING', updated_at = :updatedAt WHERE category_id = :categoryId AND is_system = 0")
+    suspend fun softDeleteCategory(categoryId: String, updatedAt: Long = System.currentTimeMillis())
 
-    // Lấy tất cả danh mục (bao gồm cả danh mục đã ẩn - dùng cho trang quản lý)
-    @Query("SELECT * FROM category ORDER BY is_system DESC, name ASC")
+    // Count active (non-deleted) items still linked to this category — used for RESTRICT check
+    @Query("SELECT COUNT(*) FROM item WHERE category_id = :categoryId AND is_deleted = 0")
+    suspend fun countActiveItemsForCategory(categoryId: String): Int
+
+    // Exclude soft-deleted rows from all user-facing queries
+    @Query("SELECT * FROM category WHERE is_deleted = 0 ORDER BY is_system DESC, name ASC")
     fun getAllCategories(): Flow<List<Category>>
 
-    // CHỈ lấy các danh mục đang hiển thị (Dùng hiển thị lên List cho user chọn khi add món ăn)
-    @Query("SELECT * FROM category WHERE is_hidden = 0 ORDER BY is_system DESC, name ASC")
+    @Query("SELECT * FROM category WHERE is_hidden = 0 AND is_deleted = 0 ORDER BY is_system DESC, name ASC")
     fun getVisibleCategories(): Flow<List<Category>>
 
-    // ── BỔ SUNG CÁC HÀM PHỤC VỤ ĐỒNG BỘ (SYNC LOGIC) ──
+    // ── SYNC ──
 
+    // Pending = needs upsert or delete pushed to server
     @Query("SELECT * FROM category WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingCategories(): List<Category>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertCategoriesFromServer(categories: List<Category>)
 
     @Query("UPDATE category SET sync_status = 'SYNCED' WHERE category_id = :categoryId")

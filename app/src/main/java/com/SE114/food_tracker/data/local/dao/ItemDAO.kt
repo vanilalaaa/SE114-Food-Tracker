@@ -3,11 +3,10 @@ package com.SE114.food_tracker.data.local.dao
 import androidx.room.*
 import com.SE114.food_tracker.data.local.entities.Item
 import kotlinx.coroutines.flow.Flow
-
 @Dao
 interface ItemDAO {
     // CRUD
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertItem(item: Item)
 
     @Update
@@ -20,10 +19,13 @@ interface ItemDAO {
     suspend fun softDeleteItem(itemId: String, updatedAt: Long = System.currentTimeMillis())
 
     @Query("SELECT * FROM item WHERE item_id = :id AND is_deleted = 0")
-    fun getItemById(id: String): Flow<Item?> 
+    fun getItemById(id: String): Flow<Item?>
 
     @Query("SELECT * FROM item WHERE is_deleted = 0 ORDER BY created_at DESC")
     fun getAllItems(): Flow<List<Item>>
+
+    @Query("SELECT * FROM item WHERE item_id = :id")
+    suspend fun getItemByIdOneShot(id: String): Item?
 
     @Query("SELECT * FROM item WHERE category_id = :catId AND is_deleted = 0")
     fun getItemsByCategory(catId: String): Flow<List<Item>>
@@ -42,7 +44,8 @@ interface ItemDAO {
     @Query("SELECT * FROM item WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingItems(): List<Item>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // 🛠️ SỬA TẠI ĐÂY: Dùng @Upsert để tối ưu hóa hiệu năng, cập nhật tại chỗ không delete dòng cũ
+    @Upsert
     suspend fun upsertItemsFromServer(items: List<Item>)
 
     @Query("UPDATE item SET sync_status = 'SYNCED' WHERE item_id = :itemId")
@@ -56,7 +59,7 @@ interface ItemDAO {
     fun getItemCountForDay(startDate: Long, endDate: Long): Flow<Int>
 
     @Query("SELECT SUM(price) FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0")
-    fun getTotalExpenseForDay(startDate: Long, endDate: Long): Flow<Double?> 
+    fun getTotalExpenseForDay(startDate: Long, endDate: Long): Flow<Double?>
 
     // Lấy chi tiêu gom nhóm theo danh mục phục vụ vẽ biểu đồ Donut của Vico Chart
     @Query("SELECT category_id, SUM(price) as total FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0 GROUP BY category_id ORDER BY total DESC")

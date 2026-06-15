@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +26,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.diary.DiaryCategory
 import com.SE114.food_tracker.feature.diary.DiaryItem
@@ -54,6 +59,16 @@ fun NutritionCard(
     }
     val availableCategories = categories.filter { categoryCounts.containsKey(it.categoryId) }
 
+    // Lọc danh sách món ăn theo Category đang chọn để map trực tiếp vào Engine vật lý
+    val filteredItems = remember(unfilteredItems, selectedCategoryId) {
+        selectedCategoryId?.let { catId ->
+            unfilteredItems.filter { it.categoryId == catId }
+        } ?: unfilteredItems
+    }
+
+    // TỐI ƯU 1: Tạo map tra cứu một lần duy nhất khi danh mục thay đổi, tránh vòng lặp O(n*m) .find()
+    val categoriesById = remember(categories) { categories.associateBy { it.categoryId } }
+
     Surface(
         modifier = Modifier.fillMaxWidth().height(180.dp).padding(horizontal = 24.dp),
         color = LightPinkBG,
@@ -62,6 +77,7 @@ fun NutritionCard(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
 
+            // ── Menu Dropdown Options ──────────────────────────────────────────
             Box(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).zIndex(2f)) {
                 IconButton(onClick = {
                     expanded = true
@@ -194,6 +210,7 @@ fun NutritionCard(
                 }
             }
 
+            // ── Physics Engine Configurations ─────────────────────────────────
             val density = LocalDensity.current
             val baseSizePx = with(density) { 44.dp.toPx() }
             val stickerSizePx = baseSizePx * boxScale
@@ -201,45 +218,112 @@ fun NutritionCard(
             val stickers = remember { mutableStateListOf<StickerNode>() }
             var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
-            LaunchedEffect(filteredItemCount, boxSize) {
+            // TỐI ƯU 2: áp dụng cơ chế So sánh sự thay đổi (Diff-based)
+            LaunchedEffect(filteredItems, boxSize, selectedCategoryId) {
                 if (boxSize == IntSize.Zero) return@LaunchedEffect
-                if (stickers.size != filteredItemCount) {
-                    stickers.clear()
-                    repeat(filteredItemCount) {
-                        stickers.add(StickerNode(
-                            initialX = (0..(boxSize.width - baseSizePx.toInt())).random().toFloat(),
-                            initialY = -100f
-                        ))
+
+                val currentIds = filteredItems.map { it.itemId }.toSet()
+
+                // Bước A: Xóa những sticker không còn nằm trong danh sách được lọc (Filter thay đổi hoặc bị xóa món)
+                stickers.removeAll { node -> node.id !in currentIds }
+
+                val existingIds = stickers.map { node -> node.id }.toSet()
+                val spawnWidthRange = (boxSize.width - stickerSizePx.toInt()).coerceAtLeast(0)
+
+                // Bước B: Chỉ khởi tạo hiệu ứng rơi cho các món ăn CHƯA xuất hiện trên màn hình.
+                // Với các node ĐÃ tồn tại, cập nhật imageUrl để phản ánh khi DB hoàn thành ghi URL.
+                filteredItems.forEach { item ->
+                    val existingNode = stickers.find { it.id == item.itemId }
+                    if (existingNode != null) {
+                        // Cập nhật imageUrl nếu DB vừa ghi xong (null -> url hoặc url thay đổi)
+                        if (existingNode.imageUrl != item.imageUrl) {
+                            existingNode.imageUrl = item.imageUrl
+                        }
+                    } else {
+                        val categoryEmoji = categoriesById[item.categoryId]?.iconUrl ?: "🍱"
+                        stickers.add(
+                            StickerNode(
+                                id = item.itemId,
+                                initialX = if (spawnWidthRange > 0) (0..spawnWidthRange).random().toFloat() else 0f,
+                                initialY = -100f,
+                                emoji = categoryEmoji,
+                                imageUrl = item.imageUrl
+                            )
+                        )
                     }
                 }
             }
 
+            // ── Vòng lặp vật lý tối ưu: Rơi tự do + Va chạm cạnh + Xếp chồng vững chãi ──
             LaunchedEffect(boxSize, boxScale) {
                 if (boxSize == IntSize.Zero) return@LaunchedEffect
                 while (isActive) {
                     withFrameNanos {
                         val maxX = boxSize.width - stickerSizePx
                         val maxY = boxSize.height - stickerSizePx
+
+                        // 1. Cập nhật trọng lực và di chuyển vật thể
                         stickers.forEach { s ->
                             if (!s.isDragging) {
-                                s.vy += 1.8f; s.x += s.vx; s.y += s.vy
-                                if (s.y >= maxY) { s.y = maxY; s.vy = -s.vy * 0.4f; s.vx *= 0.8f }
-                                if (s.x <= 0f) { s.x = 0f; s.vx = -s.vx * 0.5f }
-                                else if (s.x >= maxX) { s.x = maxX; s.vx = -s.vx * 0.5f }
+                                s.vy += 1.5f // Lực hấp dẫn gia tốc đều
+                                s.x += s.vx
+                                s.y += s.vy
+
+                                // Va chạm với sàn nhà (Damp vận tốc để đứng yên)
+                                if (s.y >= maxY) {
+                                    s.y = maxY
+                                    s.vy = -s.vy * 0.2f // Giảm độ nảy sàn để dễ xếp chồng
+                                    s.vx *= 0.75f       // Lực ma sát sàn cao để không trượt ngang
+                                }
+                                // Va chạm biên trái / biên phải
+                                if (s.x <= 0f) { s.x = 0f; s.vx = -s.vx * 0.4f }
+                                else if (s.x >= maxX) { s.x = maxX; s.vx = -s.vx * 0.4f }
                             }
                         }
+
+                        // 2. Xử lý va chạm liên khối (Circle-to-Circle Collision)
                         for (i in stickers.indices) {
                             for (j in i + 1 until stickers.size) {
-                                val s1 = stickers[i]; val s2 = stickers[j]
+                                val s1 = stickers[i]
+                                val s2 = stickers[j]
+
+                                // Tính khoảng cách giữa tâm 2 sticker
                                 val dx = (s1.x + radius) - (s2.x + radius)
                                 val dy = (s1.y + radius) - (s2.y + radius)
                                 val dist = sqrt(dx * dx + dy * dy)
+
                                 if (dist < stickerSizePx && dist > 0f) {
                                     val overlap = stickerSizePx - dist
-                                    val nx = dx / dist; val ny = dy / dist
-                                    val pushX = nx * overlap * 0.5f; val pushY = ny * overlap * 0.5f
+                                    val nx = dx / dist // Vector pháp tuyến X
+                                    val ny = dy / dist // Vector pháp tuyến Y
+
+                                    // Bước A: Tách bỏ vùng chồng lấn vị trí (Tránh xuyên thấu)
+                                    val pushX = nx * overlap * 0.5f
+                                    val pushY = ny * overlap * 0.5f
                                     if (!s1.isDragging) { s1.x += pushX; s1.y += pushY }
                                     if (!s2.isDragging) { s2.x -= pushX; s2.y -= pushY }
+
+                                    // Bước B: Triệt tiêu động lượng xuyên tâm (Giúp vật thể đứng vững trên nhau)
+                                    val rvx = s1.vx - s2.vx
+                                    val rvy = s1.vy - s2.vy
+                                    val velAlongNormal = rvx * nx + rvy * ny
+
+                                    // Chỉ xử lý xung lực nếu 2 vật thể đang có xu hướng lao vào nhau
+                                    if (velAlongNormal < 0) {
+                                        val restitution = 0.1f // Độ nảy giữa các sticker thấp giúp chúng bám dính xếp tầng
+                                        val impulseScalar = -(1f + restitution) * velAlongNormal
+
+                                        val impulseX = (impulseScalar / 2f) * nx
+                                        val impulseY = (impulseScalar / 2f) * ny
+
+                                        if (!s1.isDragging) { s1.vx += impulseX; s1.vy += impulseY }
+                                        if (!s2.isDragging) { s2.vx -= impulseX; s2.vy -= impulseY }
+                                    }
+
+                                    // Bước C: Bổ sung ma sát bề mặt tiếp xúc (Chặn trượt ngang tự do)
+                                    val contactFriction = 0.82f
+                                    if (!s1.isDragging) { s1.vx *= contactFriction }
+                                    if (!s2.isDragging) { s2.vx *= contactFriction }
                                 }
                             }
                         }
@@ -247,6 +331,7 @@ fun NutritionCard(
                 }
             }
 
+            // ── Render Stickers Layout ────────────────────────────────────────
             Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
                 stickers.forEach { node ->
                     Box(
@@ -265,10 +350,15 @@ fun NutritionCard(
                                 )
                             }
                             .size((44 * boxScale).dp)
-                            .clip(CircleShape).background(Color.White),
+                            .clip(CircleShape)
+                            .background(Color.White),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Restaurant, null, tint = OrangeMain, modifier = Modifier.size((22 * boxScale).dp))
+                        FoodStickerAvatar(
+                            imageUrl = node.imageUrl,
+                            emoji = node.emoji,
+                            scale = boxScale
+                        )
                     }
                 }
             }
@@ -276,8 +366,47 @@ fun NutritionCard(
     }
 }
 
-class StickerNode(initialX: Float, initialY: Float) {
+// ── Sub-component render Avatar hình ảnh từ Supabase hoặc Emoji ───────────────
+@Composable
+private fun FoodStickerAvatar(imageUrl: String?, emoji: String, scale: Float) {
+    if (!imageUrl.isNullOrBlank()) {
+        val context = LocalContext.current
+        val request = ImageRequest.Builder(context)
+            .data(imageUrl)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .crossfade(true)
+            .build()
+        AsyncImage(
+            model = request,
+            contentDescription = emoji,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = emoji.ifBlank { "🍱" }, fontSize = (22 * scale).sp)
+        }
+    }
+}
+
+// ── Physics Node Class ────────────────────────────────────────────────────────
+class StickerNode(
+    val id: String,
+    initialX: Float,
+    initialY: Float,
+    val emoji: String,
+    imageUrl: String?
+) {
     var x by mutableFloatStateOf(initialX)
     var y by mutableFloatStateOf(initialY)
     var vx = 0f; var vy = 0f; var isDragging = false
+
+    // Backed by mutableStateOf so Compose recomposes when DB writes the URL after initial save
+    var imageUrl by mutableStateOf(imageUrl)
 }

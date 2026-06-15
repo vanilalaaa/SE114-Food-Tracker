@@ -40,11 +40,71 @@ fun ManageCategoryBottomSheet(
     onToggleVisibility: (DiaryCategory) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
     onEditCategory: (DiaryCategory) -> Unit,
-    onCreateNew: (name: String, emoji: String) -> Unit
+    onCreateNew: (name: String, emoji: String) -> Unit,
+    deleteError: String? = null,
+    onClearDeleteError: () -> Unit = {}
 ) {
     val systemCategories = categories.filter { it.isSystem }
     val customCategories = categories.filter { !it.isSystem }
     var showCreateSheet by remember { mutableStateOf(false) }
+
+    // Category pending confirmation before delete is committed
+    var pendingDeleteCategory by remember { mutableStateOf<DiaryCategory?>(null) }
+
+    // ── Delete confirmation dialog ─────────────────────────────────────────
+    pendingDeleteCategory?.let { target ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteCategory = null },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color.White,
+            title = {
+                Text("Xóa danh mục?", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Text(
+                    "Danh mục \"${target.name}\" sẽ bị xóa vĩnh viễn. " +
+                            "Thao tác này không thể hoàn tác.",
+                    fontSize = 14.sp,
+                    color = Color(0xFF555555)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteCategory(target)
+                        pendingDeleteCategory = null
+                    }
+                ) {
+                    Text("Xóa", color = Color(0xFFE57373), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteCategory = null }) {
+                    Text("Hủy", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    // ── RESTRICT / error snackbar ──────────────────────────────────────────
+    deleteError?.let { msg ->
+        AlertDialog(
+            onDismissRequest = onClearDeleteError,
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color.White,
+            title = {
+                Text("Không thể xóa", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Text(msg, fontSize = 14.sp, color = Color(0xFF555555))
+            },
+            confirmButton = {
+                TextButton(onClick = onClearDeleteError) {
+                    Text("Đã hiểu", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -82,24 +142,42 @@ fun ManageCategoryBottomSheet(
             ) {
                 if (systemCategories.isNotEmpty()) {
                     item {
-                        Text("MẶC ĐỊNH", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
+                        Text(
+                            "MẶC ĐỊNH",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
                     }
                     items(systemCategories) { category ->
-                        CategoryItemRow(category = category, onToggleVisibility = { onToggleVisibility(category) })
+                        // System categories: visibility toggle only, no delete button
+                        CategoryItemRow(
+                            category = category,
+                            showEditActions = false,
+                            onToggleVisibility = { onToggleVisibility(category) }
+                        )
                     }
                 }
 
                 if (customCategories.isNotEmpty()) {
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("TỰ TẠO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
+                        Text(
+                            "TỰ TẠO",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
                     }
                     items(customCategories) { category ->
                         CategoryItemRow(
                             category = category,
                             showEditActions = true,
                             onEdit = { onEditCategory(category) },
-                            onDelete = { onDeleteCategory(category) },
+                            // Request confirmation first; ViewModel runs RESTRICT check on confirm
+                            onDelete = { pendingDeleteCategory = category },
                             onToggleVisibility = { onToggleVisibility(category) }
                         )
                     }
@@ -128,7 +206,7 @@ fun ManageCategoryBottomSheet(
     if (showCreateSheet) {
         CreateCategoryBottomSheet(
             onDismiss = { showCreateSheet = false },
-            onCreate = { name, emoji ->
+            onCreate  = { name, emoji ->
                 onCreateNew(name, emoji)
                 showCreateSheet = false
             }
@@ -163,7 +241,10 @@ fun CreateCategoryBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Tạo loại mới", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                IconButton(onClick = onDismiss, modifier = Modifier.background(Color(0xFFF5F5F5), CircleShape).size(32.dp)) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.background(Color(0xFFF5F5F5), CircleShape).size(32.dp)
+                ) {
                     Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
                 }
             }
@@ -187,7 +268,12 @@ fun CreateCategoryBottomSheet(
                             .background(Color(0xFFE57373), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(10.dp)
+                        )
                     }
                 }
 
@@ -206,7 +292,9 @@ fun CreateCategoryBottomSheet(
                                 .padding(horizontal = 16.dp),
                             contentAlignment = Alignment.CenterStart
                         ) {
-                            if (categoryName.isEmpty()) Text("Tên loại", color = Color.LightGray, fontSize = 16.sp)
+                            if (categoryName.isEmpty()) {
+                                Text("Tên loại", color = Color.LightGray, fontSize = 16.sp)
+                            }
                             innerTextField()
                         }
                     }
@@ -220,9 +308,17 @@ fun CreateCategoryBottomSheet(
                 enabled = categoryName.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE89A7A), disabledContainerColor = Color(0xFFE0E0E0))
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFE89A7A),
+                    disabledContainerColor = Color(0xFFE0E0E0)
+                )
             ) {
-                Text("Tạo loại", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (categoryName.isNotBlank()) Color.White else Color.Gray)
+                Text(
+                    "Tạo loại",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (categoryName.isNotBlank()) Color.White else Color.Gray
+                )
             }
         }
     }
@@ -255,7 +351,6 @@ fun EmojiPickerBottomSheet(
             color = Color.White
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -271,7 +366,6 @@ fun EmojiPickerBottomSheet(
                         Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
                     }
                 }
-
                 AndroidView(
                     factory = { context: android.content.Context ->
                         EmojiPickerView(context).apply {
@@ -316,10 +410,20 @@ private fun CategoryItemRow(
 
         if (showEditActions) {
             IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Outlined.Edit, contentDescription = "Sửa", tint = Color(0xFFE6C229), modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Outlined.Edit,
+                    contentDescription = "Sửa",
+                    tint = Color(0xFFE6C229),
+                    modifier = Modifier.size(20.dp)
+                )
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Outlined.Delete, contentDescription = "Xóa", tint = Color(0xFFE57373), modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = "Xóa",
+                    tint = Color(0xFFE57373),
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
 
@@ -341,12 +445,16 @@ fun Preview_ManageCategoryBottomSheet() {
         Box(modifier = Modifier.fillMaxSize().background(Color.Gray)) {
             ManageCategoryBottomSheet(
                 categories = listOf(
-                    DiaryCategory("1", "Bánh mì", "🥖", isSystem = true, isHidden = false),
-                    DiaryCategory("2", "Cơm", "🍚", isSystem = true, isHidden = false),
-                    DiaryCategory("4", "Tráng miệng", "🍰", isSystem = true, isHidden = true),
-                    DiaryCategory("5", "Ăn vặt", "🍡", isSystem = false, isHidden = false)
+                    DiaryCategory("1", "Bánh mì",     "🥖", isSystem = true,  isHidden = false),
+                    DiaryCategory("2", "Cơm",         "🍚", isSystem = true,  isHidden = false),
+                    DiaryCategory("4", "Tráng miệng", "🍰", isSystem = true,  isHidden = true),
+                    DiaryCategory("5", "Ăn vặt",      "🍡", isSystem = false, isHidden = false)
                 ),
-                onDismiss = {}, onToggleVisibility = {}, onDeleteCategory = {}, onEditCategory = {}, onCreateNew = { _, _ -> }
+                onDismiss = {},
+                onToggleVisibility = {},
+                onDeleteCategory = {},
+                onEditCategory = {},
+                onCreateNew = { _, _ -> }
             )
         }
     }

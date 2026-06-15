@@ -11,13 +11,19 @@ class ImageRepository @Inject constructor(
     suspend fun uploadItemImage(userId: String, itemId: String, bytes: ByteArray): Result<String> {
         return try {
             val path = "$userId/$itemId.jpg"
-
-            // Tiến hành upload đè (upsert = true) lên bucket "items"
-            supabaseClient.storage.from("items").upload(path, bytes) {
-                upsert = true
+            try {
+                supabaseClient.storage.from("items").upload(path, bytes) {
+                    upsert = false
+                }
+            } catch (uploadException: Exception) {
+                val msg = uploadException.message.orEmpty()
+                if (msg.contains("409") || msg.contains("already exists", ignoreCase = true)
+                    || msg.contains("Duplicate", ignoreCase = true)) {
+                    supabaseClient.storage.from("items").update(path, bytes)
+                } else {
+                    throw uploadException
+                }
             }
-
-            // Lấy URL công khai (Public URL) để lưu vào database local/remote
             val publicUrl = supabaseClient.storage.from("items").publicUrl(path)
             Result.success(publicUrl)
         } catch (e: Exception) {

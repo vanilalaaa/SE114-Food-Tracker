@@ -172,18 +172,26 @@ fun DayDetailBottomSheetContent(
                     val catIcon = matchedCategory?.iconUrl ?: getEmojiByName(catName)
 
                     DayItem(
-                        name = item.name,
-                        category = catName,
+                        name         = item.name,
+                        category     = catName,
                         categoryIcon = catIcon,
-                        price = item.price,
-                        time = item.timeLabel.ifBlank { item.timeType.toSessionLabel() },
-                        onClick = { onEditItemClick(item) }
+                        imageUrl     = item.imageUrl,
+                        price        = item.price,
+                        time         = item.timeLabel.ifBlank { item.timeType.toTimeLabel() },
+                        onClick      = { onEditItemClick(item) }
                     )
                 }
                 Spacer(Modifier.height(12.dp))
             }
         }
     }
+}
+
+private fun Int.toTimeLabel(): String = when (this) {
+    0    -> "Sáng"
+    1    -> "Trưa/Chiều"
+    2    -> "Tối"
+    else -> "Khác"
 }
 
 @Preview(showBackground = true)
