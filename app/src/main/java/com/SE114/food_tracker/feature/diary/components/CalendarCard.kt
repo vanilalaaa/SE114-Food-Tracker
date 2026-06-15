@@ -34,15 +34,14 @@ fun CalendarCard(
     selectedYear: Int,
     selectedMonth: Int,
     onDateClick: (Int) -> Unit,
-    hasDataDates: List<Int> = emptyList()
+    hasDataDates: List<Int> = emptyList(),
+    scale: Float = 1f
 ) {
     val days = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
-
     val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
 
     val calendarGridItems = remember(selectedYear, selectedMonth) {
         val firstDayOfMonth = LocalDate(selectedYear, selectedMonth, 1)
-
         val emptySlotsBefore = firstDayOfMonth.dayOfWeek.isoDayNumber - 1
 
         val nextMonth = if (selectedMonth == 12) 1 else selectedMonth + 1
@@ -57,12 +56,13 @@ fun CalendarCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 16.dp)
-            .height(380.dp),
-        shape = RoundedCornerShape(25.dp),
-        color = CalendarHighlight,
-        shadowElevation = 10.dp
+            .height(410.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White,
+        shadowElevation = 8.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
@@ -71,8 +71,8 @@ fun CalendarCard(
                     Text(
                         text = it,
                         color = DarkPink,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -82,48 +82,46 @@ fun CalendarCard(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(7),
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(calendarGridItems) { date ->
                     if (date != null) {
-                        val isToday = (date == today.dayOfMonth &&
-                                selectedMonth == today.monthNumber &&
-                                selectedYear == today.year)
-
+                        val isToday = (date == today.dayOfMonth && selectedMonth == today.monthNumber && selectedYear == today.year)
                         val hasData = hasDataDates.contains(date)
 
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (hasData) CalendarHighlight else Color.Transparent)
                                 .clickable { onDateClick(date) }
                                 .padding(vertical = 4.dp)
                         ) {
-                            // Ô hiển thị Số ngày
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 if (isToday) {
                                     Box(
                                         modifier = Modifier
-                                            .size(32.dp)
-                                            .background(LightGreen, CircleShape),
+                                            .size(36.dp)
+                                            .background(MintGreen, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            date.toString(),
+                                            text = date.toString(),
                                             color = Color.White,
                                             fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
                                 } else {
                                     Text(
-                                        date.toString(),
-                                        color = TextSecondary,
-                                        fontSize = 14.sp
+                                        text = date.toString(),
+                                        color = TextPrimary,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Normal
                                     )
                                 }
                             }
@@ -132,25 +130,22 @@ fun CalendarCard(
 
                             Box(
                                 modifier = Modifier
-                                    .size(24.dp)
-                                    .background(
-                                        if (hasData) Color.White else Color.Transparent,
-                                        CircleShape
-                                    ),
+                                    .size((24 * scale).dp)
+                                    .background(if (hasData) Color.White else Color.Transparent, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (hasData) {
                                     Icon(
                                         Icons.Default.Restaurant,
                                         null,
-                                        modifier = Modifier.size(12.dp),
+                                        modifier = Modifier.size((12 * scale).dp),
                                         tint = OrangeMain
                                     )
                                 }
                             }
                         }
                     } else {
-                        Spacer(modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.size(36.dp))
                     }
                 }
             }

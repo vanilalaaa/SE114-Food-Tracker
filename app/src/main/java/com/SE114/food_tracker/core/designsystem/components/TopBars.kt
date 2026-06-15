@@ -21,7 +21,9 @@ import androidx.compose.ui.tooling.preview.Preview
 fun DiaryTopBar(
     streakCount: String,
     currentMonth: String,
-    onMonthClick: () -> Unit
+    onMonthClick: () -> Unit,
+    onPreviousClick: () -> Unit,
+    onNextClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -36,25 +38,57 @@ fun DiaryTopBar(
         }
 
         Surface(
-            onClick = onMonthClick,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             color = CardWhite,
             shadowElevation = 2.dp
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.DateRange,
-                    contentDescription = "Calendar",
+                    imageVector = Icons.Default.KeyboardArrowLeft,
+                    contentDescription = "Tháng trước",
                     tint = TextSecondary,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onPreviousClick() }
                 )
-                Text(
-                    text = currentMonth,
-                    style = AppTypography.bodyLarge
+                Row(
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onMonthClick() }
+                        .padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Calendar",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = currentMonth,
+                        style = StatTabActiveStyle,
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowRight,
+                    contentDescription = "Tháng sau",
+                    tint = TextSecondary,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onNextClick() }
                 )
             }
         }
@@ -148,7 +182,9 @@ fun TopBarsPreview() {
             DiaryTopBar(
                 streakCount = "1",
                 currentMonth = "thg 4 2026",
-                onMonthClick = {}
+                onPreviousClick = {},
+                onMonthClick = {},
+                onNextClick = {}
             )
             StatisticsTopBar(
                 dateText = "03/04/2026",

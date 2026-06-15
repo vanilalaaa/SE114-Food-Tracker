@@ -32,7 +32,9 @@ data class MessageUiModel(
     val imageUrl: String?,
     val isSystem: Boolean = false,
     val syncStatus: MessageSyncStatus = MessageSyncStatus.SENT,
-    val timeLabel: String = "10:15 PM"
+    val timeLabel: String = "10:15 PM",
+    val dateLabel: String = "Hôm nay",
+    val rawEntity: com.SE114.food_tracker.data.local.entities.Message? = null
 )
 
 @Composable
@@ -133,15 +135,27 @@ fun MessageBubble(
                         MessageSyncStatus.PENDING -> {
                             Text(text = "🕒", fontSize = 10.sp) // Đồng hồ chờ gửi
                         }
+
                         MessageSyncStatus.SENT -> {
-                            Text(text = "✓", color = Color(0xFF4CAF50), fontSize = 10.sp, fontWeight = FontWeight.Bold) // Dấu tích thành công
+                            Text(
+                                text = "✓",
+                                color = Color(0xFF4CAF50),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            ) // Dấu tích thành công
                         }
+
                         MessageSyncStatus.FAILED -> {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.clickable { onRetryClick() }
                             ) {
-                                Text(text = "🚨 Thất bại", color = Color.Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "🚨 Thất bại",
+                                    color = Color.Red,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                                 Spacer(modifier = Modifier.width(2.dp))
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
@@ -162,11 +176,14 @@ fun MessageBubble(
 @Composable
 fun MessageBubblePeerPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier.fillMaxWidth().background(MainBackground).padding(16.dp)) {
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .background(MainBackground)
+            .padding(16.dp)) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "azun_id",
-                    body = "Tớ bật cờ Realtime cho bảng message rồi á Vy!",
+                    body = "Ăn bún bò Huế đi zz",
                     imageUrl = null
                 ),
                 isMine = false,
@@ -180,11 +197,14 @@ fun MessageBubblePeerPreview() {
 @Composable
 fun MessageBubbleMineSentPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier.fillMaxWidth().background(MainBackground).padding(16.dp)) {
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .background(MainBackground)
+            .padding(16.dp)) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
-                    body = "Oki để tớ up cái giao diện khung chat lên luôn nè",
+                    body = "Oki lên kèo. Ăn quán này đi",
                     imageUrl = null,
                     syncStatus = MessageSyncStatus.SENT
                 ),
@@ -199,7 +219,10 @@ fun MessageBubbleMineSentPreview() {
 @Composable
 fun MessageBubbleMinePendingPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier.fillMaxWidth().background(MainBackground).padding(16.dp)) {
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .background(MainBackground)
+            .padding(16.dp)) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
@@ -218,7 +241,10 @@ fun MessageBubbleMinePendingPreview() {
 @Composable
 fun MessageBubbleMineFailedPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier.fillMaxWidth().background(MainBackground).padding(16.dp)) {
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .background(MainBackground)
+            .padding(16.dp)) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
@@ -237,7 +263,10 @@ fun MessageBubbleMineFailedPreview() {
 @Composable
 fun MessageBubbleSystemPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier.fillMaxWidth().background(MainBackground).padding(16.dp)) {
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .background(MainBackground)
+            .padding(16.dp)) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "system",

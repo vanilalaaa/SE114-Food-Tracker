@@ -11,11 +11,14 @@ import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.data.local.entities.Conversation
 import com.SE114.food_tracker.data.local.entities.ConversationParticipant
 import com.SE114.food_tracker.data.local.entities.Message
+import com.SE114.food_tracker.data.local.entities.FriendshipEntity
+import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
 import com.SE114.food_tracker.data.local.dao.ChatDAO
+import com.SE114.food_tracker.data.local.dao.FriendDAO
 
 @Database(
-    entities = [Category::class, Item::class, Budget::class, Conversation::class, ConversationParticipant::class, Message::class],
-    version = 7,
+    entities = [Category::class, Item::class, Budget::class, Conversation::class, ConversationParticipant::class, Message::class, FriendshipEntity::class, UserProfileCacheEntity::class],
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -23,4 +26,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun itemDAO(): ItemDAO
     abstract fun budgetDAO(): BudgetDAO
     abstract fun chatDao(): ChatDAO
+    abstract fun friendDao(): FriendDAO
 }

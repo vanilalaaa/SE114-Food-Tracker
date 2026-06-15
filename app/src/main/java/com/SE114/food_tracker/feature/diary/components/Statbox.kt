@@ -14,7 +14,7 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 fun StatBox(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        color = CalendarHighlight, // Màu #FCDFCF
+        color = CalendarHighlight,
         shape = RoundedCornerShape(24.dp),
         shadowElevation = 2.dp
     ) {

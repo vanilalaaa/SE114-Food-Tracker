@@ -141,10 +141,15 @@ fun StatisticsScreen() {
 
                 ChartCard(
                     title = "Chi tiêu theo buổi",
-                    data = listOf(Pair("Sáng", 20), Pair("Trưa", 40), Pair("Chiều", 60), Pair("Tối", 0))
+                    data = listOf(
+                        Pair("Sáng", 20),
+                        Pair("Trưa", 40),
+                        Pair("Chiều", 60),
+                        Pair("Tối", 0)
+                    )
                 )
 
-               //================== BIỂU ĐỒ TRÒN ==================
+                //================== BIỂU ĐỒ TRÒN ==================
                 LocalDonutChartCard(
                     title = "Tỷ trọng chi tiêu theo danh mục",
                     categories = listOf(
@@ -200,7 +205,16 @@ fun StatisticsScreen() {
     if (showBudgetDialog) {
         AlertDialog(
             onDismissRequest = { showBudgetDialog = false },
-            title = { Text("Đặt ngân sách " + when (selectedTab) { 1 -> "Tuần" 2 -> "Tháng" 3 -> "Năm" else -> "Ngày" }, fontWeight = FontWeight.Bold) },
+            title = {
+                Text(
+                    "Đặt ngân sách " + when (selectedTab) {
+                        1 -> "Tuần"
+                        2 -> "Tháng"
+                        3 -> "Năm"
+                        else -> "Ngày"
+                    }, fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Hạn mức mong muốn (đ):")
