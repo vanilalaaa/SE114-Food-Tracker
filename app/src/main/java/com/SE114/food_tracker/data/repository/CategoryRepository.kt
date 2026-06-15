@@ -22,19 +22,18 @@ class CategoryRepository @Inject constructor(
 
     suspend fun updateCategory(category: Category) = categoryDAO.update(category)
 
-    suspend fun deleteCategory(category: Category) = categoryDAO.delete(category)
+    suspend fun countActiveItemsForCategory(categoryId: String): Int =
+        categoryDAO.countActiveItemsForCategory(categoryId)
 
-    suspend fun insert(category: Category) = insertCategory(category)
+    suspend fun softDeleteCategory(categoryId: String) =
+        categoryDAO.softDeleteCategory(categoryId)
 
-    suspend fun update(category: Category) = updateCategory(category)
-
-    suspend fun delete(category: Category) = deleteCategory(category)
-
-    // ── BỔ SUNG CÁC HÀM PHỤC VỤ ĐỒNG BỘ CHO SYNC WORKER ──
+    // ── SYNC ──
 
     suspend fun getPendingCategories(): List<Category> = categoryDAO.getPendingCategories()
 
-    suspend fun upsertCategoriesFromServer(categories: List<Category>) = categoryDAO.upsertCategoriesFromServer(categories)
+    suspend fun upsertCategoriesFromServer(categories: List<Category>) =
+        categoryDAO.upsertCategoriesFromServer(categories)
 
     suspend fun markSynced(categoryId: String) = categoryDAO.markSynced(categoryId)
 

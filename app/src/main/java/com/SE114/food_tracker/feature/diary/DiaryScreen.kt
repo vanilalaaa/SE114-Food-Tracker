@@ -44,6 +44,7 @@ fun DiaryScreen(
     val uiState           by diaryViewModel.uiState.collectAsStateWithLifecycle()
     val categoryState     by categoryViewModel.visibleCategories.collectAsStateWithLifecycle()
     val pendingImageUri   by diaryViewModel.pendingImageUri.collectAsStateWithLifecycle()
+    val categoryError     by categoryViewModel.error.collectAsStateWithLifecycle()
 
     val categories = categoryState.ifEmpty { uiState.categories }
 
@@ -51,9 +52,11 @@ fun DiaryScreen(
         uiState                    = uiState,
         pendingImageUri            = pendingImageUri,
         categories                 = categories,
+        categoryDeleteError        = categoryError,
         triggerAdd                 = triggerAdd,
         onAddTriggered             = onAddTriggered,
         onClearPendingImage        = { diaryViewModel.clearPendingImage() },
+        onClearCategoryError       = { categoryViewModel.clearError() },
         onLoadDate                 = { diaryViewModel.loadDate(it) },
         onImageSelected            = { diaryViewModel.onImageSelected(it) },
         onSaveItem                 = { n, p, c, r, no, t -> diaryViewModel.saveItem(n, p, c, r, no, t) },
@@ -72,8 +75,10 @@ fun DiaryScreenContent(
     uiState: DiaryUiState,
     pendingImageUri: Uri?,
     categories: List<DiaryCategory>,
+    categoryDeleteError: String?,
     triggerAdd: Boolean,
     onAddTriggered: () -> Unit,
+    onClearCategoryError: () -> Unit,
     onLoadDate: (LocalDate) -> Unit,
     onImageSelected: (Uri) -> Unit,
     onClearPendingImage: () -> Unit,
@@ -100,6 +105,12 @@ fun DiaryScreenContent(
         uiState.selectedCategoryId?.let { catId ->
             uiState.items.filter { it.categoryId == catId }
         } ?: uiState.items
+    }
+
+    val filteredMonthlyItems = remember(uiState.monthlyItems, uiState.selectedCategoryId) {
+        uiState.selectedCategoryId?.let { catId ->
+            uiState.monthlyItems.filter { it.categoryId == catId }
+        } ?: uiState.monthlyItems
     }
 
     LaunchedEffect(triggerAdd) {
@@ -149,7 +160,7 @@ fun DiaryScreenContent(
 
         NutritionCard(
             unfilteredItems    = uiState.monthlyItems,
-            filteredItemCount  = filteredItems.size,
+            filteredItemCount  = filteredMonthlyItems.size,
             categories         = categories,
             selectedCategoryId = uiState.selectedCategoryId,
             onCategorySelect   = onSelectCategoryFilter,
@@ -244,6 +255,7 @@ fun DiaryScreenContent(
                     preSelectedCategory = preSelectedCategory,
                     categories          = categories,
                     pendingImageUri     = pendingImageUri,
+                    categoryDeleteError = categoryDeleteError,
                     onDismiss = {
                         showEntryScreen     = false
                         selectedItemForEdit = null
@@ -268,7 +280,8 @@ fun DiaryScreenContent(
                     },
                     onToggleCategoryVisibility = onToggleCategoryVisibility,
                     onDeleteCategory           = onDeleteCategory,
-                    onCreateCategory           = onCreateCategory
+                    onCreateCategory           = onCreateCategory,
+                    onClearCategoryError       = onClearCategoryError
                 )
             }
         }
@@ -286,23 +299,25 @@ fun DiaryScreenPreview() {
                 totalSpend    = 45000.0,
                 itemCount     = 2
             ),
-            pendingImageUri = null,
-            categories = listOf(
+            pendingImageUri        = null,
+            categories             = listOf(
                 DiaryCategory("1", "Cơm",      "🍚", isSystem = true),
                 DiaryCategory("2", "Mì & Phở", "🍜", isSystem = true)
             ),
-            triggerAdd             = false,
-            onClearPendingImage    = {},
-            onAddTriggered         = {},
-            onLoadDate             = {},
-            onImageSelected        = {},
-            onSaveItem             = { _, _, _, _, _, _ -> },
-            onUpdateItem           = { _, _, _, _, _, _, _ -> },
-            onDeleteItem           = {},
-            onDeleteCategory       = {},
+            categoryDeleteError        = null,
+            triggerAdd                 = false,
+            onClearPendingImage        = {},
+            onClearCategoryError       = {},
+            onAddTriggered             = {},
+            onLoadDate                 = {},
+            onImageSelected            = {},
+            onSaveItem                 = { _, _, _, _, _, _ -> },
+            onUpdateItem               = { _, _, _, _, _, _, _ -> },
+            onDeleteItem               = {},
+            onDeleteCategory           = {},
             onToggleCategoryVisibility = {},
-            onCreateCategory       = { _, _ -> },
-            onSelectCategoryFilter = {}
+            onCreateCategory           = { _, _ -> },
+            onSelectCategoryFilter     = {}
         )
     }
 }

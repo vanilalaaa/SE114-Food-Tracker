@@ -64,12 +64,14 @@ fun FoodEntryScreen(
     preSelectedCategory: DiaryCategory? = null,
     categories: List<DiaryCategory> = emptyList(),
     pendingImageUri: Uri? = null,
+    categoryDeleteError: String? = null,
     onDismiss: () -> Unit,
     onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int) -> Unit,
     onDelete: ((String) -> Unit)? = null,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
-    onCreateCategory: (String, String) -> Unit = { _, _ -> }
+    onCreateCategory: (String, String) -> Unit = { _, _ -> },
+    onClearCategoryError: () -> Unit = {}
 ) {
     var foodName by remember(existingItem?.itemId, preSelectedCategory) {
         mutableStateOf(existingItem?.name ?: preSelectedCategory?.name.orEmpty())
@@ -216,7 +218,9 @@ fun FoodEntryScreen(
             onCreateNew         = { name, emoji ->
                 onCreateCategory(name, emoji)
                 showManageCategoriesSheet = false
-            }
+            },
+            deleteError         = categoryDeleteError,
+            onClearDeleteError  = onClearCategoryError
         )
     }
 

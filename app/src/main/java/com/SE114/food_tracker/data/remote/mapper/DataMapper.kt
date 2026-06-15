@@ -76,7 +76,6 @@ object DataMapper {
 
     fun CategoryDTO.toEntity(): Category {
         val createdAtMillis = Instant.parse(this.createdAt).toEpochMilliseconds()
-
         return Category(
             categoryId = this.id,
             ownerId    = this.ownerId,
@@ -84,15 +83,15 @@ object DataMapper {
             iconUrl    = this.iconUrl,
             isHidden   = this.isHidden,
             isSystem   = this.isSystem,
+            isDeleted  = this.isDeleted,
             syncStatus = SyncStatus.SYNCED.name,
             createdAt  = createdAtMillis,
-            updatedAt  = createdAtMillis   // server has no updated_at on category table
+            updatedAt  = createdAtMillis
         )
     }
 
     fun Category.toDto(): CategoryDTO {
         val createdAtStr = Instant.fromEpochMilliseconds(this.createdAt).toString()
-
         return CategoryDTO(
             id        = this.categoryId,
             ownerId   = this.ownerId,
@@ -100,6 +99,7 @@ object DataMapper {
             iconUrl   = this.iconUrl,
             isHidden  = this.isHidden,
             isSystem  = this.isSystem,
+            isDeleted = this.isDeleted,
             createdAt = createdAtStr
         )
     }

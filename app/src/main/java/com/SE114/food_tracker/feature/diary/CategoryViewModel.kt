@@ -24,9 +24,7 @@ class CategoryViewModel @Inject constructor(
 
     val visibleCategories: StateFlow<List<DiaryCategory>> =
         categoryRepository.getVisibleCategories()
-            .map { categories ->
-                categories.map { category -> category.toDiaryCategory() }
-            }
+            .map { categories -> categories.map { it.toDiaryCategory() } }
             .catch { throwable ->
                 _error.value = throwable.message
                 emit(emptyList())
@@ -43,25 +41,22 @@ class CategoryViewModel @Inject constructor(
             _error.value = "User unauthenticated"
             return
         }
-
         viewModelScope.launch {
             runCatching {
                 val now = System.currentTimeMillis()
                 categoryRepository.insertCategory(
                     Category(
-                        ownerId = userId,
-                        name = name,
-                        iconUrl = iconUrl,
-                        isHidden = false,
-                        isSystem = false,
+                        ownerId    = userId,
+                        name       = name,
+                        iconUrl    = iconUrl,
+                        isHidden   = false,
+                        isSystem   = false,
                         syncStatus = "PENDING",
-                        createdAt = now,
-                        updatedAt = now
+                        createdAt  = now,
+                        updatedAt  = now
                     )
                 )
-            }.onFailure { throwable ->
-                _error.value = throwable.message
-            }
+            }.onFailure { _error.value = it.message }
         }
     }
 
@@ -71,45 +66,44 @@ class CategoryViewModel @Inject constructor(
                 categoryRepository.updateCategory(
                     category.toEntity().copy(isHidden = !category.isHidden)
                 )
-            }.onFailure { throwable ->
-                _error.value = throwable.message
-            }
+            }.onFailure { _error.value = it.message }
         }
     }
 
     fun deleteCategory(category: DiaryCategory) {
         if (category.isSystem) {
-            _error.value = "System categories cannot be deleted"
+            _error.value = "Danh mục hệ thống không thể xóa. Hãy ẩn nó thay thế."
             return
         }
-
         viewModelScope.launch {
             runCatching {
-                categoryRepository.deleteCategory(category.toEntity())
-            }.onFailure { throwable ->
-                _error.value = throwable.message
-            }
+                val linkedCount = categoryRepository.countActiveItemsForCategory(category.categoryId)
+                if (linkedCount > 0) {
+                    _error.value = "Không thể xóa: còn $linkedCount món ăn đang dùng danh mục này."
+                    return@runCatching
+                }
+                categoryRepository.softDeleteCategory(category.categoryId)
+            }.onFailure { _error.value = it.message }
         }
     }
 
-    private fun ensureAuthenticated(): Boolean =
-        categoryRepository.getCurrentUserId() != null
+    fun clearError() { _error.value = null }
 
     private fun Category.toDiaryCategory(): DiaryCategory =
         DiaryCategory(
             categoryId = categoryId,
-            name = name,
-            iconUrl = iconUrl,
-            isHidden = isHidden,
-            isSystem = isSystem
+            name       = name,
+            iconUrl    = iconUrl,
+            isHidden   = isHidden,
+            isSystem   = isSystem
         )
 
     private fun DiaryCategory.toEntity(): Category =
         Category(
             categoryId = categoryId,
-            name = name,
-            iconUrl = iconUrl,
-            isHidden = isHidden,
-            isSystem = isSystem
+            name       = name,
+            iconUrl    = iconUrl,
+            isHidden   = isHidden,
+            isSystem   = isSystem
         )
 }
