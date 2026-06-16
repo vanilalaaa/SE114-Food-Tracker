@@ -13,16 +13,24 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.SE114.food_tracker.core.designsystem.theme.*
 
+private fun Double.formatVnd(): String = when {
+    this >= 1_000_000 -> "${"%.1f".format(this / 1_000_000)}M"
+    this >= 1_000     -> "${(this / 1_000).toInt()}K"
+    this > 0          -> "${this.toInt()}"
+    else              -> ""
+}
+
+
 @Composable
 fun ChartItem(
     label: String,
-    value: Int,
+    value: Double,
     maxHeight: Int,
-    maxValue: Int,
+    maxValue: Double,
     isHighest: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val barHeight = if (maxValue > 0) (value.toFloat() / maxValue * maxHeight).dp else 0.dp
+    val barHeight = if (maxValue > 0) (value / maxValue * maxHeight).dp else 0.dp
     val barColor = if (isHighest) StatPinkDark else Color.White
 
     Column(
@@ -32,7 +40,7 @@ fun ChartItem(
     ) {
         if (value > 0) {
             Text(
-                text = value.toString(),
+                text = value.formatVnd(),
                 style = StatLabelStyle,
                 color = TextPrimaryStat
             )
@@ -62,10 +70,10 @@ fun ChartItem(
 @Composable
 fun ChartCard(
     title: String,
-    data: List<Pair<String, Int>>,
+    data: List<Pair<String, Double>>,
     modifier: Modifier = Modifier
 ) {
-    val maxValue = data.maxOfOrNull { it.second } ?: 0
+    val maxValue = data.maxOfOrNull { it.second } ?: 0.0
     val chartBaseHeight = 100
     val calendarHighlight = Color(0xFFFCDFCF)
 
@@ -110,16 +118,14 @@ fun ChartCard(
 @Composable
 fun ChartCardPreview() {
     val sampleData = listOf(
-        "Sáng" to 1,
-        "Trưa" to 1,
-        "Chiều" to 3,
-        "Tối" to 1,
-        "Khuya" to 1
+        "Sáng" to 35000.0,
+        "Trưa" to 120000.0,
+        "Tối"  to 75000.0
     )
     FoodTrackerTheme {
         Box(modifier = Modifier.padding(16.dp).background(MainBackground)) {
             ChartCard(
-                title = "Món theo buổi",
+                title = "Chi tiêu theo buổi",
                 data = sampleData
             )
         }

@@ -10,17 +10,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 
 data class MealRecord(
     val time: String,
     val name: String,
     val category: String,
-    val price: String
+    val price: String,
+    val iconText: String = "🍽️",
+    val imageUrl: String? = null
 )
 
 data class DayGroup(
@@ -61,8 +65,26 @@ fun DetailItemRow(
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(50.dp))
-                .background(Color(0xFFE8D3C7))
-        )
+                .background(Color(0xFFE8D3C7)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (meal.imageUrl != null) {
+                AsyncImage(
+                    model = meal.imageUrl,
+                    contentDescription = meal.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(50.dp))
+                )
+            } else {
+                // Fallback: emoji/text icon from category
+                Text(
+                    text = meal.iconText,
+                    fontSize = 22.sp
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -173,7 +195,18 @@ fun DetailCardSection(
 @Composable
 fun DetailCardDailyPreview() {
     val sampleData = listOf(
-        DayGroup(meals = listOf(MealRecord("15:20", "Phở Hà Nội", "Mì & Phở", "30k đ")))
+        DayGroup(
+            meals = listOf(
+                MealRecord(
+                    time = "15:20",
+                    name = "Phở Hà Nội",
+                    category = "Mì & Phở",
+                    price = "30k đ",
+                    iconText = "🍜",
+                    imageUrl = null
+                )
+            )
+        )
     )
     FoodTrackerTheme {
         Box(modifier = Modifier.background(MainBackground).padding(16.dp)) {

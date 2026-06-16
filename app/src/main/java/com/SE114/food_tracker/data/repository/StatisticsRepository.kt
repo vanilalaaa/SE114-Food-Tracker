@@ -10,22 +10,18 @@ import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.feature.stats.CategoryStat
 import com.SE114.food_tracker.feature.stats.ChartBar
 import com.SE114.food_tracker.feature.stats.ChartSlice
+import com.SE114.food_tracker.feature.stats.DetailItem
 import com.SE114.food_tracker.feature.stats.PopularFoodStat
 import com.SE114.food_tracker.feature.stats.WalletDestroyerItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
 
-/**
- * Aggregates raw DAO flows into UI-ready chart models for the Statistics feature.
- *
- * Contract:
- * - All queries filter `wallet_id IS NULL` (enforced in ItemDAO) — personal stats only.
- * - Category metadata (name/icon) is joined from CategoryDAO — same pattern as
- *   [ItemRepository.getDiaryItemsByDay].
- * - No Vico types here — plain data classes keep this layer testable and TV4-agnostic.
- */
 class StatisticsRepository @Inject constructor(
     private val itemDAO: ItemDAO,
     private val categoryDAO: CategoryDAO
@@ -33,10 +29,6 @@ class StatisticsRepository @Inject constructor(
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
-    /**
-     * Raw (total spend, item count) for a date range.
-     * ViewModel combines this with previous-period total to build [StatisticsSummary].
-     */
     fun getTotalSpent(start: Long, end: Long): Flow<Double> =
         itemDAO.getTotalExpenseForDay(start, end).map { it ?: 0.0 }
 
@@ -48,27 +40,16 @@ class StatisticsRepository @Inject constructor(
 
     // ── Bar chart ─────────────────────────────────────────────────────────────
 
-    /**
-     * Returns one [ChartBar] per time bucket:
-     * - DAY   → 3 bars labelled "Sáng", "Trưa", "Tối" (time_type 0/1/2)
-     * - WEEK  → up to 7 bars labelled "T2"…"CN"
-     * - MONTH → up to 31 bars labelled "1"…"31"
-     * - YEAR  → up to 12 bars labelled "Th1"…"Th12" (month-bucket query)
-     *
-     * Bars for missing days (zero spend) are omitted — TV4 pads them if needed.
-     */
     fun getBarData(timeFrame: TimeFrame, start: Long, end: Long): Flow<List<ChartBar>> =
         when (timeFrame) {
             TimeFrame.DAY ->
                 itemDAO.getExpenseByTimeType(start, end).map { rows ->
                     rows.map { ChartBar(label = it.timeType.toSessionLabel(), value = it.total) }
                 }
-
             TimeFrame.WEEK, TimeFrame.MONTH ->
                 itemDAO.getExpenseByDateBucket(start, end).map { rows ->
                     rows.map { ChartBar(label = it.entryDate.toDayLabel(timeFrame), value = it.total) }
                 }
-
             TimeFrame.YEAR ->
                 itemDAO.getExpenseByMonthBucket(start, end).map { rows ->
                     rows.map { ChartBar(label = it.monthEpoch.toDayLabel(timeFrame), value = it.total) }
@@ -77,10 +58,6 @@ class StatisticsRepository @Inject constructor(
 
     // ── Donut chart ───────────────────────────────────────────────────────────
 
-    /**
-     * Spend by category, decorated with category name and icon from Room.
-     * Ordered by total DESC (matches DAO query).
-     */
     fun getDonutData(start: Long, end: Long): Flow<List<ChartSlice>> =
         combine(
             itemDAO.getPersonalExpenseByCategory(start, end),
@@ -100,9 +77,6 @@ class StatisticsRepository @Inject constructor(
 
     // ── Insight cards ─────────────────────────────────────────────────────────
 
-    /**
-     * Top N categories by spend — derived from the donut data to avoid a duplicate query.
-     */
     fun getTopCategories(start: Long, end: Long, limit: Int = 3): Flow<List<CategoryStat>> =
         getDonutData(start, end).map { slices ->
             slices.sortedByDescending { it.value }
@@ -110,12 +84,6 @@ class StatisticsRepository @Inject constructor(
                 .map { CategoryStat(name = it.label, iconUrl = it.iconUrl, total = it.value) }
         }
 
-    /**
-     * The single most expensive personal item in the period ("Wallet Destroyer").
-     * Returns null when there are no items.
-     * Category metadata is joined so TV4 can render icon + category name without
-     * touching CategoryDAO directly.
-     */
     fun getWalletDestroyer(start: Long, end: Long): Flow<WalletDestroyerItem?> =
         combine(
             itemDAO.getTopExpensiveItems(start, end, limit = 1),
@@ -125,21 +93,83 @@ class StatisticsRepository @Inject constructor(
             val byId = categories.associateBy { it.categoryId }
             val cat  = byId[item.categoryId]
             WalletDestroyerItem(
-                itemId        = item.itemId,
-                name          = item.name,
-                categoryName  = cat?.name    ?: "Khác",
+                itemId          = item.itemId,
+                name            = item.name,
+                categoryName    = cat?.name    ?: "Khác",
                 categoryIconUrl = cat?.iconUrl ?: "🍽️",
-                price         = item.price,
-                currencyCode  = item.currencyCode,
-                imageUrl      = item.imageUrl
+                price           = item.price,
+                currencyCode    = item.currencyCode,
+                imageUrl        = item.imageUrl
             )
         }
 
-    /**
-     * Top N most frequently logged food names, tie-broken by total spend.
-     */
     fun getPopularFoods(start: Long, end: Long, limit: Int = 5): Flow<List<PopularFoodStat>> =
-        itemDAO.getPopularFoods(start, end, limit).map { rows ->
-            rows.map { PopularFoodStat(name = it.name, recordCount = it.recordCount, totalSpent = it.totalSpent) }
+        combine(
+            itemDAO.getPopularFoods(start, end, limit),
+            itemDAO.getItemsByDateRange(start, end),
+            categoryDAO.getAllCategories()
+        ) { rows, allItems, categories ->
+            val byId = categories.associateBy { it.categoryId }
+            // Index items by name → pick the most recent one (highest updatedAt) per name
+            val latestItemByName: Map<String, com.SE114.food_tracker.data.local.entities.Item> =
+                allItems.groupBy { it.name }
+                    .mapValues { (_, items) -> items.maxBy { it.updatedAt } }
+            rows.map { row ->
+                val item = latestItemByName[row.name]
+                val cat  = item?.categoryId?.let { byId[it] }
+                PopularFoodStat(
+                    name            = row.name,
+                    recordCount     = row.recordCount,
+                    totalSpent      = row.totalSpent,
+                    imageUrl        = item?.imageUrl,
+                    categoryIconUrl = cat?.iconUrl ?: "🍽️"
+                )
+            }
+        }
+
+    // ── Detail list ───────────────────────────────────────────────────────────
+
+    /**
+     * All personal items in [start, end), enriched with category metadata,
+     * ready for [DetailCardSection].
+     * Ordered by entry_date DESC then time_type ASC (ItemDAO.getItemsByDateRange).
+     */
+    fun getDetailItems(start: Long, end: Long): Flow<List<DetailItem>> =
+        combine(
+            itemDAO.getItemsByDateRange(start, end),
+            categoryDAO.getAllCategories()
+        ) { items, categories ->
+            val byId = categories.associateBy { it.categoryId }
+            val tz   = TimeZone.UTC
+
+            items.map { item ->
+                val cat  = byId[item.categoryId]
+                val date = Instant.fromEpochMilliseconds(item.entryDate)
+                    .toLocalDateTime(tz).date
+
+                val dayName = when (date.dayOfWeek) {
+                    DayOfWeek.MONDAY    -> "Thứ Hai"
+                    DayOfWeek.TUESDAY   -> "Thứ Ba"
+                    DayOfWeek.WEDNESDAY -> "Thứ Tư"
+                    DayOfWeek.THURSDAY  -> "Thứ Năm"
+                    DayOfWeek.FRIDAY    -> "Thứ Sáu"
+                    DayOfWeek.SATURDAY  -> "Thứ Bảy"
+                    DayOfWeek.SUNDAY    -> "Chủ Nhật"
+                    else                -> ""
+                }
+
+                DetailItem(
+                    itemId          = item.itemId,
+                    name            = item.name,
+                    categoryName    = cat?.name     ?: "Khác",
+                    categoryIconUrl = cat?.iconUrl  ?: "🍽️",
+                    price           = item.price,
+                    currencyCode    = item.currencyCode,
+                    timeLabel       = item.timeType.toSessionLabel(),
+                    dateLabel       = "$dayName, %02d/%02d".format(date.dayOfMonth, date.monthNumber),
+                    entryDateEpoch  = item.entryDate,
+                    imageUrl        = item.imageUrl
+                )
+            }
         }
 }

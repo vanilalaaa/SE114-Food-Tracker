@@ -10,14 +10,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
+
+data class PopularFoodData(
+    val name: String,
+    val recordCount: String,
+    val imageUrl: String? = null,
+    val categoryIconUrl: String = "🍽️"
+)
 
 @Composable
 fun PopularFoodItem(
     foodName: String,
     recordCount: String,
+    imageUrl: String? = null,
+    categoryIconUrl: String = "🍽️",
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -30,8 +42,22 @@ fun PopularFoodItem(
             modifier = Modifier
                 .size(52.dp)
                 .clip(RoundedCornerShape(50.dp))
-                .background(Color(0xFFE8D3C7))
-        )
+                .background(Color(0xFFE8D3C7)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = foodName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(50.dp))
+                )
+            } else {
+                Text(text = categoryIconUrl, fontSize = 24.sp)
+            }
+        }
 
         Spacer(modifier = Modifier.width(16.dp))
 
@@ -80,13 +106,13 @@ fun PopularFoodCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 foodList.forEach { food ->
                     PopularFoodItem(
-                        foodName = food.name,
-                        recordCount = food.recordCount
+                        foodName        = food.name,
+                        recordCount     = food.recordCount,
+                        imageUrl        = food.imageUrl,
+                        categoryIconUrl = food.categoryIconUrl
                     )
                 }
             }
@@ -94,17 +120,12 @@ fun PopularFoodCard(
     }
 }
 
-data class PopularFoodData(
-    val name: String,
-    val recordCount: String
-)
-
 @Preview(showBackground = true)
 @Composable
 fun PopularFoodCardPreview() {
     val sampleFoods = listOf(
-        PopularFoodData("Phở Hà Nội", "1"),
-        PopularFoodData("Phở Vĩ", "1")
+        PopularFoodData("Phở Hà Nội", "3", imageUrl = null, categoryIconUrl = "🍜"),
+        PopularFoodData("Bánh mì", "2", imageUrl = null, categoryIconUrl = "🥖")
     )
     FoodTrackerTheme {
         Box(

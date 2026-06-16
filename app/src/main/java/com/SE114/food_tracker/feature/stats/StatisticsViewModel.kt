@@ -84,7 +84,6 @@ class StatisticsViewModel @Inject constructor(
         // Bundle navigation params so flatMapLatest receives a single value
         NavParams(tf, tab, anchor, range, prevRange)
     }.flatMapLatest { nav ->
-        // All inner flows react to the navigation params as a unit.
         combine(
             statisticsRepository.getTotalSpent(nav.range.start, nav.range.end),
             statisticsRepository.getItemCount(nav.range.start, nav.range.end),
@@ -95,55 +94,45 @@ class StatisticsViewModel @Inject constructor(
             statisticsRepository.getWalletDestroyer(nav.range.start, nav.range.end),
             statisticsRepository.getPopularFoods(nav.range.start, nav.range.end)
         ) { args ->
-            // combine with 8 flows gives an Array<Any?> — unpack by index
             @Suppress("UNCHECKED_CAST")
-            val totalSpent      = args[0] as Double
-            val itemCount       = args[1] as Int
-            val previousTotal   = args[2] as Double
-            val bars            = args[3] as List<ChartBar>
-            val donut           = args[4] as List<ChartSlice>
-            val topCats         = args[5] as List<CategoryStat>
-            val destroyer       = args[6] as WalletDestroyerItem?
-            val popular         = args[7] as List<PopularFoodStat>
-
-            val summary = StatisticsSummary(
-                totalSpent          = totalSpent,
-                itemCount           = itemCount,
-                previousPeriodTotal = previousTotal
-            )
-
-            // Budget state depends on the current totalSpent — flatMap again lazily.
-            // We embed this as a suspended-but-inline calculation here, then
-            // override with a dedicated combine below for live budget updates.
-            // (Full live budget reactivity is wired in the outer combine below.)
-            Triple(summary, bars, Pair(donut, Pair(topCats, Pair(destroyer, popular))))
-        }.flatMapLatest { (summary, bars, rest) ->
-            val (donut, rest2)     = rest
-            val (topCats, rest3)   = rest2
-            val (destroyer, popular) = rest3
-
-            budgetFlow(nav.timeFrame, summary.totalSpent).map { budget ->
-                // Trend points: last 4 periods' totals as Float for LocalLineTrendChartCard.
-                // For now we have current + previous; extend to 4 points in Sprint 3.
-                val trendPoints = buildTrendPoints(summary.previousPeriodTotal, summary.totalSpent)
-
-                StatisticsUiState(
-                    timeFrame    = nav.timeFrame,
-                    contentTab   = nav.contentTab,
-                    anchorDate   = nav.anchor,
-                    headerLabel  = TimeRangeProvider.headerLabel(nav.timeFrame, nav.anchor),
-                    summary      = summary,
-                    budget       = budget,
-                    barChartData = bars,
-                    donutData    = donut,
-                    topCategories    = topCats,
-                    walletDestroyer  = destroyer,
-                    popularFoods     = popular,
-                    trendPoints      = trendPoints,
-                    isLoading        = false,
-                    error            = null
-                )
-            }
+            val totalSpent    = args[0] as Double
+            val itemCount     = args[1] as Int
+            val previousTotal = args[2] as Double
+            val bars          = args[3] as List<ChartBar>
+            val donut         = args[4] as List<ChartSlice>
+            val topCats       = args[5] as List<CategoryStat>
+            val destroyer     = args[6] as WalletDestroyerItem?
+            val popular       = args[7] as List<PopularFoodStat>
+            NavData(totalSpent, itemCount, previousTotal, bars, donut, topCats, destroyer, popular)
+        }.flatMapLatest { nd ->
+            statisticsRepository.getDetailItems(nav.range.start, nav.range.end)
+                .flatMapLatest { detailItems ->
+                    val summary = StatisticsSummary(
+                        totalSpent          = nd.totalSpent,
+                        itemCount           = nd.itemCount,
+                        previousPeriodTotal = nd.previousTotal
+                    )
+                    budgetFlow(nav.timeFrame, nd.totalSpent).map { budget ->
+                        val trendPoints = buildTrendPoints(nd.previousTotal, nd.totalSpent)
+                        StatisticsUiState(
+                            timeFrame       = nav.timeFrame,
+                            contentTab      = nav.contentTab,
+                            anchorDate      = nav.anchor,
+                            headerLabel     = TimeRangeProvider.headerLabel(nav.timeFrame, nav.anchor),
+                            summary         = summary,
+                            budget          = budget,
+                            barChartData    = nd.bars,
+                            donutData       = nd.donut,
+                            topCategories   = nd.topCats,
+                            walletDestroyer = nd.destroyer,
+                            popularFoods    = nd.popular,
+                            detailItems     = detailItems,
+                            trendPoints     = trendPoints,
+                            isLoading       = false,
+                            error           = null
+                        )
+                    }
+                }
         }
     }
         .stateIn(
@@ -231,5 +220,15 @@ class StatisticsViewModel @Inject constructor(
         val anchor      : LocalDate,
         val range       : DateRange,
         val prevRange   : DateRange
+    )
+    private data class NavData(
+        val totalSpent    : Double,
+        val itemCount     : Int,
+        val previousTotal : Double,
+        val bars          : List<ChartBar>,
+        val donut         : List<ChartSlice>,
+        val topCats       : List<CategoryStat>,
+        val destroyer     : WalletDestroyerItem?,
+        val popular       : List<PopularFoodStat>
     )
 }
