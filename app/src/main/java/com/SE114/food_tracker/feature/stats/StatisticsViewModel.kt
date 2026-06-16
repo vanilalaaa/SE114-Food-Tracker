@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.toLocalDateTime
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -114,11 +115,22 @@ class StatisticsViewModel @Inject constructor(
                     )
                     budgetFlow(nav.timeFrame, nd.totalSpent).map { budget ->
                         val trendPoints = buildTrendPoints(nd.previousTotal, nd.totalSpent)
+                        val datesWithData = detailItems
+                            .map { it.entryDateEpoch }
+                            .distinct()
+                            .map { epochMs ->
+                                kotlinx.datetime.Instant
+                                    .fromEpochMilliseconds(epochMs)
+                                    .toLocalDateTime(kotlinx.datetime.TimeZone.UTC)
+                                    .dayOfMonth
+                            }
+                            .distinct()
                         StatisticsUiState(
                             timeFrame       = nav.timeFrame,
                             contentTab      = nav.contentTab,
                             anchorDate      = nav.anchor,
                             headerLabel     = TimeRangeProvider.headerLabel(nav.timeFrame, nav.anchor),
+                            datesWithData   = datesWithData,
                             summary         = summary,
                             budget          = budget,
                             barChartData    = nd.bars,
@@ -157,6 +169,17 @@ class StatisticsViewModel @Inject constructor(
 
     fun onNext() {
         _anchor.value = TimeRangeProvider.shift(_timeFrame.value, _anchor.value, forward = true)
+    }
+
+    /** Called when user taps a day cell in CalendarCard. */
+    fun onDateSelected(day: Int) {
+        val current = _anchor.value
+        _anchor.value = LocalDate(current.year, current.monthNumber, day)
+    }
+
+    /** Called when MonthYearPickerDialog confirms a new month/year. */
+    fun onYearMonthSelected(month: Int, year: Int) {
+        _anchor.value = LocalDate(year, month, 1)
     }
 
     /**

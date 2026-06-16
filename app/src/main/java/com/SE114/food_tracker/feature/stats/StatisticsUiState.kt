@@ -96,6 +96,7 @@ data class StatisticsUiState(
     val contentTab: ContentTab = ContentTab.EXPENSE,
     val anchorDate: LocalDate? = null,
     val headerLabel: String = "",
+    val datesWithData: List<Int> = emptyList(),
 
     // Summary row
     val summary: StatisticsSummary = StatisticsSummary(),

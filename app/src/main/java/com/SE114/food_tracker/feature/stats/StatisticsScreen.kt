@@ -45,20 +45,15 @@ fun StatisticsScreen(
     // Budget dialog state (purely local UI)
     var showBudgetDialog by remember { mutableStateOf(false) }
     var budgetInput by remember { mutableStateOf("") }
+    var showCalendarDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             StatisticsTopBar(
                 dateText = uiState.headerLabel,
                 onDateClick = {
-                    val current = when (uiState.timeFrame) {
-                        TimeFrame.DAY   -> uiState.budget.daily
-                        TimeFrame.WEEK  -> uiState.budget.weekly
-                        TimeFrame.MONTH -> uiState.budget.monthly
-                        TimeFrame.YEAR  -> uiState.budget.yearly
-                    }
-                    budgetInput = current?.toInt()?.toString() ?: ""
-                    showBudgetDialog = true
+                    // TopBar date area → always opens the CalendarCard picker
+                    showCalendarDialog = true
                 },
                 onNextClick     = { viewModel.onNext() },
                 onPreviousClick = { viewModel.onPrevious() }
@@ -324,6 +319,31 @@ fun StatisticsScreen(
                 Button(onClick = { showBudgetDialog = false }) { Text("Hủy") }
             }
         )
+    }
+
+    // ── Calendar picker dialog ───────────────────────────────────────────────
+    // Shown when the user taps the date label in StatisticsTopBar.
+    // Uses a bare Dialog (no AlertDialog chrome) so CalendarCard fills naturally.
+    if (showCalendarDialog) {
+        val anchor = uiState.anchorDate
+        if (anchor != null) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { showCalendarDialog = false }
+            ) {
+                DayPickerDialog(
+                    selectedYear       = anchor.year,
+                    selectedMonth      = anchor.monthNumber,
+                    onDateClick        = { day ->
+                        viewModel.onDateSelected(day)
+                        showCalendarDialog = false
+                    },
+                    onMonthYearChanged = { month, year ->
+                        viewModel.onYearMonthSelected(month, year)
+                    },
+                    hasDataDates       = uiState.datesWithData
+                )
+            }
+        }
     }
 }
 
