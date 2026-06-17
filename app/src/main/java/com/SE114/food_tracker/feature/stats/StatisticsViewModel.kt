@@ -82,69 +82,75 @@ class StatisticsViewModel @Inject constructor(
     val uiState: StateFlow<StatisticsUiState> = combine(
         _timeFrame, _contentTab, _anchor, _range, _previousRange
     ) { tf, tab, anchor, range, prevRange ->
-        // Bundle navigation params so flatMapLatest receives a single value
         NavParams(tf, tab, anchor, range, prevRange)
     }.flatMapLatest { nav ->
-        combine(
-            statisticsRepository.getTotalSpent(nav.range.start, nav.range.end),
-            statisticsRepository.getItemCount(nav.range.start, nav.range.end),
-            statisticsRepository.getTotalSpentForRange(nav.prevRange.start, nav.prevRange.end),
-            statisticsRepository.getBarData(nav.timeFrame, nav.range.start, nav.range.end),
-            statisticsRepository.getDonutData(nav.range.start, nav.range.end),
-            statisticsRepository.getTopCategories(nav.range.start, nav.range.end),
-            statisticsRepository.getWalletDestroyer(nav.range.start, nav.range.end),
-            statisticsRepository.getPopularFoods(nav.range.start, nav.range.end)
-        ) { args ->
-            @Suppress("UNCHECKED_CAST")
-            val totalSpent    = args[0] as Double
-            val itemCount     = args[1] as Int
-            val previousTotal = args[2] as Double
-            val bars          = args[3] as List<ChartBar>
-            val donut         = args[4] as List<ChartSlice>
-            val topCats       = args[5] as List<CategoryStat>
-            val destroyer     = args[6] as WalletDestroyerItem?
-            val popular       = args[7] as List<PopularFoodStat>
-            NavData(totalSpent, itemCount, previousTotal, bars, donut, topCats, destroyer, popular)
+        val flow1 = statisticsRepository.getTotalSpent(nav.range.start, nav.range.end)
+        val flow2 = statisticsRepository.getItemCount(nav.range.start, nav.range.end)
+        val flow3 = statisticsRepository.getTotalSpentForRange(nav.prevRange.start, nav.prevRange.end)
+        val flow4 = statisticsRepository.getBarData(nav.timeFrame, nav.range.start, nav.range.end)
+        val flow5 = statisticsRepository.getDonutData(nav.range.start, nav.range.end)
+        val flow6 = statisticsRepository.getTopCategories(nav.range.start, nav.range.end)
+        val flow7 = statisticsRepository.getWalletDestroyer(nav.range.start, nav.range.end)
+
+        combine(flow1, flow2, flow3, flow4, flow5, flow6, flow7) { args ->
+            NavData(
+                totalSpent    = args[0] as Double,
+                itemCount     = args[1] as Int,
+                previousTotal = args[2] as Double,
+                bars          = args[3] as List<ChartBar>,
+                donut         = args[4] as List<ChartSlice>,
+                topCats       = args[5] as List<CategoryStat>,
+                destroyer     = args[6] as WalletDestroyerItem?
+            )
         }.flatMapLatest { nd ->
-            statisticsRepository.getDetailItems(nav.range.start, nav.range.end)
-                .flatMapLatest { detailItems ->
-                    val summary = StatisticsSummary(
-                        totalSpent          = nd.totalSpent,
-                        itemCount           = nd.itemCount,
-                        previousPeriodTotal = nd.previousTotal
+            combine(
+                statisticsRepository.getDetailItems(nav.range.start, nav.range.end),
+                statisticsRepository.getHistoricalCycleAverage(nav.timeFrame, nav.anchor)
+            ) { detailItems, cycleAverage ->
+                detailItems to cycleAverage
+            }.flatMapLatest { (detailItems, cycleAverage) ->
+                val summary = StatisticsSummary(
+                    totalSpent          = nd.totalSpent,
+                    itemCount           = nd.itemCount,
+                    previousPeriodTotal = nd.previousTotal
+                )
+                budgetFlow(nav.timeFrame, nd.totalSpent).map { budget ->
+                    val forecast = buildTrendForecast(
+                        timeFrame      = nav.timeFrame,
+                        anchor         = nav.anchor,
+                        previousTotal  = nd.previousTotal,
+                        currentActual  = nd.totalSpent,
+                        cycleAverage   = cycleAverage
                     )
-                    budgetFlow(nav.timeFrame, nd.totalSpent).map { budget ->
-                        val trendPoints = buildTrendPoints(nd.previousTotal, nd.totalSpent)
-                        val datesWithData = detailItems
-                            .map { it.entryDateEpoch }
-                            .distinct()
-                            .map { epochMs ->
-                                kotlinx.datetime.Instant
-                                    .fromEpochMilliseconds(epochMs)
-                                    .toLocalDateTime(kotlinx.datetime.TimeZone.UTC)
-                                    .dayOfMonth
-                            }
-                            .distinct()
-                        StatisticsUiState(
-                            timeFrame       = nav.timeFrame,
-                            contentTab      = nav.contentTab,
-                            anchorDate      = nav.anchor,
-                            headerLabel     = TimeRangeProvider.headerLabel(nav.timeFrame, nav.anchor),
-                            datesWithData   = datesWithData,
-                            summary         = summary,
-                            budget          = budget,
-                            barChartData    = nd.bars,
-                            donutData       = nd.donut,
-                            topCategories   = nd.topCats,
-                            walletDestroyer = nd.destroyer,
-                            popularFoods    = nd.popular,
-                            detailItems     = detailItems,
-                            trendPoints     = trendPoints,
-                            isLoading       = false,
-                            error           = null
-                        )
-                    }
+                    val datesWithData = detailItems
+                        .map { it.entryDateEpoch }
+                        .distinct()
+                        .map { epochMs ->
+                            kotlinx.datetime.Instant
+                                .fromEpochMilliseconds(epochMs)
+                                .toLocalDateTime(kotlinx.datetime.TimeZone.UTC)
+                                .dayOfMonth
+                        }
+                        .distinct()
+                    StatisticsUiState(
+                        timeFrame       = nav.timeFrame,
+                        contentTab      = nav.contentTab,
+                        anchorDate      = nav.anchor,
+                        headerLabel     = TimeRangeProvider.headerLabel(nav.timeFrame, nav.anchor),
+                        datesWithData   = datesWithData,
+                        summary         = summary,
+                        budget          = budget,
+                        barChartData    = nd.bars,
+                        donutData       = nd.donut,
+                        topCategories   = nd.topCats,
+                        walletDestroyer = nd.destroyer,
+                        detailItems     = detailItems,
+                        trendForecast   = forecast,
+                        isLoading       = false,
+                        error           = null
+                    )
                 }
+            }
         }
     }
         .stateIn(
@@ -222,18 +228,30 @@ class StatisticsViewModel @Inject constructor(
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
-     * Builds the Float list for [LocalLineTrendChartCard].
+     * Builds the 3-point forecast for [LocalLineTrendChartCard] per Sprint 3 SRS #1/#2:
      *
-     * Sprint 2: 2 points (previous → current).
-     * Sprint 3 TODO: extend to 4+ points by pulling N-2 and N-3 period totals.
+     *   Projected Total = Current Period Spent + (7-cycle historical average * remaining cycles)
+     *
+     * "Remaining cycles" is the count of whole forecast-cycles left in the active period,
+     * computed dynamically off the real system clock via [TimeRangeProvider.remainingCyclesInPeriod]
+     * (cycle = day for WEEK/MONTH, week for YEAR). [TimeFrame.DAY] has no sub-cycle, so it
+     * always has 0 remaining cycles and the projection collapses to the current actual spend.
      */
-    private fun buildTrendPoints(previous: Double, current: Double): List<Float> {
-        // Ensure the line is always renderable — at least 2 non-zero points.
-        val prev = previous.toFloat().coerceAtLeast(0f)
-        val curr = current.toFloat().coerceAtLeast(0f)
-        // Interpolate a midpoint for a smoother 3-point curve until Sprint 3 adds real data.
-        val mid  = ((prev + curr) / 2f)
-        return listOf(prev, mid, curr)
+    private fun buildTrendForecast(
+        timeFrame: TimeFrame,
+        anchor: LocalDate,
+        previousTotal: Double,
+        currentActual: Double,
+        cycleAverage: Double
+    ): TrendForecast {
+        val remaining = TimeRangeProvider.remainingCyclesInPeriod(timeFrame, anchor)
+        val projected = currentActual + (cycleAverage.coerceAtLeast(0.0) * remaining)
+        return TrendForecast(
+            previousTotal    = previousTotal.coerceAtLeast(0.0),
+            currentActual    = currentActual.coerceAtLeast(0.0),
+            projectedTotal   = projected.coerceAtLeast(0.0),
+            remainingCycles  = remaining
+        )
     }
 
     /** Bundle for combine → flatMapLatest handoff. */
@@ -251,7 +269,6 @@ class StatisticsViewModel @Inject constructor(
         val bars          : List<ChartBar>,
         val donut         : List<ChartSlice>,
         val topCats       : List<CategoryStat>,
-        val destroyer     : WalletDestroyerItem?,
-        val popular       : List<PopularFoodStat>
+        val destroyer     : WalletDestroyerItem?
     )
 }

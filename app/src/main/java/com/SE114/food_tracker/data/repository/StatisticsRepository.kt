@@ -1,23 +1,22 @@
 package com.SE114.food_tracker.data.repository
 
 import com.SE114.food_tracker.core.util.TimeFrame
+import com.SE114.food_tracker.core.util.TimeRangeProvider
 import com.SE114.food_tracker.core.util.toDayLabel
 import com.SE114.food_tracker.core.util.toSessionLabel
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.dao.ItemDAO
-import com.SE114.food_tracker.data.local.dao.PopularFoodExpense
-import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.feature.stats.CategoryStat
 import com.SE114.food_tracker.feature.stats.ChartBar
 import com.SE114.food_tracker.feature.stats.ChartSlice
 import com.SE114.food_tracker.feature.stats.DetailItem
-import com.SE114.food_tracker.feature.stats.PopularFoodStat
 import com.SE114.food_tracker.feature.stats.WalletDestroyerItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
@@ -38,21 +37,76 @@ class StatisticsRepository @Inject constructor(
     fun getTotalSpentForRange(start: Long, end: Long): Flow<Double> =
         itemDAO.getTotalExpenseForRange(start, end).map { it ?: 0.0 }
 
+    /**
+     * Average personal spend per forecast-cycle over the last 7 cycles immediately
+     * preceding the active period (Sprint 3 SRS #1). Cycle granularity and the exact
+     * lookback window are computed by [TimeRangeProvider.lastSevenCyclesRangeFor] —
+     * WEEK/MONTH look back 7 days, YEAR looks back 7 weeks.
+     *
+     * `wallet_id IS NULL` is already enforced inside [ItemDAO.getTotalExpenseForRange],
+     * so shared-wallet expenses never leak into this average (SRS #3).
+     */
+    fun getHistoricalCycleAverage(timeFrame: TimeFrame, anchor: LocalDate): Flow<Double> {
+        val lookback = TimeRangeProvider.lastSevenCyclesRangeFor(timeFrame, anchor)
+        return itemDAO.getTotalExpenseForRange(lookback.start, lookback.end).map { total ->
+            (total ?: 0.0) / 7.0
+        }
+    }
+
     // ── Bar chart ─────────────────────────────────────────────────────────────
 
     fun getBarData(timeFrame: TimeFrame, start: Long, end: Long): Flow<List<ChartBar>> =
         when (timeFrame) {
+
+            // DAY — always 3 bars: Sáng / Trưa / Tối
             TimeFrame.DAY ->
                 itemDAO.getExpenseByTimeType(start, end).map { rows ->
-                    rows.map { ChartBar(label = it.timeType.toSessionLabel(), value = it.total) }
+                    val byType = rows.associateBy { it.timeType }
+                    listOf(0, 1, 2).map { t ->
+                        ChartBar(label = t.toSessionLabel(), value = byType[t]?.total ?: 0.0)
+                    }
                 }
-            TimeFrame.WEEK, TimeFrame.MONTH ->
+
+            // WEEK — always 7 bars: T2 … CN, in Mon→Sun order
+            TimeFrame.WEEK ->
                 itemDAO.getExpenseByDateBucket(start, end).map { rows ->
-                    rows.map { ChartBar(label = it.entryDate.toDayLabel(timeFrame), value = it.total) }
+                    val byLabel = rows.associate { it.entryDate.toDayLabel(TimeFrame.WEEK) to it.total }
+                    listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN").map { label ->
+                        ChartBar(label = label, value = byLabel[label] ?: 0.0)
+                    }
                 }
+
+            // MONTH — 4 bars representing weeks 1–4 of the month.
+            // Week boundaries: [1–7], [8–14], [15–21], [22–28/29/30/31]
+            TimeFrame.MONTH ->
+                itemDAO.getExpenseByDateBucket(start, end).map { rows ->
+                    // Group all item dates into 4 week buckets and sum by bucket
+                    val weekBuckets = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0, 4 to 0.0)
+                    rows.forEach { expense ->
+                        val expenseDate = Instant.fromEpochMilliseconds(expense.entryDate)
+                            .toLocalDateTime(TimeZone.UTC).date
+                        val dayOfMonth = expenseDate.dayOfMonth
+                        val week = when {
+                            dayOfMonth <= 7  -> 1
+                            dayOfMonth <= 14 -> 2
+                            dayOfMonth <= 21 -> 3
+                            else             -> 4
+                        }
+                        weekBuckets[week] = weekBuckets[week]!! + expense.total
+                    }
+
+                    (1..4).map { week ->
+                        ChartBar(label = "Tuần $week", value = weekBuckets[week] ?: 0.0)
+                    }
+                }
+
+            // YEAR — always 12 bars: Th1 … Th12
             TimeFrame.YEAR ->
                 itemDAO.getExpenseByMonthBucket(start, end).map { rows ->
-                    rows.map { ChartBar(label = it.monthEpoch.toDayLabel(timeFrame), value = it.total) }
+                    val byLabel = rows.associate { it.monthEpoch.toDayLabel(TimeFrame.YEAR) to it.total }
+                    (1..12).map { m ->
+                        ChartBar(label = "T$m", value = byLabel["T$m"] ?: 0.0)
+                    }
                 }
         }
 
@@ -101,30 +155,6 @@ class StatisticsRepository @Inject constructor(
                 currencyCode    = item.currencyCode,
                 imageUrl        = item.imageUrl
             )
-        }
-
-    fun getPopularFoods(start: Long, end: Long, limit: Int = 5): Flow<List<PopularFoodStat>> =
-        combine(
-            itemDAO.getPopularFoods(start, end, limit),
-            itemDAO.getItemsByDateRange(start, end),
-            categoryDAO.getAllCategories()
-        ) { rows, allItems, categories ->
-            val byId = categories.associateBy { it.categoryId }
-            // Index items by name → pick the most recent one (highest updatedAt) per name
-            val latestItemByName: Map<String, com.SE114.food_tracker.data.local.entities.Item> =
-                allItems.groupBy { it.name }
-                    .mapValues { (_, items) -> items.maxBy { it.updatedAt } }
-            rows.map { row ->
-                val item = latestItemByName[row.name]
-                val cat  = item?.categoryId?.let { byId[it] }
-                PopularFoodStat(
-                    name            = row.name,
-                    recordCount     = row.recordCount,
-                    totalSpent      = row.totalSpent,
-                    imageUrl        = item?.imageUrl,
-                    categoryIconUrl = cat?.iconUrl ?: "🍽️"
-                )
-            }
         }
 
     // ── Detail list ───────────────────────────────────────────────────────────

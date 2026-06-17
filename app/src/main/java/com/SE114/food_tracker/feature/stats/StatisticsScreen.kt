@@ -197,20 +197,6 @@ fun StatisticsScreen(
                     )
                 }
 
-                // ── Popular foods ────────────────────────────────────────────
-                if (uiState.popularFoods.isNotEmpty()) {
-                    PopularFoodCard(
-                        foodList = uiState.popularFoods.map { food ->
-                            PopularFoodData(
-                                name            = food.name,
-                                recordCount     = food.recordCount.toString(),
-                                imageUrl        = food.imageUrl,
-                                categoryIconUrl = food.categoryIconUrl
-                            )
-                        }
-                    )
-                }
-
                 // ── Detail meal list ─────────────────────────────────────────
                 if (uiState.detailItems.isNotEmpty()) {
                     val isWeeklyMode = uiState.timeFrame != TimeFrame.DAY
@@ -238,11 +224,19 @@ fun StatisticsScreen(
                 // PHÂN TÍCH tab
                 // ════════════════════════════════════════════════════════════
 
-                if (uiState.trendPoints.size >= 2) {
+                if (uiState.trendForecast.points.size >= 3) {
                     LocalLineTrendChartCard(
-                        title  = "Dự báo xu hướng kỳ tới",
-                        points = uiState.trendPoints
+                        title    = "Dự báo xu hướng kỳ tới",
+                        forecast = uiState.trendForecast
                     )
+                }
+
+                // ── Wallet Destroyer ──────────────────────────────────────────
+                WalletDestroyerCard(item = uiState.walletDestroyer)
+
+                // ── Top categories by spend ───────────────────────────────────
+                if (uiState.topCategories.isNotEmpty()) {
+                    TopCategoriesCard(categories = uiState.topCategories)
                 }
 
                 Text(
@@ -254,9 +248,7 @@ fun StatisticsScreen(
                 )
 
                 InsightDashboardGrid(
-                    topFood       = uiState.walletDestroyer?.name
-                        ?: uiState.popularFoods.firstOrNull()?.name
-                        ?: "—",
+                    topFood       = uiState.walletDestroyer?.name ?: "—",
                     topCategory   = uiState.topCategories.firstOrNull()?.let {
                         "${it.iconUrl} ${it.name}"
                     } ?: "—",
@@ -306,11 +298,16 @@ fun StatisticsScreen(
             confirmButton = {
                 Button(onClick = {
                     val value = budgetInput.toDoubleOrNull()
+                    // SRS #4: only the active TimeFrame's field gets the new typed value.
+                    // The other 3 fields must forward their existing uiState.budget values
+                    // (not null) so BudgetRepository.setBudget's merge logic can't be
+                    // accidentally short-circuited by a null that looks like "unchanged"
+                    // when the row actually needs all 4 fields kept in sync.
                     viewModel.saveBudget(
-                        daily   = if (uiState.timeFrame == TimeFrame.DAY)   value else null,
-                        weekly  = if (uiState.timeFrame == TimeFrame.WEEK)  value else null,
-                        monthly = if (uiState.timeFrame == TimeFrame.MONTH) value else null,
-                        yearly  = if (uiState.timeFrame == TimeFrame.YEAR)  value else null
+                        daily   = if (uiState.timeFrame == TimeFrame.DAY)   value else uiState.budget.daily,
+                        weekly  = if (uiState.timeFrame == TimeFrame.WEEK)  value else uiState.budget.weekly,
+                        monthly = if (uiState.timeFrame == TimeFrame.MONTH) value else uiState.budget.monthly,
+                        yearly  = if (uiState.timeFrame == TimeFrame.YEAR)  value else uiState.budget.yearly
                     )
                     showBudgetDialog = false
                 }) { Text("Lưu lại") }
@@ -421,15 +418,15 @@ private fun DetailItem.toMealRecord(): MealRecord = MealRecord(
 /** Generate a simple insight sentence from the current UiState. */
 private fun buildInsightText(state: StatisticsUiState): String {
     val destroyer = state.walletDestroyer
-    val popular   = state.popularFoods.firstOrNull()
+    val topCat    = state.topCategories.firstOrNull()
 
     return when {
         state.budget.isExceeded ->
             "Bạn đã vượt ngân sách ${(-state.budget.remaining).formatVnd()}đ — hãy điều chỉnh chi tiêu!"
         destroyer != null ->
             "\"${destroyer.name}\" là món tốn nhất kỳ này (${destroyer.price.formatVnd()}đ)"
-        popular != null ->
-            "\"${popular.name}\" là món được ghi nhận nhiều nhất (${popular.recordCount} lần)"
+        topCat != null ->
+            "Danh mục tốn nhiều nhất: ${topCat.iconUrl} ${topCat.name} (${topCat.total.formatVnd()}đ)"
         state.summary.itemCount == 0 ->
             "Chưa có dữ liệu — hãy ghi nhật ký món ăn đầu tiên!"
         state.summary.isIncrease ->
