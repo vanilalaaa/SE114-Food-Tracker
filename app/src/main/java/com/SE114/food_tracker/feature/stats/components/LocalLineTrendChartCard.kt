@@ -19,13 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.stats.TrendForecast
-
-private fun Double.formatVndShort(): String = when {
-    this >= 1_000_000 -> "${"%.1f".format(this / 1_000_000)}M"
-    this >= 1_000      -> "${(this / 1_000).toInt()}K"
-    this > 0           -> "${this.toInt()}"
-    else               -> "0"
-}
+import com.SE114.food_tracker.core.util.*
 
 @Composable
 fun LocalLineTrendChartCard(
@@ -102,7 +96,7 @@ fun LocalLineTrendChartCard(
 
                 // ── Segment 0: previous → current actual (solid, observed) ──────────
                 drawLine(
-                    color = Color(0xFFAED9E0),
+                    color = ChartLineObserved,
                     start = Offset(xFor(0), yFor(points[0])),
                     end = Offset(xFor(1), yFor(points[1])),
                     strokeWidth = 5f,
@@ -138,7 +132,7 @@ fun LocalLineTrendChartCard(
 
                 // ── Point markers at all 3 nodes ─────────────────────────────────────
                 points.forEachIndexed { i, value ->
-                    val markerColor = if (i == 2) StatPinkDark else Color(0xFF7FA8B0)
+                    val markerColor = if (i == 2) StatPinkDark else ChartMarkerNormal
                     drawCircle(
                         color = markerColor,
                         radius = 6f,

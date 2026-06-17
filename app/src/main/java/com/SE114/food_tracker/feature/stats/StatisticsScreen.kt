@@ -22,6 +22,8 @@ import com.SE114.food_tracker.core.designsystem.components.*
 import com.SE114.food_tracker.core.util.TimeFrame
 import com.SE114.food_tracker.feature.stats.components.*
 import com.SE114.food_tracker.core.designsystem.theme.*
+import com.SE114.food_tracker.core.util.formatVndExact
+import com.SE114.food_tracker.core.util.formatVndShort
 
 // Fixed donut color palette — defined at UI layer so the data layer stays color-agnostic.
 private val DONUT_COLORS = listOf(
@@ -154,11 +156,11 @@ fun StatisticsScreen(
                         }
                 ) {
                     StatisticsSummaryGrid(
-                        totalMeals    = uiState.budget.limit?.formatVnd() ?: "—",
-                        totalSpending = uiState.summary.totalSpent.formatVnd(),
+                        totalMeals    = uiState.budget.limit?.formatVndShort() ?: "—",
+                        totalSpending = uiState.summary.totalSpent.formatVndShort(),
                         averagePerMeal = if (uiState.budget.hasLimit) {
                             val rem = uiState.budget.remaining
-                            if (rem < 0) "-${(-rem).formatVnd()}" else rem.formatVnd()
+                            if (rem < 0) "-${(-rem).formatVndShort()}" else rem.formatVndShort()
                         } else "—",
                         label1 = "NGÂN SÁCH",
                         label2 = "ĐÃ CHI",
@@ -167,8 +169,6 @@ fun StatisticsScreen(
                 }
 
                 // ── Bar chart: spend by session/day/month ────────────────────
-                // Gap 2 fix: pass bar.value (Double) directly — ChartCard now
-                // formats currency labels internally via its own formatVnd().
                 if (uiState.barChartData.isNotEmpty()) {
                     ChartCard(
                         title = when (uiState.timeFrame) {
@@ -298,11 +298,6 @@ fun StatisticsScreen(
             confirmButton = {
                 Button(onClick = {
                     val value = budgetInput.toDoubleOrNull()
-                    // SRS #4: only the active TimeFrame's field gets the new typed value.
-                    // The other 3 fields must forward their existing uiState.budget values
-                    // (not null) so BudgetRepository.setBudget's merge logic can't be
-                    // accidentally short-circuited by a null that looks like "unchanged"
-                    // when the row actually needs all 4 fields kept in sync.
                     viewModel.saveBudget(
                         daily   = if (uiState.timeFrame == TimeFrame.DAY)   value else uiState.budget.daily,
                         weekly  = if (uiState.timeFrame == TimeFrame.WEEK)  value else uiState.budget.weekly,
@@ -319,8 +314,6 @@ fun StatisticsScreen(
     }
 
     // ── Calendar picker dialog ───────────────────────────────────────────────
-    // Shown when the user taps the date label in StatisticsTopBar.
-    // Uses a bare Dialog (no AlertDialog chrome) so CalendarCard fills naturally.
     if (showCalendarDialog) {
         val anchor = uiState.anchorDate
         if (anchor != null) {
@@ -345,15 +338,6 @@ fun StatisticsScreen(
 }
 
 // ─── Mappers & helpers ────────────────────────────────────────────────────────
-
-/** Format a Double as a short VND label, e.g. 120000.0 → "120K" */
-private fun Double.formatVnd(): String {
-    return when {
-        this >= 1_000_000 -> "${"%.1f".format(this / 1_000_000)}M"
-        this >= 1_000     -> "${(this / 1_000).toInt()}K"
-        else              -> "${this.toInt()}"
-    }
-}
 
 /** Convert tab index (0..3) → [TimeFrame] */
 private fun Int.toTimeFrame(): TimeFrame = when (this) {
@@ -401,16 +385,11 @@ private fun List<DetailItem>.toDetailDayGroups(isWeeklyMode: Boolean): List<DayG
     }
 }
 
-/**
- * Gap 1 fix: forward [DetailItem.categoryIconUrl] → [MealRecord.iconText]
- * and [DetailItem.imageUrl] → [MealRecord.imageUrl] so DetailItemRow can
- * render real thumbnails instead of the hardcoded peach placeholder.
- */
 private fun DetailItem.toMealRecord(): MealRecord = MealRecord(
     time      = timeLabel,
     name      = name,
     category  = categoryName,
-    price     = "${price.formatVnd()} đ",
+    price     = "${price.formatVndExact()} đ",
     iconText  = categoryIconUrl,
     imageUrl  = imageUrl
 )
@@ -422,11 +401,11 @@ private fun buildInsightText(state: StatisticsUiState): String {
 
     return when {
         state.budget.isExceeded ->
-            "Bạn đã vượt ngân sách ${(-state.budget.remaining).formatVnd()}đ — hãy điều chỉnh chi tiêu!"
+            "Bạn đã vượt ngân sách ${(-state.budget.remaining).formatVndShort()}đ — hãy điều chỉnh chi tiêu!"
         destroyer != null ->
-            "\"${destroyer.name}\" là món tốn nhất kỳ này (${destroyer.price.formatVnd()}đ)"
+            "\"${destroyer.name}\" là món tốn nhất kỳ này (${destroyer.price.formatVndShort()}đ)"
         topCat != null ->
-            "Danh mục tốn nhiều nhất: ${topCat.iconUrl} ${topCat.name} (${topCat.total.formatVnd()}đ)"
+            "Danh mục tốn nhiều nhất: ${topCat.iconUrl} ${topCat.name} (${topCat.total.formatVndShort()}đ)"
         state.summary.itemCount == 0 ->
             "Chưa có dữ liệu — hãy ghi nhật ký món ăn đầu tiên!"
         state.summary.isIncrease ->
