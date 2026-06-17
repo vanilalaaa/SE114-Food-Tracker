@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.chat
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -103,7 +104,7 @@ fun ChatScreenContent(
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                reverseLayout = true, // Đảo ngược layout
+                reverseLayout = true, // Giữ nguyên để đẩy tin nhắn từ dưới đáy mượt mà
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp, top = 16.dp)
             ) {
@@ -218,7 +219,7 @@ fun ChatScreenPreview() {
                     imageUrl = null,
                     dateLabel = "Hôm nay"
                 )
-            ).reversed(),
+            ),
             onBackClick = {},
             onSendMessage = {},
             onSendImage = {},

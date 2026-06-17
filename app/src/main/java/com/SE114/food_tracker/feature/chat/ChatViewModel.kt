@@ -20,12 +20,13 @@ import javax.inject.Inject
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
-    private val chatDAO: ChatDAO // thực hiện mồi dữ liệu local
+    private val chatDAO: ChatDAO
 ) : ViewModel() {
 
-    val currentUserId = "vy_id"
+    // 🌟 LẤY USER ID THẬT TỪ AUTH ĐỂ KHỚP VỚI POLICY MÀ KHÔNG DÙNG ID GIẢ LẬP NỮA
+    val currentUserId: String
+        get() = chatRepository.getAuthenticatedUserId()
 
-    // KHỐI KHỞI TẠO ĐÃ ĐƯỢC TỐI ƯU TRÁNH GHI ĐÈ DUPLICATE DATA KHI RE-OPEN VIEWMODEL
     init {
         viewModelScope.launch {
             // 1. Tạo sẵn một cuộc trò chuyện mẫu với ID cố định là "1" nếu chưa tồn tại
@@ -38,12 +39,13 @@ class ChatViewModel @Inject constructor(
                 )
             )
 
+            // Kích hoạt lắng nghe Realtime cho phòng chat "1" ngay khi khởi động ViewModel
+            chatRepository.subscribeToChatRealtime("1")
+
             // 2. CHỈ MỒI TIN NHẮN KHI PHÒNG CHAT ĐANG TRỐNG TRƠN
-            // Lấy danh sách tin nhắn hiện tại của cuộc trò chuyện "1" để kiểm tra
             val currentMessages = chatRepository.getMessagesStream("1").first()
 
             if (currentMessages.isEmpty()) {
-                // Cố định mốc thời gian lịch sử cụ thể để tin nhắn cũ không bị nhảy giờ lung tung
                 val oneMinuteAgo = System.currentTimeMillis() - 60000
                 val thirtySecondsAgo = System.currentTimeMillis() - 30000
 
@@ -89,10 +91,9 @@ class ChatViewModel @Inject constructor(
                     imageUrl = entity.imageUrl,
                     isSystem = entity.isSystem,
                     syncStatus = entity.syncStatus,
-                    // Đổi số Long thành Giờ thật
                     timeLabel = formatToTime(entity.createdAt),
                     dateLabel = formatToDate(entity.createdAt),
-                    rawEntity = entity // Lưu lại thực thể gốc để phục vụ hàm Retry
+                    rawEntity = entity
                 )
             }
         }
@@ -105,7 +106,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // 3. Phát lệnh gửi tin nhắn Ảnh (Giai đoạn này xử lý truyền URI thật từ thiết bị)
+    // 3. Phát lệnh gửi tin nhắn Ảnh
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
             chatRepository.sendMessage(
