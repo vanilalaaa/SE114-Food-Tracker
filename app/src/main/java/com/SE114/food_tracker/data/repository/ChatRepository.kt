@@ -26,22 +26,23 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-@Serializable
-data class SupabaseMessageDto(
-    @SerialName("id") val id: String? = null,
-    @SerialName("conversation_id") val conversationId: String,
-    @SerialName("sender_id") val senderId: String,
-    @SerialName("body") val body: String?,
-    @SerialName("image_url") val imageUrl: String?,
-    @SerialName("is_system") val isSystem: Boolean
-)
-
 @Singleton
 class ChatRepository @Inject constructor(
     private val chatDAO: ChatDAO,
     private val supabaseClient: SupabaseClient,
     @ApplicationContext private val context: Context
 ) {
+    // 🌟 ĐEM CẤT DATA CLASS DTO VÀO ĐÂY ĐỂ BIẾN FILE THÀNH KOTLIN CLASS CHUẨN XỊN
+    @Serializable
+    data class SupabaseMessageDto(
+        @SerialName("id") val id: String? = null,
+        @SerialName("conversation_id") val conversationId: String,
+        @SerialName("sender_id") val senderId: String,
+        @SerialName("body") val body: String?,
+        @SerialName("image_url") val imageUrl: String?,
+        @SerialName("is_system") val isSystem: Boolean
+    )
+
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
     private var chatChannel: RealtimeChannel? = null
 
@@ -120,7 +121,8 @@ class ChatRepository @Inject constructor(
         conversationId: String,
         senderId: String,
         body: String?,
-        imageUrl: String?
+        imageUrl: String?,
+        isSystem: Boolean = false
     ) {
         val localId = UUID.randomUUID().toString()
 
@@ -131,13 +133,80 @@ class ChatRepository @Inject constructor(
             senderId = senderId,
             body = body,
             imageUrl = imageUrl,
-            isSystem = false,
+            isSystem = isSystem,
             syncStatus = MessageSyncStatus.PENDING,
             createdAt = System.currentTimeMillis()
         )
 
         chatDAO.insertMessage(pendingMessage)
         performNetworkSend(pendingMessage)
+    }
+
+    // ── CHỨC NĂNG CHAT NHÓM NÂNG CAO (SUPABASE BACKEND INTEGRATION) ──
+
+    suspend fun createGroupChat(groupName: String, memberUserIds: List<String>): String? {
+        return try {
+            val groupUuid = UUID.randomUUID().toString()
+            val conversationMap = mapOf(
+                "id" to groupUuid,
+                "is_group" to true,
+                "name" to groupName,
+                "wallet_id" to "wallet_${UUID.randomUUID().toString().take(8)}"
+            )
+            supabaseClient.from("conversation").insert(conversationMap)
+
+            val currentUserId = getAuthenticatedUserId()
+            val allMembers = (memberUserIds + currentUserId).distinct()
+            val participantRows = allMembers.map { userId ->
+                mapOf(
+                    "conversation_id" to groupUuid,
+                    "user_id" to userId,
+                    "role" to if (userId == currentUserId) "admin" else "member"
+                )
+            }
+            supabaseClient.from("conversation_participant").insert(participantRows)
+
+            sendSystemMessage(groupUuid, "Hệ thống: Nhóm '$groupName' đã được tạo thành công.")
+            groupUuid
+        } catch (e: Exception) {
+            println("Lỗi tạo nhóm: ${e.localizedMessage}")
+            null
+        }
+    }
+
+    suspend fun updateGroupName(conversationId: String, newName: String) {
+        try {
+            supabaseClient.from("conversation").update(mapOf("name" to newName)) {
+                filter { eq("id", conversationId) }
+            }
+            sendSystemMessage(conversationId, "Hệ thống: Tên nhóm đã đổi thành '$newName'")
+        } catch (e: Exception) {
+            println("Lỗi đổi tên: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun kickMember(conversationId: String, userIdToKick: String, memberName: String) {
+        try {
+            supabaseClient.from("conversation_participant").delete {
+                filter {
+                    eq("conversation_id", conversationId)
+                    eq("user_id", userIdToKick)
+                }
+            }
+            sendSystemMessage(conversationId, "Hệ thống: Admin đã mời $memberName rời khỏi nhóm.")
+        } catch (e: Exception) {
+            println("Lỗi kích thành viên: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun sendSystemMessage(conversationId: String, content: String) {
+        sendMessage(
+            conversationId = conversationId,
+            senderId = "system",
+            body = content,
+            imageUrl = null,
+            isSystem = true
+        )
     }
 
     // ── CHỨC NĂNG 3: MẠNG LƯỚI GỬI LÊN SERVER + UPLOAD ẢNH + RETRY  ──
