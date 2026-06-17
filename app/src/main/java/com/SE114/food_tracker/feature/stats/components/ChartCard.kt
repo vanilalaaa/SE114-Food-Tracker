@@ -14,13 +14,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.SE114.food_tracker.core.designsystem.theme.*
-
-private fun Double.formatVndShort(): String = when {
-    this >= 1_000_000 -> "${"%.1f".format(this / 1_000_000)}M"
-    this >= 1_000     -> "${(this / 1_000).toInt()}K"
-    this > 0          -> "${this.toInt()}"
-    else              -> ""
-}
+import com.SE114.food_tracker.core.util.*
 
 @Composable
 fun ChartItem(

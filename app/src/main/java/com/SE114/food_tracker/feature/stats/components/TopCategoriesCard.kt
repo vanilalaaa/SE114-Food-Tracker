@@ -20,13 +20,6 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.core.util.formatVndExact
 import com.SE114.food_tracker.feature.stats.CategoryStat
 
-private val BAR_COLORS = listOf(
-    Color(0xFFD2785F), // terracotta — rank 1
-    Color(0xFFE3A85C), // amber      — rank 2
-    Color(0xFFAED9E0), // soft teal  — rank 3
-    Color(0xFFB5C4E3), // soft blue  — rank 4+
-)
-
 @Composable
 fun CategoryStatItem(
     name: String,
@@ -116,6 +109,13 @@ fun TopCategoriesCard(
 ) {
     if (categories.isEmpty()) return
 
+    val barColors = listOf(
+        Rank1Terracotta,
+        Rank2Amber,
+        Rank3SoftTeal,
+        Rank4SoftBlue
+    )
+
     val maxTotal = categories.maxOf { it.total }.coerceAtLeast(0.0001)
 
     Surface(
@@ -137,7 +137,7 @@ fun TopCategoriesCard(
 
             categories.forEachIndexed { index, stat ->
                 val fraction  = (stat.total / maxTotal).toFloat()
-                val barColor  = BAR_COLORS[index % BAR_COLORS.size]
+                val barColor  = barColors[index % barColors.size]
                 val trackColor = barColor.copy(alpha = 0.18f)
 
                 CategoryStatItem(

@@ -25,18 +25,6 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.core.util.formatVndExact
 import com.SE114.food_tracker.core.util.formatVndShort
 
-// Fixed donut color palette — defined at UI layer so the data layer stays color-agnostic.
-private val DONUT_COLORS = listOf(
-    Color(0xFFE8AEB4),
-    Color(0xFFFBE3B5),
-    Color(0xFFAED9E0),
-    Color(0xFFD2EBD9),
-    Color(0xFFD39292),
-    Color(0xFFB5C4E3),
-    Color(0xFFE8D3C7),
-    Color(0xFFC9C0D3)
-)
-
 @Composable
 fun StatisticsScreen(
     viewModel: StatisticsViewModel = hiltViewModel()
@@ -127,7 +115,7 @@ fun StatisticsScreen(
                         Text("⚠️", fontSize = 16.sp, modifier = Modifier.padding(end = 8.dp))
                         Text(
                             text       = "Chi tiêu hiện tại đã vượt quá ngân sách kỳ này!",
-                            color      = Color(0xFF9B1C1C),
+                            color      = TextWarning,
                             fontSize   = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -185,13 +173,23 @@ fun StatisticsScreen(
 
                 // ── Donut chart: spend by category ───────────────────────────
                 if (uiState.donutData.isNotEmpty()) {
+                    val donutColors = listOf(
+                        DonutSegment1,
+                        DonutSegment2,
+                        DonutSegment3,
+                        DonutSegment4,
+                        DonutSegment5,
+                        DonutSegment6,
+                        DonutSegment7,
+                        DonutSegment8
+                    )
                     LocalDonutChartCard(
                         title      = "Tỷ trọng chi tiêu theo danh mục",
                         categories = uiState.donutData.mapIndexed { i, slice ->
                             DonutSegment(
                                 label = slice.label,
                                 value = slice.value.toFloat(),
-                                color = DONUT_COLORS[i % DONUT_COLORS.size]
+                                color = donutColors[i % donutColors.size]
                             )
                         }
                     )
