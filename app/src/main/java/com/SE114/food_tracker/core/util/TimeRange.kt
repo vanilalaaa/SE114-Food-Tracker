@@ -82,6 +82,43 @@ object TimeRangeProvider {
         TimeFrame.YEAR  -> "Năm %04d".format(anchor.year)
     }
 
+    fun cycleLengthDays(timeFrame: TimeFrame): Int = when (timeFrame) {
+        TimeFrame.DAY   -> 1   // unused for projection — see remainingUnitsInPeriod
+        TimeFrame.WEEK  -> 1
+        TimeFrame.MONTH -> 1
+        TimeFrame.YEAR  -> 7
+    }
+
+    fun lastSevenCyclesRangeFor(timeFrame: TimeFrame, anchor: LocalDate): DateRange {
+        val periodStart = rangeFor(timeFrame, anchor).start
+        val cycleDays = cycleLengthDays(timeFrame)
+        val lookbackMillis = 7L * cycleDays * DAY_MILLIS
+        return DateRange(start = periodStart - lookbackMillis, end = periodStart)
+    }
+
+    fun remainingCyclesInPeriod(timeFrame: TimeFrame, anchor: LocalDate): Int {
+        if (timeFrame == TimeFrame.DAY) return 0
+
+        val periodEnd = rangeFor(timeFrame, anchor).end
+        val cycleDays = cycleLengthDays(timeFrame)
+        val cycleMillis = cycleDays * DAY_MILLIS
+
+        // Start counting from the cycle right after "today" (anchor's own cycle is excluded).
+        val afterAnchorCycleStart = when (timeFrame) {
+            TimeFrame.WEEK, TimeFrame.MONTH ->
+                anchor.plus(DatePeriod(days = 1)).atStartOfDayIn(tz).toEpochMilliseconds()
+            TimeFrame.YEAR ->
+                weekStart(anchor).plus(DatePeriod(days = 7)).atStartOfDayIn(tz).toEpochMilliseconds()
+            TimeFrame.DAY -> return 0
+        }
+
+        if (afterAnchorCycleStart >= periodEnd) return 0
+        val remainingMillis = periodEnd - afterAnchorCycleStart
+        return (remainingMillis / cycleMillis).toInt()
+    }
+
+    private const val DAY_MILLIS = 86_400_000L
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun dayRange(anchor: LocalDate): DateRange {
@@ -153,7 +190,7 @@ fun Long.toDayLabel(timeFrame: TimeFrame): String {
             else                -> "?"
         }
         TimeFrame.MONTH -> date.dayOfMonth.toString()
-        TimeFrame.YEAR  -> "Th${date.monthNumber}"
+        TimeFrame.YEAR  -> "T${date.monthNumber}"
         TimeFrame.DAY   -> "%02d:%02d".format(date.dayOfMonth, date.monthNumber) // fallback
     }
 }

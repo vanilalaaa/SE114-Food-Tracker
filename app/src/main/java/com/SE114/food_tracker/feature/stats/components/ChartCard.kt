@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.stats.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -9,17 +10,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.SE114.food_tracker.core.designsystem.theme.*
 
-private fun Double.formatVnd(): String = when {
+private fun Double.formatVndShort(): String = when {
     this >= 1_000_000 -> "${"%.1f".format(this / 1_000_000)}M"
     this >= 1_000     -> "${(this / 1_000).toInt()}K"
     this > 0          -> "${this.toInt()}"
     else              -> ""
 }
-
 
 @Composable
 fun ChartItem(
@@ -30,26 +31,35 @@ fun ChartItem(
     isHighest: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val barHeight = if (maxValue > 0) (value / maxValue * maxHeight).dp else 0.dp
-    val barColor = if (isHighest) StatPinkDark else Color.White
+    val barHeight = if (value > 0 && maxValue > 0) (value / maxValue * maxHeight).dp else 4.dp
+    val barColor = when {
+        value == 0.0 -> Color.White.copy(alpha = 0.35f)
+        isHighest -> StatPinkDark
+        else -> Color.White
+    }
 
     Column(
-        modifier = modifier,
+        // Sử dụng weight(1f) thay vì width cố định để các cột tự chia đều khoảng trống vừa khít với màn hình
+        modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Bottom
     ) {
         if (value > 0) {
             Text(
-                text = value.formatVnd(),
+                text = value.formatVndShort(),
                 style = StatLabelStyle,
-                color = TextPrimaryStat
+                color = TextPrimaryStat,
+                textAlign = TextAlign.Center,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(4.dp))
+        } else {
+            Box(modifier = Modifier.height(20.dp))
         }
 
         Box(
             modifier = Modifier
-                .width(28.dp)
+                .width(20.dp) // độ rộng của thanh (Bar)
                 .height(barHeight)
                 .background(
                     color = barColor,
@@ -62,7 +72,9 @@ fun ChartItem(
         Text(
             text = label,
             style = StatLabelStyle,
-            color = TextPrimaryStat
+            color = TextPrimaryStat,
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }
@@ -73,7 +85,22 @@ fun ChartCard(
     data: List<Pair<String, Double>>,
     modifier: Modifier = Modifier
 ) {
-    val maxValue = data.maxOfOrNull { it.second } ?: 0.0
+    val targetSessions = listOf("Sáng", "Trưa/Chiều", "Tối")
+    val isSessionChart = title.contains("giờ", ignoreCase = true) || title.contains("buổi", ignoreCase = true)
+
+    val finalizedData = if (isSessionChart) {
+        targetSessions.map { targetLabel ->
+            val matchingValue = data.find {
+                it.first.contains(targetLabel, ignoreCase = true) ||
+                        (targetLabel == "Trưa/Chiều" && (it.first.contains("Trưa") || it.first.contains("Chiều")))
+            }?.second ?: 0.0
+            targetLabel to matchingValue
+        }
+    } else {
+        data
+    }
+
+    val maxValue = finalizedData.maxOfOrNull { it.second } ?: 0.0
     val chartBaseHeight = 100
     val calendarHighlight = Color(0xFFFCDFCF)
 
@@ -84,50 +111,36 @@ fun ChartCard(
         shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier.padding(vertical = 20.dp, horizontal = 12.dp) // padding ngang của card
         ) {
             Text(
                 text = title,
                 style = StatSectionTitleStyle,
-                color = TextPrimaryStat
+                color = TextPrimaryStat,
+                modifier = Modifier.padding(horizontal = 8.dp)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height((chartBaseHeight + 40).dp), // Khóa chiều cao cố định cho hàng biểu đồ
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                data.forEach { (label, value) ->
+                finalizedData.forEach { (label, value) ->
                     val isHighest = value == maxValue && maxValue > 0
                     ChartItem(
                         label = label,
                         value = value,
                         maxHeight = chartBaseHeight,
                         maxValue = maxValue,
-                        isHighest = isHighest
+                        isHighest = isHighest,
+                        modifier = Modifier.weight(1f) // Ép các cột tự động co giãn đều nhau vừa vặn trong Row
                     )
                 }
             }
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ChartCardPreview() {
-    val sampleData = listOf(
-        "Sáng" to 35000.0,
-        "Trưa" to 120000.0,
-        "Tối"  to 75000.0
-    )
-    FoodTrackerTheme {
-        Box(modifier = Modifier.padding(16.dp).background(MainBackground)) {
-            ChartCard(
-                title = "Chi tiêu theo buổi",
-                data = sampleData
-            )
         }
     }
 }
