@@ -75,7 +75,7 @@ fun MessageBubble(
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMine) {
-            // Avatar đối phương (Tone xanh pastel)
+            // Avatar đối phương
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -176,10 +176,12 @@ fun MessageBubble(
 @Composable
 fun MessageBubblePeerPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "azun_id",
@@ -197,10 +199,12 @@ fun MessageBubblePeerPreview() {
 @Composable
 fun MessageBubbleMineSentPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
@@ -219,10 +223,12 @@ fun MessageBubbleMineSentPreview() {
 @Composable
 fun MessageBubbleMinePendingPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
@@ -241,10 +247,12 @@ fun MessageBubbleMinePendingPreview() {
 @Composable
 fun MessageBubbleMineFailedPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
@@ -263,10 +271,12 @@ fun MessageBubbleMineFailedPreview() {
 @Composable
 fun MessageBubbleSystemPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "system",

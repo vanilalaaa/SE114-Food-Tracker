@@ -35,7 +35,7 @@ fun ChatScreen(
 ) {
     val myId = viewModel.currentUserId
 
-    // 🌟 KÍCH HOẠT LẮNG NGHE REALTIME ĐỘNG THEO ID THẬT ĐƯỢC CHỌN TỪ CONVERSATION LIST
+    // KÍCH HOẠT LẮNG NGHE REALTIME ĐỘNG THEO ID THẬT ĐƯỢC CHỌN TỪ CONVERSATION LIST
     LaunchedEffect(conversationId) {
         viewModel.connectToConversation(conversationId)
     }
