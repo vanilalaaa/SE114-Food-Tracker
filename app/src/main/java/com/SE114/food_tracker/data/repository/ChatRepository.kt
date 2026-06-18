@@ -32,7 +32,6 @@ class ChatRepository @Inject constructor(
     private val supabaseClient: SupabaseClient,
     @ApplicationContext private val context: Context
 ) {
-    // 🌟 ĐEM CẤT DATA CLASS DTO VÀO ĐÂY ĐỂ BIẾN FILE THÀNH KOTLIN CLASS CHUẨN XỊN
     @Serializable
     data class SupabaseMessageDto(
         @SerialName("id") val id: String? = null,

@@ -103,8 +103,9 @@ fun AppNavGraph(
                 val id = backStackEntry.arguments?.getString("conversationId") ?: ""
                 val name = backStackEntry.arguments?.getString("conversationName") ?: "Người dùng"
 
-                val chatDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>()
-
+                val chatDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>(
+                    key = id
+                )
                 ChatScreen(
                     conversationId = id,
                     conversationName = name,
