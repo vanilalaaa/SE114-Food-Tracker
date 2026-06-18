@@ -182,7 +182,10 @@ fun GroupWalletScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
+                    .padding(
+                        top = innerPadding.calculateTopPadding(),
+                        bottom = innerPadding.calculateBottomPadding()
+                    )
                     .padding(horizontal = 16.dp)
             ) {
                 Card(
