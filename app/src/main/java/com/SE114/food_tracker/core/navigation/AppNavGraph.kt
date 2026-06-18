@@ -17,6 +17,7 @@ import com.SE114.food_tracker.feature.feed.FeedScreen
 import com.SE114.food_tracker.feature.friend.FriendScreen
 import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
+import com.SE114.food_tracker.feature.chat.GroupWalletScreen
 
 object NavGraphs {
     const val AUTH = "auth_graph"
@@ -110,6 +111,17 @@ fun AppNavGraph(
                     conversationId = id,
                     conversationName = name,
                     viewModel = chatDetailViewModel,
+                    onBackClick = { navController.popBackStack() },
+                    onWalletClick = { conversationId ->
+                        navController.navigate("group_wallet_screen/$conversationId")
+                    }
+                )
+            }
+            composable("group_wallet_screen/{conversationId}") { backStackEntry ->
+                val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+
+                GroupWalletScreen(
+                    conversationId = conversationId,
                     onBackClick = { navController.popBackStack() }
                 )
             }

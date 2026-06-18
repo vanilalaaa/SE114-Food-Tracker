@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.SE114.food_tracker.core.designsystem.theme.*
+import com.SE114.food_tracker.feature.chat.components.GroupSettingsDialog
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 
@@ -31,7 +32,8 @@ fun ChatScreen(
     conversationId: String,
     conversationName: String,
     viewModel: ChatViewModel = viewModel(),
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    onWalletClick: (id: String) -> Unit = {}
 ) {
     val myId = viewModel.currentUserId
 
@@ -50,6 +52,7 @@ fun ChatScreen(
         messageList = messageList,
         myId = myId,
         onBackClick = onBackClick,
+        onWalletClick = { onWalletClick(conversationId) }, // 🌟 Bắn dữ liệu Id thật ra ngoài khi nhấn nút túi tiền
         onSendMessage = { text -> viewModel.sendTextMessage(conversationId, text) },
         onSendImage = { uri -> viewModel.sendImageMessage(conversationId, uri) },
         onRetryMessage = { rawMsg -> viewModel.retryFailedMessage(rawMsg) },
@@ -66,6 +69,7 @@ fun ChatScreenContent(
     messageList: List<MessageUiModel>,
     myId: String,
     onBackClick: () -> Unit,
+    onWalletClick: () -> Unit,
     onSendMessage: (String) -> Unit,
     onSendImage: (String) -> Unit,
     onRetryMessage: (com.SE114.food_tracker.data.local.entities.Message) -> Unit,
@@ -75,7 +79,6 @@ fun ChatScreenContent(
 ) {
     var textInput by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
-    var groupNameInput by remember { mutableStateOf(conversationName) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -84,59 +87,16 @@ fun ChatScreenContent(
     }
 
     if (showSettingsDialog) {
-        AlertDialog(
+        GroupSettingsDialog(
+            conversationName = conversationName,
             onDismissRequest = { showSettingsDialog = false },
-            title = { Text("Quản trị nhóm Chat", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = groupNameInput,
-                        onValueChange = { groupNameInput = it },
-                        label = { Text("Tên nhóm") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Button(
-                        onClick = {
-                            if (groupNameInput.isNotBlank()) {
-                                onRenameGroup(conversationId, groupNameInput)
-                                showSettingsDialog = false
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark),
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("Cập nhật tên")
-                    }
-
-                    Divider(modifier = Modifier.padding(vertical = 4.dp))
-                    Text("Danh sách thành viên (Mô phỏng)", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-
-                    val mockMembers = listOf(Pair("azun_id", "Azun (Data)"), Pair("member_test_id", "Nguyễn Văn B"))
-                    mockMembers.forEach { member ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(member.second, fontSize = 14.sp)
-                            Text(
-                                text = "Mời ra ❌",
-                                color = Color.Red,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .clickable {
-                                        onKickMember(conversationId, member.first, member.second)
-                                        showSettingsDialog = false
-                                    }
-                                    .padding(4.dp)
-                            )
-                        }
-                    }
-                }
+            onRenameGroup = { newName ->
+                onRenameGroup(conversationId, newName)
+                showSettingsDialog = false
             },
-            confirmButton = {
-                TextButton(onClick = { showSettingsDialog = false }) { Text("Đóng") }
+            onKickMember = { userId, memberName ->
+                onKickMember(conversationId, userId, memberName)
+                showSettingsDialog = false
             }
         )
     }
@@ -146,7 +106,11 @@ fun ChatScreenContent(
             TopAppBar(
                 title = {
                     Column {
-                        Text(text = conversationName, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = conversationName,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         Text(text = "Đang trực tuyến", fontSize = 11.sp, color = Color(0xFF4CAF50))
                     }
                 },
@@ -156,8 +120,15 @@ fun ChatScreenContent(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onWalletClick) {
+                        Text("💰", fontSize = 22.sp)
+                    }
                     IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = StatPinkDark)
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = StatPinkDark
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
@@ -275,10 +246,21 @@ fun ChatScreenPreview() {
             conversationName = "Team SE114 - Food Tracker 🥑",
             myId = "vy_id",
             messageList = listOf(
-                MessageUiModel(senderId = "azun_id", body = "Ăn bún bò Huế đi", imageUrl = null, dateLabel = "Hôm nay"),
-                MessageUiModel(senderId = "vy_id", body = "Oki chốt kèo luôn nha!", imageUrl = null, dateLabel = "Hôm nay")
+                MessageUiModel(
+                    senderId = "azun_id",
+                    body = "Ăn bún bò Huế đi",
+                    imageUrl = null,
+                    dateLabel = "Hôm nay"
+                ),
+                MessageUiModel(
+                    senderId = "vy_id",
+                    body = "Oki chốt kèo luôn nha!",
+                    imageUrl = null,
+                    dateLabel = "Hôm nay"
+                )
             ),
             onBackClick = {},
+            onWalletClick = {},
             onSendMessage = {},
             onSendImage = {},
             onRetryMessage = {},
