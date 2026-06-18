@@ -3,12 +3,15 @@ package com.SE114.food_tracker.feature.chat
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,25 +35,33 @@ fun ChatScreen(
 ) {
     val myId = viewModel.currentUserId
 
+    // 🌟 KÍCH HOẠT LẮNG NGHE REALTIME ĐỘNG THEO ID THẬT ĐƯỢC CHỌN TỪ CONVERSATION LIST
+    LaunchedEffect(conversationId) {
+        viewModel.connectToConversation(conversationId)
+    }
+
     // Đọc luồng dữ liệu thật realtime từ Room DB thông qua Flow
     val messageList by viewModel.getMessagesState(conversationId)
         .collectAsState(initial = emptyList())
 
-    // Chuyển tiếp dữ liệu và sự kiện xuống hàm xử lý giao diện thuần
     ChatScreenContent(
+        conversationId = conversationId,
         conversationName = conversationName,
         messageList = messageList,
         myId = myId,
         onBackClick = onBackClick,
         onSendMessage = { text -> viewModel.sendTextMessage(conversationId, text) },
         onSendImage = { uri -> viewModel.sendImageMessage(conversationId, uri) },
-        onRetryMessage = { rawMsg -> viewModel.retryFailedMessage(rawMsg) }
+        onRetryMessage = { rawMsg -> viewModel.retryFailedMessage(rawMsg) },
+        onRenameGroup = { id, name -> viewModel.renameGroup(id, name) },
+        onKickMember = { id, uid, name -> viewModel.kickGroupMember(id, uid, name) }
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreenContent(
+    conversationId: String,
     conversationName: String,
     messageList: List<MessageUiModel>,
     myId: String,
@@ -58,15 +69,76 @@ fun ChatScreenContent(
     onSendMessage: (String) -> Unit,
     onSendImage: (String) -> Unit,
     onRetryMessage: (com.SE114.food_tracker.data.local.entities.Message) -> Unit,
+    onRenameGroup: (String, String) -> Unit,
+    onKickMember: (String, String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var textInput by remember { mutableStateOf("") }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    var groupNameInput by remember { mutableStateOf(conversationName) }
 
-    // Bộ phóng mở Gallery thật của hệ điều hành lấy Uri ảnh thật
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { onSendImage(it.toString()) }
+    }
+
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = { Text("Quản trị nhóm Chat", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = groupNameInput,
+                        onValueChange = { groupNameInput = it },
+                        label = { Text("Tên nhóm") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = {
+                            if (groupNameInput.isNotBlank()) {
+                                onRenameGroup(conversationId, groupNameInput)
+                                showSettingsDialog = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark),
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Cập nhật tên")
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text("Danh sách thành viên (Mô phỏng)", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+
+                    val mockMembers = listOf(Pair("azun_id", "Azun (Data)"), Pair("member_test_id", "Nguyễn Văn B"))
+                    mockMembers.forEach { member ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(member.second, fontSize = 14.sp)
+                            Text(
+                                text = "Mời ra ❌",
+                                color = Color.Red,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clickable {
+                                        onKickMember(conversationId, member.first, member.second)
+                                        showSettingsDialog = false
+                                    }
+                                    .padding(4.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettingsDialog = false }) { Text("Đóng") }
+            }
+        )
     }
 
     Scaffold(
@@ -74,17 +146,18 @@ fun ChatScreenContent(
             TopAppBar(
                 title = {
                     Column {
-                        Text(
-                            text = conversationName,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = conversationName, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Text(text = "Đang trực tuyến", fontSize = 11.sp, color = Color(0xFF4CAF50))
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showSettingsDialog = true }) {
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = StatPinkDark)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
@@ -98,13 +171,12 @@ fun ChatScreenContent(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 1. Vùng hiển thị nội dung danh sách tin nhắn
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                reverseLayout = true, // Giữ nguyên để đẩy tin nhắn từ dưới đáy mượt mà
+                reverseLayout = true,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp, top = 16.dp)
             ) {
@@ -116,9 +188,7 @@ fun ChatScreenContent(
                     MessageBubble(
                         message = message,
                         isMine = message.senderId == myId,
-                        onRetryClick = {
-                            message.rawEntity?.let { onRetryMessage(it) }
-                        }
+                        onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
                     )
 
                     val hasOlderMessage = index + 1 < reversedList.size
@@ -142,7 +212,6 @@ fun ChatScreenContent(
                 }
             }
 
-            // 2. Ô soạn thảo tin nhắn (Bottom Input Bar)
             Surface(
                 color = MainBackground,
                 tonalElevation = 2.dp,
@@ -155,9 +224,7 @@ fun ChatScreenContent(
                         .imePadding(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = {
-                        imagePickerLauncher.launch("image/*")
-                    }) {
+                    IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
                         Text("🖼️", fontSize = 22.sp)
                     }
 
@@ -204,26 +271,19 @@ fun ChatScreenContent(
 fun ChatScreenPreview() {
     FoodTrackerTheme {
         ChatScreenContent(
-            conversationName = "Azun (Data)",
+            conversationId = "2",
+            conversationName = "Team SE114 - Food Tracker 🥑",
             myId = "vy_id",
             messageList = listOf(
-                MessageUiModel(
-                    senderId = "azun_id",
-                    body = "Ăn bún bò Huế đi",
-                    imageUrl = null,
-                    dateLabel = "Hôm nay"
-                ),
-                MessageUiModel(
-                    senderId = "vy_id",
-                    body = "Oki chốt kèo luôn nha!",
-                    imageUrl = null,
-                    dateLabel = "Hôm nay"
-                )
+                MessageUiModel(senderId = "azun_id", body = "Ăn bún bò Huế đi", imageUrl = null, dateLabel = "Hôm nay"),
+                MessageUiModel(senderId = "vy_id", body = "Oki chốt kèo luôn nha!", imageUrl = null, dateLabel = "Hôm nay")
             ),
             onBackClick = {},
             onSendMessage = {},
             onSendImage = {},
-            onRetryMessage = {}
+            onRetryMessage = {},
+            onRenameGroup = { _, _ -> },
+            onKickMember = { _, _, _ -> }
         )
     }
 }

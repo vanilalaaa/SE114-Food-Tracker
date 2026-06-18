@@ -10,7 +10,6 @@ import com.SE114.food_tracker.data.repository.ChatRepository
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -23,61 +22,33 @@ class ChatViewModel @Inject constructor(
     private val chatDAO: ChatDAO
 ) : ViewModel() {
 
-    // 🌟 LẤY USER ID THẬT TỪ AUTH ĐỂ KHỚP VỚI POLICY MÀ KHÔNG DÙNG ID GIẢ LẬP NỮA
+    // LẤY USER ID THẬT TỪ AUTH ĐỂ KHỚP VỚI POLICY MÀ KHÔNG DÙNG ID GIẢ LẬP
     val currentUserId: String
         get() = chatRepository.getAuthenticatedUserId()
 
+    // 🌟 SẠCH BÓNG MOCK DATA: Khối khởi tạo trống trơn để nhường chỗ cho dữ liệu liên thông thật
     init {
+        // Không mồi dữ liệu giả lập nữa
+    }
+
+    // 🌟 KÍCH HOẠT LẮNG NGHE REALTIME ĐỘNG: Được gọi trực tiếp khi bấm vào bất kỳ phòng nào ở list bên ngoài
+    fun connectToConversation(conversationId: String) {
         viewModelScope.launch {
-            // 1. Tạo sẵn một cuộc trò chuyện mẫu với ID cố định là "1" nếu chưa tồn tại
-            chatDAO.insertConversation(
-                Conversation(
-                    id = "1",
-                    isGroup = false,
-                    name = "Azun (Data)",
-                    walletId = "mock_wallet_id_1"
-                )
-            )
-
-            // Kích hoạt lắng nghe Realtime cho phòng chat "1" ngay khi khởi động ViewModel
-            chatRepository.subscribeToChatRealtime("1")
-
-            // 2. CHỈ MỒI TIN NHẮN KHI PHÒNG CHAT ĐANG TRỐNG TRƠN
-            val currentMessages = chatRepository.getMessagesStream("1").first()
-
-            if (currentMessages.isEmpty()) {
-                val oneMinuteAgo = System.currentTimeMillis() - 60000
-                val thirtySecondsAgo = System.currentTimeMillis() - 30000
-
-                chatDAO.insertMessage(
-                    Message(
-                        localId = "mock_msg_init_1",
-                        serverId = "srv_init_1",
-                        conversationId = "1",
-                        senderId = "azun_id",
-                        body = "Ăn bún bò Huế đi zz",
-                        imageUrl = null,
-                        isSystem = false,
-                        syncStatus = MessageSyncStatus.SENT,
-                        createdAt = oneMinuteAgo
-                    )
-                )
-
-                chatDAO.insertMessage(
-                    Message(
-                        localId = "mock_msg_init_2",
-                        serverId = "srv_init_2",
-                        conversationId = "1",
-                        senderId = "system",
-                        body = "Hệ thống: Vy đã nộp 100k vào quỹ nhóm",
-                        imageUrl = null,
-                        isSystem = true,
-                        syncStatus = MessageSyncStatus.SENT,
-                        createdAt = thirtySecondsAgo
-                    )
-                )
-            }
+            chatRepository.subscribeToChatRealtime(conversationId)
         }
+    }
+
+    // Tương tác Chat nhóm từ giao diện UI điều phối xuống Repository
+    fun createGroup(name: String, members: List<String>) {
+        viewModelScope.launch { chatRepository.createGroupChat(name, members) }
+    }
+
+    fun renameGroup(conversationId: String, newName: String) {
+        viewModelScope.launch { chatRepository.updateGroupName(conversationId, newName) }
+    }
+
+    fun kickGroupMember(conversationId: String, userId: String, name: String) {
+        viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
     }
 
     // 1. Lấy tin nhắn từ Room và tự động định dạng Ngày/Giờ thật sang dữ liệu UI
@@ -127,7 +98,6 @@ class ChatViewModel @Inject constructor(
         return chatDAO.getAllConversations()
     }
 
-    // --- CÁC HÀM TIỆN ÍCH CHUYỂN ĐỔI NGÀY GIỜ THẬT ---
     private fun formatToTime(timestamp: Long): String {
         return SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(timestamp))
     }
