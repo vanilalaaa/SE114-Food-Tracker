@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
+import com.SE114.food_tracker.core.util.*
 
 @Composable
 fun DayItem(
@@ -90,7 +91,7 @@ fun DayItem(
             }
 
             Text(
-                text = "${(price / 1000).toInt()}k đ",
+                text = price.formatVndExact(),
                 color = OrangeMain,
                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold)
             )

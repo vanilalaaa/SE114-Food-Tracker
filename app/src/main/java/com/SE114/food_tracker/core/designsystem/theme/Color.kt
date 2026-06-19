@@ -32,4 +32,24 @@ val TextLabelGray = Color(0xFF777777)
 val HintGrayStat = Color(0xFFB8B3B3)
 val StoryBorderYellow = Color(0xFFFFC107)
 val SearchBarBg = Color(0xFFFFFFFF)
+val TextWarning = Color(0xFF9B1C1C)
 
+// --- 5. BIỂU ĐỒ & THỐNG KÊ ---
+val ChartLineObserved = Color(0xFFAED9E0)
+val ChartMarkerNormal = Color(0xFF7FA8B0)
+
+// --- 6. BẢNG MÀU THỨ HẠNG TOP DANH MỤC (BAR_COLORS) ---
+val Rank1Terracotta = Color(0xFFD2785F)
+val Rank2Amber      = Color(0xFFE3A85C)
+val Rank3SoftTeal   = Color(0xFFAED9E0)
+val Rank4SoftBlue   = Color(0xFFB5C4E3)
+
+// --- 7. BẢNG MÀU BIỂU ĐỒ HÌNH TRÒN (DONUT CHART) ---
+val DonutSegment1 = Color(0xFFE8AEB4)
+val DonutSegment2 = Color(0xFFFBE3B5)
+val DonutSegment3 = Color(0xFFAED9E0)
+val DonutSegment4 = Color(0xFFD2EBD9)
+val DonutSegment5 = Color(0xFFD39292)
+val DonutSegment6 = Color(0xFFB5C4E3)
+val DonutSegment7 = Color(0xFFE8D3C7)
+val DonutSegment8 = Color(0xFFC9C0D3)
