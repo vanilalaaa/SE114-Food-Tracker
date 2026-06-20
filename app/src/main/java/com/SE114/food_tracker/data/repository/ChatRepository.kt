@@ -44,7 +44,6 @@ class ChatRepository @Inject constructor(
         @SerialName("created_at") val createdAt: String? = null
     )
 
-    // DTO để bốc thông tin chi tiết cuộc hội thoại từ Supabase
     @Serializable
     data class SupabaseConversationDto(
         @SerialName("id") val id: String,
@@ -54,9 +53,10 @@ class ChatRepository @Inject constructor(
     )
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
-    private var chatChannel: RealtimeChannel? = null
 
-    // Hàm phụ trợ giúp chuyển đổi chuỗi thời gian Server sang Long để nạp vào Room
+    // 🔥 FIX LỖI RÒ RỈ KÊNH: Quản lý danh sách các phòng chat đang kết nối realtime bằng Map thay vì biến đơn
+    private val activeChannels = mutableMapOf<String, RealtimeChannel>()
+
     private fun parseServerTimeToLong(serverTimeStr: String?): Long {
         if (serverTimeStr.isNullOrBlank()) return System.currentTimeMillis()
         return try {
@@ -82,30 +82,20 @@ class ChatRepository @Inject constructor(
         return chatDAO.getMessagesByConversation(conversationId)
     }
 
-    // Lấy luồng thông tin phòng chat từ Room Local để UI xem trực tiếp tên và ID ví
     fun getLocalConversation(conversationId: String): Flow<LocalConversation?> {
         return chatDAO.getConversationById(conversationId)
     }
 
-    // ── ĐỒNG BỘ DANH SÁCH PHÒNG CHAT TỪ SERVER VỀ ROOM LOCAL ──
     suspend fun fetchAndSaveConversationsToLocal() {
         try {
             val currentUserId = getAuthenticatedUserId()
-            println("ChatRepository: Bắt đầu fetch phòng chat cho user: $currentUserId")
-
-            // 1. Quét bảng trung gian lấy tất cả conversation_id mà mình tham gia (Nhận map lỏng lẻo để tránh lỗi ép kiểu)
             val myParticipations = supabaseClient.from("conversation_participant")
                 .select {
                     filter { eq("user_id", currentUserId) }
                 }.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
 
-            println("ChatRepository: Tìm thấy ${myParticipations.size} phòng tham gia trên Server.")
-
-            // 2. Kéo thông tin chi tiết từng phòng chat về và lưu vào Room
             myParticipations.forEach { part ->
-                // Trích xuất an toàn String từ JsonElement
                 val convId = part["conversation_id"]?.toString()?.replace("\"", "") ?: return@forEach
-
                 try {
                     val response = supabaseClient.from("conversation")
                         .select {
@@ -126,10 +116,7 @@ class ChatRepository @Inject constructor(
                         isGroup = cIsGroup,
                         walletId = cWalletId ?: "wallet_default"
                     )
-
-                    // Chèn vào Room DB máy local
                     chatDAO.insertConversation(localConversation)
-                    println("ChatRepository: Đã đồng bộ thành công phòng $convId về máy local.")
                 } catch (e: Exception) {
                     println("Lỗi bốc chi tiết phòng chat $convId: ${e.localizedMessage}")
                 }
@@ -139,22 +126,25 @@ class ChatRepository @Inject constructor(
         }
     }
 
-    // ── CHỨC NĂNG REALTIME CHANNEL (ĐÃ ĐỒNG BỘ GIỜ SERVER THẬT) ──
+    // ── 🔥 FIX TOÀN DIỆN CHỨC NĂNG REALTIME CHANNEL (SUBSCRIBE + RECONNECT CHUẨN BA) ──
 
     fun subscribeToChatRealtime(conversationId: String) {
         repositoryScope.launch {
-            try {
-                chatChannel = supabaseClient.channel("chat_channel_$conversationId")
+            // Nếu phòng chat này đã có kênh kết nối đang chạy rồi thì bỏ qua, không tạo đè lên nữa
+            if (activeChannels.containsKey(conversationId)) return@launch
 
-                val changeFlow = chatChannel?.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+            try {
+                val channel = supabaseClient.channel("chat_channel_$conversationId")
+                val changeFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
                     table = "message"
                 }
 
                 repositoryScope.launch {
-                    changeFlow?.collect { action ->
+                    changeFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
                         val currentUserId = getAuthenticatedUserId()
 
+                        // Kiểm tra tin nhắn có thuộc về phòng chat này hay không
                         if (dto.conversationId == conversationId && dto.senderId != currentUserId) {
                             val incomingMessage = Message(
                                 localId = dto.id ?: UUID.randomUUID().toString(),
@@ -172,10 +162,34 @@ class ChatRepository @Inject constructor(
                     }
                 }
 
-                chatChannel?.subscribe()
-                println("Supabase Realtime: Subscribe thành công phòng $conversationId")
+                repositoryScope.launch {
+                    changeFlow.collect { action ->
+                        val dto = action.decodeRecord<SupabaseMessageDto>()
+                        val currentUserId = getAuthenticatedUserId()
+
+                        // Chỉ nhận tin nhắn của người khác gửi đến, không tự nạp tin nhắn của chính mình
+                        if (dto.senderId != currentUserId) {
+                            val incomingMessage = Message(
+                                localId = dto.id ?: UUID.randomUUID().toString(),
+                                serverId = dto.id,
+                                conversationId = dto.conversationId,
+                                senderId = dto.senderId,
+                                body = dto.body,
+                                imageUrl = dto.imageUrl,
+                                isSystem = dto.isSystem,
+                                syncStatus = MessageSyncStatus.SENT,
+                                createdAt = parseServerTimeToLong(dto.createdAt)
+                            )
+                            chatDAO.insertMessage(incomingMessage)
+                        }
+                    }
+                }
+
+                channel.subscribe()
+                activeChannels[conversationId] = channel
+                println("Supabase Realtime: Đã mở kênh nghe động độc quyền cho phòng $conversationId")
             } catch (e: Exception) {
-                println("Supabase Realtime Lỗi: ${e.localizedMessage}")
+                println("Supabase Realtime Lỗi kết nối ban đầu: ${e.localizedMessage}")
                 handleRealtimeReconnect(conversationId)
             }
         }
@@ -188,16 +202,19 @@ class ChatRepository @Inject constructor(
         while (!isConnected) {
             delay(retryDelay)
             try {
-                chatChannel?.subscribe()
+                val channel = activeChannels[conversationId] ?: supabaseClient.channel("chat_channel_$conversationId")
+                channel.subscribe()
+                activeChannels[conversationId] = channel
                 isConnected = true
-                println("Supabase Realtime: Reconnect thành công!")
+                println("Supabase Realtime: Reconnect thành công phòng $conversationId!")
             } catch (e: Exception) {
+                // Tự động nhân đôi thời gian chờ (Exponential Backoff) lên tối đa 1 phút để tránh nghẽn Thread
                 retryDelay = (retryDelay * 2).coerceAtMost(60000L)
             }
         }
     }
 
-    // ── CHỨC NĂNG GỬI TIN NHẮN ───
+    // ── CHỨC NĂNG CHAT NHÓM & QUẢN TRỊ VIÊN ──
 
     suspend fun sendMessage(
         conversationId: String,
@@ -207,7 +224,6 @@ class ChatRepository @Inject constructor(
         isSystem: Boolean = false
     ) {
         val localId = UUID.randomUUID().toString()
-
         val pendingMessage = Message(
             localId = localId,
             serverId = null,
@@ -219,27 +235,21 @@ class ChatRepository @Inject constructor(
             syncStatus = MessageSyncStatus.PENDING,
             createdAt = System.currentTimeMillis()
         )
-
         chatDAO.insertMessage(pendingMessage)
         performNetworkSend(pendingMessage)
     }
 
-    // ── CHỨC NĂNG CHAT 1-1 ──
-
     suspend fun getOrCreateOneToOneChat(friendUserId: String): String? {
         return try {
             val currentUserId = getAuthenticatedUserId()
-
             val myParticipations = supabaseClient.from("conversation_participant")
                 .select {
                     filter { eq("user_id", currentUserId) }
                 }.decodeList<Map<String, String>>()
 
             var existingConversationId: String? = null
-
             for (part in myParticipations) {
                 val convId = part["conversation_id"] ?: continue
-
                 val isGroupCheck = supabaseClient.from("conversation")
                     .select {
                         filter { eq("id", convId) }
@@ -261,36 +271,27 @@ class ChatRepository @Inject constructor(
                 }
             }
 
-            if (existingConversationId != null) {
-                return existingConversationId
-            }
+            if (existingConversationId != null) return existingConversationId
 
             val newChatUuid = UUID.randomUUID().toString()
-            val conversationMap = mapOf(
-                "id" to newChatUuid,
-                "is_group" to false,
-                "name" to null
-            )
-            supabaseClient.from("conversation").insert(conversationMap)
+            supabaseClient.from("conversation").insert(mapOf("id" to newChatUuid, "is_group" to false, "name" to null))
 
             val participantRows = listOf(
                 mapOf("conversation_id" to newChatUuid, "user_id" to currentUserId, "is_admin" to false),
                 mapOf("conversation_id" to newChatUuid, "user_id" to friendUserId, "is_admin" to false)
             )
             supabaseClient.from("conversation_participant").insert(participantRows)
-
             newChatUuid
         } catch (e: Exception) {
-            println("Lỗi luồng xử lý tạo chat 1-1: ${e.localizedMessage}")
+            println("Lỗi luồng tạo chat 1-1: ${e.localizedMessage}")
             null
         }
     }
 
-    // ── CHỨC NĂNG CHAT NHÓM ──
-
     suspend fun createGroupChat(groupName: String, memberUserIds: List<String>): String? {
         return try {
             val groupUuid = UUID.randomUUID().toString()
+            // Đã tích hợp gán mã wallet_id cho phòng chat nhóm để đồng bộ phân hệ Ví Quỹ
             val conversationMap = mapOf(
                 "id" to groupUuid,
                 "is_group" to true,
@@ -369,34 +370,20 @@ class ChatRepository @Inject constructor(
         )
     }
 
-    // ── CHỨC NĂNG LƯU TRỮ VÀ THỰC HIỆN GIAO DỊCH QUỸ NHÓM ──
-
-    // 1. Hàm bốc số dư hiện tại của phòng chat từ database Supabase về máy
+    // ── CHỨC NĂNG QUY TRÌNH VÍ QUỸ ──
     suspend fun getWalletBalance(conversationId: String): Double {
         return try {
             val response = supabaseClient.from("conversation")
                 .select { filter { eq("id", conversationId) } }
                 .decodeSingle<Map<String, kotlinx.serialization.json.JsonElement>>()
-
             response["balance"]?.toString()?.toDoubleOrNull() ?: 0.0
-        } catch (e: Exception) {
-            println("Lỗi bốc số dư từ server: ${e.localizedMessage}")
-            0.0
-        }
+        } catch (e: Exception) { 0.0 }
     }
 
-    // 2. Hàm đẩy lịch sử giao dịch nộp/rút thực tế lên Supabase và tự động sinh tin nhắn hệ thống công khai
-    suspend fun executeWalletTransaction(
-        conversationId: String,
-        amount: Double,
-        isDeposit: Boolean,
-        note: String
-    ): Boolean {
+    suspend fun executeWalletTransaction(conversationId: String, amount: Double, isDeposit: Boolean, note: String): Boolean {
         return try {
             val currentUserId = getAuthenticatedUserId()
             val finalAmount = if (isDeposit) amount else -amount
-
-            // Đẩy giao dịch lịch sử lên bảng wallet_transaction
             val txRow = mapOf(
                 "id" to UUID.randomUUID().toString(),
                 "conversation_id" to conversationId,
@@ -408,47 +395,35 @@ class ChatRepository @Inject constructor(
             )
             supabaseClient.from("wallet_transaction").insert(txRow)
 
-            // Cập nhật số dư tổng mới vào bảng cuộc trò chuyện trên Server
             val currentBalance = getWalletBalance(conversationId)
-            val newBalance = currentBalance + finalAmount
-            supabaseClient.from("conversation").update(mapOf("balance" to newBalance)) {
+            supabaseClient.from("conversation").update(mapOf("balance" to currentBalance + finalAmount)) {
                 filter { eq("id", conversationId) }
             }
 
-            // Bắn tin nhắn hệ thống công khai (System message cờ isSystem = true)
             val systemNotification = if (isDeposit) {
                 "Hệ thống: Thành viên đã nộp ${String.format("%,.0f", amount)}đ vào quỹ nhóm. Nội dung: $note"
             } else {
                 "Hệ thống: Admin đã chi ${String.format("%,.0f", amount)}đ từ quỹ nhóm. Nội dung: $note"
             }
             sendSystemMessage(conversationId, systemNotification)
-
             true
-        } catch (e: Exception) {
-            println("Lỗi xử lý luồng giao dịch quỹ: ${e.localizedMessage}")
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
-    // 3. Hàm tải lịch sử giao dịch thực tế từ bảng wallet_transaction trên máy chủ về vẽ UI
     suspend fun fetchWalletTransactionsFromServer(conversationId: String): List<Map<String, kotlinx.serialization.json.JsonElement>> {
         return try {
             supabaseClient.from("wallet_transaction")
-                .select {
-                    filter { eq("conversation_id", conversationId) }
-                }.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
-        } catch (e: Exception) {
-            println("Lỗi lấy lịch sử giao dịch từ server: ${e.localizedMessage}")
-            emptyList()
-        }
+                .select { filter { eq("conversation_id", conversationId) } }.decodeList()
+        } catch (e: Exception) { emptyList() }
     }
 
-    // ── CHỨC NĂNG MẠNG LƯỚI GỬI LÊN SERVER + CẬP NHẬT THỜI GIAN THẬT ──
+    // ── CHỨC NĂNG GỬI MẠNG LƯỚI & RETRY TIN NHẮN LỖI ──
 
     private suspend fun performNetworkSend(message: Message) {
         try {
             var finalImageUrl = message.imageUrl
 
+            // Nếu tin nhắn có chứa ảnh cục bộ (đường dẫn content:// từ thiết bị) thì thực hiện upload trước
             if (message.imageUrl != null && message.imageUrl.startsWith("content://")) {
                 val uri = Uri.parse(message.imageUrl)
                 val inputStream = context.contentResolver.openInputStream(uri)
@@ -473,10 +448,7 @@ class ChatRepository @Inject constructor(
                 isSystem = message.isSystem
             )
 
-            val response = supabaseClient.from("message").insert(listOf(messageDto)) {
-                select()
-            }
-
+            val response = supabaseClient.from("message").insert(listOf(messageDto)) { select() }
             val insertedDto = response.decodeSingle<SupabaseMessageDto>()
 
             val successMessage = message.copy(
