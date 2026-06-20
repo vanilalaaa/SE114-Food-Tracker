@@ -7,6 +7,7 @@ import com.SE114.food_tracker.data.local.AppDatabase
 import com.SE114.food_tracker.data.local.dao.BudgetDAO
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.dao.ChatDAO
+import com.SE114.food_tracker.data.local.dao.FeedDAO
 import com.SE114.food_tracker.data.local.dao.ItemDAO
 import com.SE114.food_tracker.data.local.dao.FriendDAO
 import dagger.Module
@@ -25,6 +26,7 @@ object DatabaseModule {
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "app_database")
             .addMigrations(AppDatabase.MIGRATION_8_9)
+            .addMigrations(AppDatabase.MIGRATION_9_10)
             .fallbackToDestructiveMigration()
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
@@ -59,4 +61,7 @@ object DatabaseModule {
 
     @Provides @Singleton
     fun provideChatDao(db: AppDatabase): ChatDAO = db.chatDao()
+
+    @Provides @Singleton
+    fun provideFeedDao(db: AppDatabase): FeedDAO = db.feedDao()
 }
