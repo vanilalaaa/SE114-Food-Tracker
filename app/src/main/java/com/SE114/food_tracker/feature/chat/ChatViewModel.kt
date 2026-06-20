@@ -32,22 +32,45 @@ class ChatViewModel @Inject constructor(
         get() = chatRepository.getAuthenticatedUserId()
 
     // ── STATE QUẢN LÝ DỮ LIỆU QUỸ NHÓM THẬT CHO UI QUAN SÁT ──
-    var walletBalance by mutableStateOf(0.0)
+    // Đọc trạng thái động từ Companion Object tĩnh để không bị reset khi nhấn Back
+    var walletBalance by mutableStateOf(mockBalance)
         private set
 
-    private val _walletTransactions =
-        MutableStateFlow<List<Map<String, kotlinx.serialization.json.JsonElement>>>(emptyList())
     val walletTransactions: StateFlow<List<Map<String, kotlinx.serialization.json.JsonElement>>> =
-        _walletTransactions.asStateFlow()
+        _mockWalletTransactions.asStateFlow()
 
     var isTransactionSuccess by mutableStateOf<Boolean?>(null)
         private set
+
+    // KHỐI BỘ NHỚ TĨNH (COMPANION OBJECT) BẢO VỆ DỮ LIỆU KHÔNG BỊ RESET KHI THOÁT RA VÀO LẠI
+    companion object {
+        private var mockBalance by mutableStateOf(680000.0)
+        private val _mockWalletTransactions =
+            MutableStateFlow<List<Map<String, kotlinx.serialization.json.JsonElement>>>(
+                listOf(
+                    mapOf(
+                        "id" to kotlinx.serialization.json.JsonPrimitive("tx_mồi_01"),
+                        "type" to kotlinx.serialization.json.JsonPrimitive("deposit"),
+                        "amount" to kotlinx.serialization.json.JsonPrimitive(200000.0),
+                        "note" to kotlinx.serialization.json.JsonPrimitive("Nộp tiền quỹ cơm trưa tuần này"),
+                        "created_at" to kotlinx.serialization.json.JsonPrimitive("10:15 - Hôm nay")
+                    ),
+                    mapOf(
+                        "id" to kotlinx.serialization.json.JsonPrimitive("tx_mồi_02"),
+                        "type" to kotlinx.serialization.json.JsonPrimitive("withdrawal"),
+                        "amount" to kotlinx.serialization.json.JsonPrimitive(-120000.0),
+                        "note" to kotlinx.serialization.json.JsonPrimitive("Mua cơm gà phi lê nhóm"),
+                        "created_at" to kotlinx.serialization.json.JsonPrimitive("12:30 - Hôm qua")
+                    )
+                )
+            )
+    }
 
     init {
         // 1. Duy trì lệnh đồng bộ từ server như bình thường
         fetchConversationsFromServer()
 
-        // 2. MỒI DATA VÀO ROOM LOCAL ĐỂ KIỂM TRA MÀN HÌNH LÊN ĐÈN
+        // 2. MỒI DATA VÀO ROOM LOCAL ĐỂ KIỂM TRA MÀN HÌNH
         viewModelScope.launch {
             try {
                 val testRoom = Conversation(
@@ -58,6 +81,9 @@ class ChatViewModel @Inject constructor(
                 )
                 chatDAO.insertConversation(testRoom)
                 println("ChatViewModel: Đã mồi thành công phòng chat test xuống Room local!")
+
+                // Đồng bộ biến UI khớp trực tiếp với bộ nhớ tĩnh Companion Object hiện thời
+                walletBalance = mockBalance
             } catch (e: Exception) {
                 println("Lỗi mồi dữ liệu local: ${e.localizedMessage}")
             }
@@ -150,9 +176,15 @@ class ChatViewModel @Inject constructor(
 
     // Hàm gọi bốc số dư và lịch sử giao dịch thật từ Server về máy
     fun loadWalletData(conversationId: String) {
+        // Nếu là phòng test mock data, giữ nguyên dữ liệu tĩnh, không ghi đè dữ liệu rỗng từ server lên
+        if (conversationId == "phong_test_114") {
+            walletBalance = mockBalance
+            return
+        }
+
         viewModelScope.launch {
             walletBalance = chatRepository.getWalletBalance(conversationId)
-            _walletTransactions.value =
+            _mockWalletTransactions.value =
                 chatRepository.fetchWalletTransactionsFromServer(conversationId)
         }
     }
@@ -165,13 +197,31 @@ class ChatViewModel @Inject constructor(
         note: String
     ) {
         viewModelScope.launch {
-            val success =
-                chatRepository.executeWalletTransaction(conversationId, amount, isDeposit, note)
-            if (success) {
-                // Tự động load lại số dư và lịch sử giao dịch mới nhất nếu thành công
-                loadWalletData(conversationId)
+            // NẾU LÀ PHÒNG TEST MOCK DATA: Cập nhật thẳng vào vùng nhớ tĩnh Companion để không bị bay màu
+            if (conversationId == "phong_test_114") {
+                val finalAmount = if (isDeposit) amount else -amount
+
+                mockBalance += finalAmount
+                walletBalance = mockBalance
+
+                val newMockTx = mapOf(
+                    "id" to kotlinx.serialization.json.JsonPrimitive(UUID.randomUUID().toString()),
+                    "type" to kotlinx.serialization.json.JsonPrimitive(if (isDeposit) "deposit" else "withdrawal"),
+                    "amount" to kotlinx.serialization.json.JsonPrimitive(finalAmount),
+                    "note" to kotlinx.serialization.json.JsonPrimitive(note),
+                    "created_at" to kotlinx.serialization.json.JsonPrimitive("Vừa xong")
+                )
+                _mockWalletTransactions.value = listOf(newMockTx) + _mockWalletTransactions.value
+                isTransactionSuccess = true
+            } else {
+                // Luồng chạy dữ liệu thật liên thông Supabase khi tháo mock data
+                val success =
+                    chatRepository.executeWalletTransaction(conversationId, amount, isDeposit, note)
+                if (success) {
+                    loadWalletData(conversationId)
+                }
+                isTransactionSuccess = success
             }
-            isTransactionSuccess = success
         }
     }
 

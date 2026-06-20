@@ -22,7 +22,7 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.TransactionItem
 import com.SE114.food_tracker.feature.chat.components.WalletTransactionDialog
 
-// 🔥 KHÔI PHỤC LẠI DATA CLASS ĐỂ ĐỊNH HƯỚNG DỮ LIỆU HIỂN THỊ TRÊN UI
+// DATA CLASS ĐỂ ĐỊNH HƯỚNG DỮ LIỆU HIỂN THỊ TRÊN UI
 data class GroupWalletUiTxModel(
     val id: String,
     val actorName: String,
@@ -51,12 +51,40 @@ fun GroupWalletScreen(
         viewModel.loadWalletData(conversationId)
     }
 
-    // Gán dữ liệu thật từ ViewModel, nếu chưa load xong hoặc rỗng thì mặc định như thiết kế ban đầu
+    // Gán dữ liệu thật từ ViewModel
     val walletBalance = viewModel.walletBalance
     val walletName = conversationState?.name?.let { "Quỹ của $it" } ?: "Quỹ Nhóm Tài Chính"
     val hasWallet = conversationState?.walletId != null
 
-    var showTransactionDialog by remember { mutableStateOf<String?>(null) } // "deposit" hoặc "withdrawal"
+    GroupWalletScreenContent(
+        walletName = walletName,
+        walletBalance = walletBalance,
+        hasWallet = hasWallet,
+        realTransactions = realTransactions,
+        onBackClick = onBackClick,
+        onConfirmTransaction = { amount, isDeposit, note ->
+            viewModel.executeWalletTransaction(
+                conversationId = conversationId,
+                amount = amount,
+                isDeposit = isDeposit,
+                note = note
+            )
+        }
+    )
+}
+
+// HÀM CONTENT RIÊNG BIỆT: CHỈ CHỨA GIAO DIỆN THUẦN
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GroupWalletScreenContent(
+    walletName: String,
+    walletBalance: Double,
+    hasWallet: Boolean,
+    realTransactions: List<Map<String, kotlinx.serialization.json.JsonElement>>,
+    onBackClick: () -> Unit,
+    onConfirmTransaction: (Double, Boolean, String) -> Unit
+) {
+    var showTransactionDialog by remember { mutableStateOf<String?>(null) }
     var selectedFilter by remember { mutableStateOf("Tất cả") }
 
     // Chuyển đổi Map<String, JsonElement> từ Supabase sang Object giao diện UI
@@ -67,8 +95,6 @@ fun GroupWalletScreen(
             val amount = tx["amount"]?.toString()?.toDoubleOrNull() ?: 0.0
             val note = tx["note"]?.toString()?.replace("\"", "") ?: ""
             val createdAt = tx["created_at"]?.toString()?.replace("\"", "") ?: "Vừa xong"
-
-            // Tạm thời bốc tên hoặc hiển thị chung tên thành viên
             val actorName = if (amount > 0) "Thành viên" else "Admin nhóm"
 
             GroupWalletUiTxModel(txId, actorName, type, amount, note, createdAt)
@@ -88,13 +114,7 @@ fun GroupWalletScreen(
             transactionType = showTransactionDialog!!,
             onDismissRequest = { showTransactionDialog = null },
             onConfirm = { amount, note ->
-                // 🔥 KÍCH HOẠT LỆNH GIAO DỊCH QUỸ THẬT LÊN SERVER SUPABASE
-                viewModel.executeWalletTransaction(
-                    conversationId = conversationId,
-                    amount = amount,
-                    isDeposit = (showTransactionDialog == "deposit"),
-                    note = note
-                )
+                onConfirmTransaction(amount, showTransactionDialog == "deposit", note)
                 showTransactionDialog = null
             }
         )
@@ -151,137 +171,147 @@ fun GroupWalletScreen(
                 }
             }
         } else {
-            Column(
+            // 🔥 FIX XOAY NGANG: Thay thế Column cha bằng LazyColumn cho toàn bộ màn hình
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
                         top = innerPadding.calculateTopPadding(),
                         bottom = innerPadding.calculateBottomPadding()
                     )
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = CardWhite),
-                    shape = RoundedCornerShape(24.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                // Khối 1: Card hiển thị tổng số dư quỹ
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardWhite),
+                        shape = RoundedCornerShape(24.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
                     ) {
-                        Text(
-                            text = walletName,
-                            fontSize = 14.sp,
-                            color = TextLabelGray,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "${String.format("%,.0f", walletBalance)} VND",
-                            fontSize = 28.sp, fontWeight = FontWeight.Bold, color = StatPinkDark
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Button(
-                                onClick = { showTransactionDialog = "deposit" },
-                                colors = ButtonDefaults.buttonColors(containerColor = LightGreenStat),
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(24.dp)
+                            Text(
+                                text = walletName,
+                                fontSize = 14.sp,
+                                color = TextLabelGray,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "${String.format("%,.0f", walletBalance)} VND",
+                                fontSize = 28.sp, fontWeight = FontWeight.Bold, color = StatPinkDark
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Text(
-                                    "📥 Nộp tiền",
-                                    color = Color(0xFF2E7D32),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Button(
-                                onClick = { showTransactionDialog = "withdrawal" },
-                                colors = ButtonDefaults.buttonColors(containerColor = StatPinkLight),
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(24.dp)
-                            ) {
-                                Text(
-                                    "📤 Rút quỹ",
-                                    color = StatPinkDark,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Button(
+                                    onClick = { showTransactionDialog = "deposit" },
+                                    colors = ButtonDefaults.buttonColors(containerColor = LightGreenStat),
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(24.dp)
+                                ) {
+                                    Text(
+                                        "📥 Nộp tiền",
+                                        color = Color(0xFF2E7D32),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Button(
+                                    onClick = { showTransactionDialog = "withdrawal" },
+                                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkLight),
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(24.dp)
+                                ) {
+                                    Text(
+                                        "📤 Rút quỹ",
+                                        color = StatPinkDark,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("Tất cả", "Nộp tiền", "Chi tiêu").forEach { filter ->
-                        FilterChip(
-                            selected = selectedFilter == filter,
-                            onClick = { selectedFilter = filter },
-                            label = { Text(filter) },
-                            shape = RoundedCornerShape(24.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = StatPinkLight,
-                                selectedLabelColor = StatPinkDark,
-                                disabledContainerColor = CardWhite,
-                                disabledLabelColor = HintGray
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
+                // Khối 2: Thanh Filter Chips lựa chọn bộ lọc phân loại
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Tất cả", "Nộp tiền", "Chi tiêu").forEach { filter ->
+                            FilterChip(
                                 selected = selectedFilter == filter,
-                                borderColor = Color(0xFFE0E0E0),
-                                selectedBorderColor = StatPinkDark,
-                                borderWidth = 1.dp,
-                                selectedBorderWidth = 1.dp
+                                onClick = { selectedFilter = filter },
+                                label = { Text(filter) },
+                                shape = RoundedCornerShape(24.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = StatPinkLight,
+                                    selectedLabelColor = StatPinkDark,
+                                    disabledContainerColor = CardWhite,
+                                    disabledLabelColor = HintGray
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = selectedFilter == filter,
+                                    borderColor = Color(0xFFE0E0E0),
+                                    selectedBorderColor = StatPinkDark,
+                                    borderWidth = 1.dp,
+                                    selectedBorderWidth = 1.dp
+                                )
                             )
-                        )
+                        }
                     }
                 }
 
-                Text(
-                    "Lịch sử giao dịch quỹ (Mới nhất)",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextLabelGray
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                // Khối 3: Dòng tiêu đề nhỏ của khu vực Lịch sử
+                item {
+                    Text(
+                        "Lịch sử giao dịch quỹ (Mới nhất)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextLabelGray,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
 
+                // Khối 4: Hiển thị danh sách lịch sử giao dịch hoặc báo trống động
                 if (filteredTransactions.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Chưa có lịch sử giao dịch nào.",
-                            color = HintGray,
-                            fontSize = 13.sp
-                        )
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Chưa có lịch sử giao dịch nào.",
+                                color = HintGray,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        items(filteredTransactions, key = { it.id }) { tx ->
-                            TransactionItem(
-                                actorName = tx.actorName,
-                                type = tx.type,
-                                amount = tx.amount,
-                                note = tx.note,
-                                createdAt = tx.createdAt
-                            )
-                        }
+                    items(filteredTransactions, key = { it.id }) { tx ->
+                        TransactionItem(
+                            actorName = tx.actorName,
+                            type = tx.type,
+                            amount = tx.amount,
+                            note = tx.note,
+                            createdAt = tx.createdAt
+                        )
                     }
                 }
             }
@@ -293,7 +323,13 @@ fun GroupWalletScreen(
 @Composable
 fun GroupWalletScreenPreview() {
     FoodTrackerTheme {
-        // Vì Preview không chạy được Hilt ViewModel thật nên gọi mock ID tạm
-        GroupWalletScreen(conversationId = "phong_test_114")
+        GroupWalletScreenContent(
+            walletName = "Quỹ của Nhóm Quỹ Thực Tế 🥑 (Preview)",
+            walletBalance = 680000.0,
+            hasWallet = true,
+            realTransactions = emptyList(),
+            onBackClick = {},
+            onConfirmTransaction = { _, _, _ -> }
+        )
     }
 }
