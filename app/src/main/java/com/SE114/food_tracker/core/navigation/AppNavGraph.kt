@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.core.navigation
 
+import android.net.Uri
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -95,9 +96,10 @@ fun AppNavGraph(
             composable(AppDestinations.Chat.route)     {
                 ConversationListScreen(
                     onConversationClick = { conversationId, conversationName ->
-                        navController.navigate("chat_screen/$conversationId/$conversationName")
-                    },
-                    onBackClick = { navController.popBackStack() }
+                        navController.navigate(
+                            "chat_screen/$conversationId/${Uri.encode(conversationName)}"
+                        )
+                    }
                 )
             }
             composable("chat_screen/{conversationId}/{conversationName}") { backStackEntry ->
