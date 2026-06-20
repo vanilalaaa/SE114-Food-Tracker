@@ -17,10 +17,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.TransactionItem
 import com.SE114.food_tracker.feature.chat.components.WalletTransactionDialog
 
+// 🔥 KHÔI PHỤC LẠI DATA CLASS ĐỂ ĐỊNH HƯỚNG DỮ LIỆU HIỂN THỊ TRÊN UI
 data class GroupWalletUiTxModel(
     val id: String,
     val actorName: String,
@@ -34,53 +36,46 @@ data class GroupWalletUiTxModel(
 @Composable
 fun GroupWalletScreen(
     conversationId: String,
+    viewModel: ChatViewModel = hiltViewModel(),
     onBackClick: () -> Unit = {}
 ) {
-    var hasWallet by remember { mutableStateOf(true) }
-    var walletBalance by remember { mutableStateOf(520000.0) }
-    var walletName by remember { mutableStateOf("Quỹ Ăn Trưa Nhóm SE114 🥑") }
+    // 1. Theo dõi thông tin phòng chat Realtime từ local Room DB (Tên cuộc hội thoại thật)
+    val conversationState by viewModel.getConversationState(conversationId)
+        .collectAsState(initial = null)
+
+    // 2. Lắng nghe lịch sử giao dịch thực tế lấy từ bảng wallet_transaction trên máy chủ về
+    val realTransactions by viewModel.walletTransactions.collectAsState()
+
+    // Tự động load số dư và lịch sử giao dịch thật từ server ngay khi khởi chạy màn hình
+    LaunchedEffect(conversationId) {
+        viewModel.loadWalletData(conversationId)
+    }
+
+    // Gán dữ liệu thật từ ViewModel, nếu chưa load xong hoặc rỗng thì mặc định như thiết kế ban đầu
+    val walletBalance = viewModel.walletBalance
+    val walletName = conversationState?.name?.let { "Quỹ của $it" } ?: "Quỹ Nhóm Tài Chính"
+    val hasWallet = conversationState?.walletId != null
 
     var showTransactionDialog by remember { mutableStateOf<String?>(null) } // "deposit" hoặc "withdrawal"
     var selectedFilter by remember { mutableStateOf("Tất cả") }
 
-    val mockTransactions = remember {
-        listOf(
-            GroupWalletUiTxModel(
-                "1",
-                "Thúy Vy",
-                "deposit",
-                200000.0,
-                "Nộp tiền quỹ tuần mới",
-                "10:15 - Hôm nay"
-            ),
-            GroupWalletUiTxModel(
-                "2",
-                "Azun",
-                "purchase",
-                -120000.0,
-                "Mua 3 hộp cơm gà phi lê",
-                "12:30 - Hôm qua"
-            ),
-            GroupWalletUiTxModel(
-                "3",
-                "Thẻo U",
-                "deposit",
-                500000.0,
-                "Quỹ mồi lập nhóm",
-                "09:00 - 15/06"
-            ),
-            GroupWalletUiTxModel(
-                "4",
-                "Tịnh Zan",
-                "withdrawal",
-                -60000.0,
-                "Rút tiền trả ship trà sữa",
-                "16:20 - 14/06"
-            )
-        )
+    // Chuyển đổi Map<String, JsonElement> từ Supabase sang Object giao diện UI
+    val cleanTransactions = remember(realTransactions) {
+        realTransactions.map { tx ->
+            val txId = tx["id"]?.toString()?.replace("\"", "") ?: ""
+            val type = tx["type"]?.toString()?.replace("\"", "") ?: "deposit"
+            val amount = tx["amount"]?.toString()?.toDoubleOrNull() ?: 0.0
+            val note = tx["note"]?.toString()?.replace("\"", "") ?: ""
+            val createdAt = tx["created_at"]?.toString()?.replace("\"", "") ?: "Vừa xong"
+
+            // Tạm thời bốc tên hoặc hiển thị chung tên thành viên
+            val actorName = if (amount > 0) "Thành viên" else "Admin nhóm"
+
+            GroupWalletUiTxModel(txId, actorName, type, amount, note, createdAt)
+        }
     }
 
-    val filteredTransactions = mockTransactions.filter {
+    val filteredTransactions = cleanTransactions.filter {
         when (selectedFilter) {
             "Nộp tiền" -> it.type == "deposit"
             "Chi tiêu" -> it.type == "withdrawal" || it.type == "purchase"
@@ -93,11 +88,13 @@ fun GroupWalletScreen(
             transactionType = showTransactionDialog!!,
             onDismissRequest = { showTransactionDialog = null },
             onConfirm = { amount, note ->
-                if (showTransactionDialog == "deposit") {
-                    walletBalance += amount
-                } else if (showTransactionDialog == "withdrawal" && walletBalance >= amount) {
-                    walletBalance -= amount
-                }
+                // 🔥 KÍCH HOẠT LỆNH GIAO DỊCH QUỸ THẬT LÊN SERVER SUPABASE
+                viewModel.executeWalletTransaction(
+                    conversationId = conversationId,
+                    amount = amount,
+                    isDeposit = (showTransactionDialog == "deposit"),
+                    note = note
+                )
                 showTransactionDialog = null
             }
         )
@@ -150,31 +147,6 @@ fun GroupWalletScreen(
                             textAlign = TextAlign.Center,
                             color = TextSecondary
                         )
-                        var newWalletName by remember { mutableStateOf("") }
-                        OutlinedTextField(
-                            value = newWalletName,
-                            onValueChange = { newWalletName = it },
-                            placeholder = { Text("Nhập tên Quỹ nhóm...", color = HintGray) },
-                            shape = RoundedCornerShape(24.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = StatPinkDark,
-                                unfocusedBorderColor = Color(0xFFE0E0E0)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Button(
-                            onClick = {
-                                if (newWalletName.isNotBlank()) {
-                                    walletName = newWalletName
-                                    hasWallet = true
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark),
-                            shape = RoundedCornerShape(24.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Tạo Quỹ nhóm mới (Chỉ Admin)", fontWeight = FontWeight.Bold)
-                        }
                     }
                 }
             }
@@ -283,18 +255,33 @@ fun GroupWalletScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(filteredTransactions, key = { it.id }) { tx ->
-                        TransactionItem(
-                            actorName = tx.actorName,
-                            type = tx.type,
-                            amount = tx.amount,
-                            note = tx.note,
-                            createdAt = tx.createdAt
+                if (filteredTransactions.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Chưa có lịch sử giao dịch nào.",
+                            color = HintGray,
+                            fontSize = 13.sp
                         )
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(filteredTransactions, key = { it.id }) { tx ->
+                            TransactionItem(
+                                actorName = tx.actorName,
+                                type = tx.type,
+                                amount = tx.amount,
+                                note = tx.note,
+                                createdAt = tx.createdAt
+                            )
+                        }
                     }
                 }
             }
@@ -306,6 +293,7 @@ fun GroupWalletScreen(
 @Composable
 fun GroupWalletScreenPreview() {
     FoodTrackerTheme {
-        GroupWalletScreen(conversationId = "2")
+        // Vì Preview không chạy được Hilt ViewModel thật nên gọi mock ID tạm
+        GroupWalletScreen(conversationId = "phong_test_114")
     }
 }

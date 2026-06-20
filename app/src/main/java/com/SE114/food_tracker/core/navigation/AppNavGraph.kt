@@ -114,8 +114,8 @@ fun AppNavGraph(
                     conversationName = name,
                     viewModel = chatDetailViewModel,
                     onBackClick = { navController.popBackStack() },
-                    onWalletClick = { conversationId ->
-                        navController.navigate("group_wallet_screen/$conversationId")
+                    onWalletClick = {
+                        navController.navigate("group_wallet_screen/$id")
                     }
                 )
             }

@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.MessageSyncStatus
 import java.util.UUID
@@ -103,34 +104,39 @@ fun MessageBubble(
                 )
             ) {
                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    // Render văn bản chữ
-                    if (message.body != null) {
-                        Text(text = message.body, fontSize = 14.sp)
-                    }
-
-                    // Render hình ảnh đính kèm giả lập cục bộ
                     if (message.imageUrl != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 160.dp, height = 120.dp)
-                                .background(Color.LightGray, RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🖼️ Image Attachment", fontSize = 12.sp, color = Color.DarkGray)
+                        Column {
+                            // Dùng AsyncImage của thư viện Coil để hiển thị ảnh từ Supabase Storage
+                            AsyncImage(
+                                model = message.imageUrl,
+                                contentDescription = "Hình ảnh gửi kèm",
+                                modifier = Modifier
+                                    .size(150.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                            // Nếu có text caption kèm theo ảnh thì vẽ thêm ở dưới cách 4dp
+                            if (!message.body.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(text = message.body, fontSize = 14.sp)
+                            }
+                        }
+                    } else {
+                        // Tin nhắn chỉ chứa ký tự chữ thuần túy
+                        if (message.body != null) {
+                            Text(text = message.body, fontSize = 14.sp)
                         }
                     }
                 }
             }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp)
+            ) {
+                Text(text = message.timeLabel, fontSize = 10.sp, color = TextLabelGray)
 
-            // Hiển thị mốc thời gian và cờ trạng thái đồng bộ hàng đợi offline (Chỉ dành cho chính mình)
-            if (isMine) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp, end = 2.dp)
-                ) {
-                    Text(text = message.timeLabel, fontSize = 10.sp, color = TextLabelGray)
+                // Cờ trạng thái đồng bộ hàng đợi offline (Chỉ hiển thị cho chính mình gửi)
+                if (isMine) {
                     Spacer(modifier = Modifier.width(4.dp))
-
                     when (message.syncStatus) {
                         MessageSyncStatus.PENDING -> {
                             Text(text = "🕒", fontSize = 10.sp) // Đồng hồ chờ gửi
@@ -142,7 +148,7 @@ fun MessageBubble(
                                 color = Color(0xFF4CAF50),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
-                            ) // Dấu tích thành công
+                            )
                         }
 
                         MessageSyncStatus.FAILED -> {

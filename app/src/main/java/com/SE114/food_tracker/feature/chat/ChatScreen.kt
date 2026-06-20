@@ -31,33 +31,37 @@ import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 fun ChatScreen(
     conversationId: String,
     conversationName: String,
-    viewModel: ChatViewModel = viewModel(),
-    onBackClick: () -> Unit = {},
-    onWalletClick: (id: String) -> Unit = {}
+    viewModel: ChatViewModel,
+    onBackClick: () -> Unit,
+    onWalletClick: () -> Unit
 ) {
-    val myId = viewModel.currentUserId
-
-    // KÍCH HOẠT LẮNG NGHE REALTIME ĐỘNG THEO ID THẬT ĐƯỢC CHỌN TỪ CONVERSATION LIST
-    LaunchedEffect(conversationId) {
-        viewModel.connectToConversation(conversationId)
-    }
-
-    // Đọc luồng dữ liệu thật realtime từ Room DB thông qua Flow
-    val messageList by viewModel.getMessagesState(conversationId)
-        .collectAsState(initial = emptyList())
+    // Lấy từ Room DB Realtime lên UI
+    val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
+    val currentUserId = viewModel.currentUserId
 
     ChatScreenContent(
         conversationId = conversationId,
         conversationName = conversationName,
-        messageList = messageList,
-        myId = myId,
+        messageList = messages,
+        myId = currentUserId,
         onBackClick = onBackClick,
-        onWalletClick = { onWalletClick(conversationId) }, // 🌟 Bắn dữ liệu Id thật ra ngoài khi nhấn nút túi tiền
-        onSendMessage = { text -> viewModel.sendTextMessage(conversationId, text) },
-        onSendImage = { uri -> viewModel.sendImageMessage(conversationId, uri) },
-        onRetryMessage = { rawMsg -> viewModel.retryFailedMessage(rawMsg) },
-        onRenameGroup = { id, name -> viewModel.renameGroup(id, name) },
-        onKickMember = { id, uid, name -> viewModel.kickGroupMember(id, uid, name) }
+        onWalletClick = onWalletClick,
+
+        onSendMessage = { text ->
+            viewModel.sendTextMessage(conversationId, text)
+        },
+        onSendImage = { imageUri ->
+            viewModel.sendImageMessage(conversationId, imageUri)
+        },
+        onRenameGroup = { convId, newName ->
+            viewModel.renameGroup(convId, newName)
+        },
+        onKickMember = { convId, userId, name ->
+            viewModel.kickGroupMember(convId, userId, name)
+        },
+        onRetryMessage = { messageEntity ->
+            viewModel.retryFailedMessage(messageEntity)
+        }
     )
 }
 
@@ -92,11 +96,9 @@ fun ChatScreenContent(
             onDismissRequest = { showSettingsDialog = false },
             onRenameGroup = { newName ->
                 onRenameGroup(conversationId, newName)
-                showSettingsDialog = false
             },
-            onKickMember = { userId, memberName ->
-                onKickMember(conversationId, userId, memberName)
-                showSettingsDialog = false
+            onKickMember = { userId, name ->
+                onKickMember(conversationId, userId, name)
             }
         )
     }
@@ -120,7 +122,7 @@ fun ChatScreenContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onWalletClick) {
+                    IconButton(onClick = { onWalletClick() }) {
                         Text("💰", fontSize = 22.sp)
                     }
                     IconButton(onClick = { showSettingsDialog = true }) {

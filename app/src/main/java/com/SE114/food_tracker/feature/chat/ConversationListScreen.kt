@@ -30,7 +30,10 @@ fun ConversationListScreen(
     ConversationListScreenContent(
         conversationList = conversationList,
         onConversationClick = onConversationClick,
-        onBackClick = onBackClick
+        onBackClick = onBackClick,
+        onCreateGroupClick = { groupName ->
+            viewModel.createGroup(name = groupName, members = emptyList())
+        }
     )
 }
 
@@ -40,6 +43,7 @@ fun ConversationListScreenContent(
     conversationList: List<Conversation>,
     onConversationClick: (id: String, name: String) -> Unit,
     onBackClick: (() -> Unit)?,
+    onCreateGroupClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -59,6 +63,13 @@ fun ConversationListScreenContent(
                         }
                     }
                 },
+                actions = {
+                    IconButton(onClick = {
+                        onCreateGroupClick("Nhóm Đồ Án SE114 🥑")
+                    }) {
+                        Text("➕", fontSize = 20.sp)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
             )
         },
@@ -72,7 +83,7 @@ fun ConversationListScreenContent(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "Chưa có cuộc hội thoại nào", color = TextLabelGray, fontSize = 14.sp)
+                Text(text = "Chưa có cuộc hội thoại nào\n(Bấm nút ➕ góc trên để tạo nhóm test thật nhe!)", color = TextLabelGray, fontSize = 14.sp)
             }
         } else {
             LazyColumn(
@@ -112,7 +123,8 @@ fun ConversationListScreenPreview() {
                 )
             ),
             onConversationClick = { _, _ -> },
-            onBackClick = {}
+            onBackClick = {},
+            onCreateGroupClick = {}
         )
     }
 }
