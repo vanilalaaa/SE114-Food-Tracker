@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.core
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,8 +24,11 @@ private val BAR_ROUTES = listOf(
     AppDestinations.Diary.route,
     AppDestinations.Stats.route,
     AppDestinations.Feed.route,
+    AppDestinations.Chat.route,
     AppDestinations.Settings.route
 )
+
+private const val CHAT_DETAIL_ROUTE = "chat_screen/{conversationId}/{conversationName}"
 
 private val AUTH_ROUTES = setOf(
     AppDestinations.Splash.route,
@@ -42,7 +46,11 @@ fun MainScaffold() {
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
 
-    val selectedIndex = BAR_ROUTES.indexOf(currentRoute).coerceAtLeast(0)
+    val selectedRoute = when (currentRoute) {
+        CHAT_DETAIL_ROUTE -> AppDestinations.Chat.route
+        else -> currentRoute
+    }
+    val selectedIndex = BAR_ROUTES.indexOf(selectedRoute).coerceAtLeast(0)
     val showBottomBar = currentRoute != null && currentRoute !in AUTH_ROUTES
 
     // FAB state lives here; DiaryScreen receives a callback to trigger the add flow
@@ -58,6 +66,7 @@ fun MainScaffold() {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
                 BottomBar(

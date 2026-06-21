@@ -75,7 +75,8 @@ fun FriendScreenContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(MainBackground),
+            .background(MainBackground)
+            .statusBarsPadding(),
         contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
     ) {
         item {
