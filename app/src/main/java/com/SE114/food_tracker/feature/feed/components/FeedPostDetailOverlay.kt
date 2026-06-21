@@ -301,7 +301,7 @@ private fun FeedPostTypeBadge(
         shape = RoundedCornerShape(999.dp)
     ) {
         Text(
-            text = "${feedFallbackIcon(post.categoryIconUrl, post.imageUrl)} ${post.itemName ?: "Ảnh tự do"}",
+            text = post.itemName ?: "Ảnh tự do",
             color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,

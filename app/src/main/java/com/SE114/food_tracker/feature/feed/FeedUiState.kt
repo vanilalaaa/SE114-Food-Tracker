@@ -18,6 +18,7 @@ data class FeedUiState(
     val isCreateSheetOpen: Boolean = false,
     val selectedSourceItem: FeedSourceItemDto? = null,
     val pickedImageUri: Uri? = null,
+    val draftFreeImageTitle: String = "",
     val draftCaption: String = "",
     val draftVisibility: String = FeedVisibility.FRIENDS.value,
     val isLoading: Boolean = false,

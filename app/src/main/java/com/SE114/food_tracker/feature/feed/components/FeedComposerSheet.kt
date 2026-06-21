@@ -20,9 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,15 +59,18 @@ import com.SE114.food_tracker.feature.feed.FeedVisibility
 fun FeedComposerSheet(
     uiState: FeedUiState,
     onPickImage: () -> Unit,
+    onTakePhoto: () -> Unit,
     onSelectSourceItem: (FeedSourceItemDto?) -> Unit,
+    onFreeImageTitleChange: (String) -> Unit,
     onCaptionChange: (String) -> Unit,
     onVisibilityChange: (FeedVisibility) -> Unit,
     onCreatePost: () -> Unit,
     onCancel: () -> Unit,
     onClearError: () -> Unit
 ) {
-    val canCreate = !uiState.isCreatingPost &&
-        (uiState.selectedSourceItem != null || uiState.pickedImageUri != null)
+    val hasRequiredContent = uiState.selectedSourceItem != null ||
+        (uiState.pickedImageUri != null && uiState.draftFreeImageTitle.isNotBlank())
+    val canCreate = !uiState.isCreatingPost && hasRequiredContent
 
     Column(
         modifier = Modifier
@@ -75,33 +79,13 @@ fun FeedComposerSheet(
             .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Tạo bài viết",
-                    color = TextPrimary,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Chọn ảnh hoặc món trong nhật ký",
-                    color = TextLabelGray,
-                    fontSize = 13.sp
-                )
-            }
-
-            TextButton(onClick = onCancel) {
-                Text("Hủy", color = TextLabelGray, fontWeight = FontWeight.Bold)
-            }
-        }
+        FeedComposerHeader(onCancel = onCancel)
 
         FeedPickedSourcePreview(
             selectedSourceItem = uiState.selectedSourceItem,
             pickedImageUri = uiState.pickedImageUri,
-            onPickImage = onPickImage
+            freeImageTitle = uiState.draftFreeImageTitle,
+            onFreeImageTitleChange = onFreeImageTitleChange
         )
 
         Surface(
@@ -118,13 +102,7 @@ fun FeedComposerSheet(
                 minLines = 2,
                 maxLines = 4,
                 shape = RoundedCornerShape(18.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    cursorColor = DarkPink
-                )
+                colors = composerTextFieldColors()
             )
         }
 
@@ -133,42 +111,7 @@ fun FeedComposerSheet(
             onVisibilityChange = onVisibilityChange
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Từ nhật ký",
-                color = TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Surface(
-                onClick = onPickImage,
-                shape = RoundedCornerShape(16.dp),
-                color = CardWhite.copy(alpha = 0.96f),
-                shadowElevation = 4.dp
-            ) {
-            Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.PhotoLibrary,
-                    contentDescription = null,
-                    tint = MintGreen,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = "Chọn ảnh",
-                    color = TextPrimary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        }
+        FeedSourceHeader()
 
         LazyColumn(
             modifier = Modifier
@@ -186,79 +129,62 @@ fun FeedComposerSheet(
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                 }
-        } else {
-            items(
-                items = uiState.sourceItems,
-                key = { it.itemId }
-            ) { item ->
-                FeedSourceItemRow(
-                    item = item,
-                    selected = uiState.selectedSourceItem?.itemId == item.itemId,
-                    onClick = { onSelectSourceItem(item) }
-                )
-            }
-        }
-        }
-
-        uiState.error?.let { error ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        MaterialTheme.colorScheme.errorContainer,
-                        RoundedCornerShape(14.dp)
+            } else {
+                items(
+                    items = uiState.sourceItems,
+                    key = { it.itemId }
+                ) { item ->
+                    FeedSourceItemRow(
+                        item = item,
+                        selected = uiState.selectedSourceItem?.itemId == item.itemId,
+                        onClick = { onSelectSourceItem(item) }
                     )
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = error,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    fontSize = 13.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                TextButton(onClick = onClearError) {
-                    Text("Ẩn")
                 }
             }
         }
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            color = Color.Transparent,
-            shadowElevation = 0.dp
-        ) {
-            Button(
-                onClick = onCreatePost,
-                enabled = canCreate,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MintGreen,
-                    disabledContainerColor = MintGreen.copy(alpha = 0.48f),
-                    disabledContentColor = TextPrimary.copy(alpha = 0.54f)
-                )
-            ) {
-            if (uiState.isCreatingPost) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                text = "Đăng bài",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+        uiState.error?.let { error ->
+            FeedComposerError(
+                error = error,
+                onClearError = onClearError
             )
-            }
         }
 
+        FeedComposerActionBar(
+            showCreate = hasRequiredContent,
+            isCreatingPost = uiState.isCreatingPost,
+            onPickImage = onPickImage,
+            onTakePhoto = onTakePhoto,
+            onCreatePost = { if (canCreate) onCreatePost() }
+        )
+
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun FeedComposerHeader(onCancel: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Tạo bài viết",
+                color = TextPrimary,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Chọn ảnh hoặc món trong nhật ký",
+                color = TextLabelGray,
+                fontSize = 13.sp
+            )
+        }
+
+        TextButton(onClick = onCancel) {
+            Text("Hủy", color = TextLabelGray, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -266,10 +192,11 @@ fun FeedComposerSheet(
 private fun FeedPickedSourcePreview(
     selectedSourceItem: FeedSourceItemDto?,
     pickedImageUri: Uri?,
-    onPickImage: () -> Unit
+    freeImageTitle: String,
+    onFreeImageTitleChange: (String) -> Unit
 ) {
     val previewModel = pickedImageUri ?: selectedSourceItem?.imageUrl
-    val previewTitle = selectedSourceItem?.name ?: "Ảnh tự do"
+    val isFreeImage = selectedSourceItem == null
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -281,55 +208,177 @@ private fun FeedPickedSourcePreview(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(74.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(LightPeach),
+                contentAlignment = Alignment.Center
+            ) {
+                if (previewModel != null && previewModel.toString().isNotBlank()) {
+                    AsyncImage(
+                        model = previewModel,
+                        contentDescription = selectedSourceItem?.name ?: freeImageTitle.ifBlank { "Ảnh tự do" },
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (selectedSourceItem != null) {
+                    Text(
+                        text = selectedSourceItem.categoryIconUrl?.takeIf { it.isNotBlank() } ?: "🍱",
+                        fontSize = 28.sp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Image,
+                        contentDescription = null,
+                        tint = DarkPink,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                if (isFreeImage) {
+                    OutlinedTextField(
+                        value = freeImageTitle,
+                        onValueChange = onFreeImageTitleChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Tên loại ảnh", color = TextLabelGray) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = composerTextFieldColors()
+                    )
+                    Text(
+                        text = if (pickedImageUri == null) "Chưa chọn nguồn" else "Ảnh tự do",
+                        color = TextLabelGray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                } else {
+                    Text(
+                        text = selectedSourceItem?.name.orEmpty(),
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Từ nhật ký",
+                        color = TextLabelGray,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedSourceHeader() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Từ nhật ký",
+            color = TextPrimary,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun FeedComposerActionBar(
+    showCreate: Boolean,
+    isCreatingPost: Boolean,
+    onPickImage: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onCreatePost: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Box(
-            modifier = Modifier
-                .size(74.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(LightPeach),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart
         ) {
-            if (previewModel != null && previewModel.toString().isNotBlank()) {
-                AsyncImage(
-                    model = previewModel,
-                    contentDescription = previewTitle,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+            FeedRoundIconButton(
+                icon = Icons.Outlined.PhotoLibrary,
+                contentDescription = "Chọn ảnh từ thư viện",
+                size = 52,
+                containerColor = CardWhite.copy(alpha = 0.96f),
+                contentColor = DarkPink,
+                onClick = onPickImage
+            )
+        }
+
+        FeedRoundIconButton(
+            icon = Icons.Outlined.PhotoCamera,
+            contentDescription = "Chụp ảnh",
+            size = 68,
+            containerColor = MintGreen,
+            contentColor = Color.White,
+            onClick = onTakePhoto
+        )
+
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            if (showCreate) {
+                FeedRoundIconButton(
+                    icon = Icons.Outlined.Send,
+                    contentDescription = "Đăng bài",
+                    size = 52,
+                    containerColor = DarkPink,
+                    contentColor = Color.White,
+                    onClick = onCreatePost,
+                    loading = isCreatingPost
                 )
-            } else if (selectedSourceItem != null) {
-                Text(
-                    text = selectedSourceItem?.categoryIconUrl?.takeIf { it.isNotBlank() } ?: "🍱",
-                    fontSize = 28.sp
+            } else {
+                Spacer(Modifier.size(52.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedRoundIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    size: Int,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit,
+    loading: Boolean = false
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(999.dp),
+        color = containerColor,
+        shadowElevation = 4.dp,
+        modifier = Modifier.size(size.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (loading) {
+                CircularProgressIndicator(
+                    color = contentColor,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(22.dp)
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Outlined.Image,
-                    contentDescription = null,
-                    tint = DarkPink,
-                    modifier = Modifier.size(28.dp)
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = contentColor,
+                    modifier = Modifier.size((size * 0.42f).dp)
                 )
             }
-        }
-
-        Spacer(Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = previewTitle,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = if (selectedSourceItem != null) "Từ nhật ký" else "Chưa chọn nguồn",
-                color = TextLabelGray,
-                fontSize = 12.sp
-            )
-        }
-
-        TextButton(onClick = onPickImage) {
-            Text("Ảnh", color = DarkPink, fontWeight = FontWeight.Bold)
-        }
         }
     }
 }
@@ -368,14 +417,40 @@ private fun FeedVisibilityPicker(
 }
 
 @Composable
+private fun FeedComposerError(
+    error: String,
+    onClearError: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.errorContainer,
+                RoundedCornerShape(14.dp)
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = error,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onClearError) {
+            Text("Ẩn")
+        }
+    }
+}
+
+@Composable
 private fun FeedSourceItemRow(
     item: FeedSourceItemDto,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
         color = if (selected) StatPinkLight else CardWhite.copy(alpha = 0.98f),
@@ -435,3 +510,13 @@ private fun FeedSourceItemRow(
         }
     }
 }
+
+@Composable
+private fun composerTextFieldColors() =
+    OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = Color.Transparent,
+        unfocusedBorderColor = Color.Transparent,
+        focusedContainerColor = Color.Transparent,
+        unfocusedContainerColor = Color.Transparent,
+        cursorColor = DarkPink
+    )

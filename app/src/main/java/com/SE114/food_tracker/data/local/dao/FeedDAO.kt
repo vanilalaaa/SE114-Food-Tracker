@@ -23,10 +23,22 @@ interface FeedDAO {
             COALESCE(u.display_name, p.owner_name) AS ownerName,
             u.avatar_url AS ownerAvatarUrl,
             p.item_id AS itemId,
-            i.name AS itemName,
+            CASE
+                WHEN p.item_id IS NULL AND instr(p.caption, char(10)) > 0
+                    THEN trim(substr(p.caption, 1, instr(p.caption, char(10)) - 1))
+                WHEN p.item_id IS NULL
+                    THEN p.caption
+                ELSE i.name
+            END AS itemName,
             c.icon_url AS categoryIconUrl,
             p.image_url AS imageUrl,
-            p.caption AS caption,
+            CASE
+                WHEN p.item_id IS NULL AND instr(p.caption, char(10)) > 0
+                    THEN trim(substr(p.caption, instr(p.caption, char(10)) + 1))
+                WHEN p.item_id IS NULL
+                    THEN ''
+                ELSE p.caption
+            END AS caption,
             p.visibility AS visibility,
             (
                 SELECT COUNT(*)

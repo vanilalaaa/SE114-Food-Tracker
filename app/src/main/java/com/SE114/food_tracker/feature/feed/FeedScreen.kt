@@ -1,5 +1,7 @@
 package com.SE114.food_tracker.feature.feed
 
+import android.content.Context
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,11 +18,16 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
@@ -32,6 +39,7 @@ import com.SE114.food_tracker.feature.feed.components.FeedComposerSheet
 import com.SE114.food_tracker.feature.feed.components.FeedGridContent
 import com.SE114.food_tracker.feature.feed.components.FeedPagingEffect
 import com.SE114.food_tracker.feature.feed.components.FeedPostDetailOverlay
+import java.io.File
 
 @Composable
 fun FeedScreen(
@@ -40,12 +48,24 @@ fun FeedScreen(
     viewModel: FeedViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
             viewModel.onImagePicked(uri)
             viewModel.openCreateSheet()
+        }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { isSuccess ->
+        if (isSuccess) {
+            pendingCameraUri?.let { uri ->
+                viewModel.onImagePicked(uri)
+                viewModel.openCreateSheet()
+            }
         }
     }
 
@@ -58,7 +78,16 @@ fun FeedScreen(
         onOpenComposer = viewModel::openCreateSheet,
         onCloseComposer = viewModel::closeCreateSheet,
         onPickImage = { imagePicker.launch("image/*") },
+        onTakePhoto = {
+            runCatching { createFeedCameraUri(context) }
+                .onSuccess { uri ->
+                    pendingCameraUri = uri
+                    cameraLauncher.launch(uri)
+                }
+                .onFailure { viewModel.showError("Không mở được camera") }
+        },
         onSelectSourceItem = viewModel::selectSourceItem,
+        onFreeImageTitleChange = viewModel::updateDraftFreeImageTitle,
         onCaptionChange = viewModel::updateDraftCaption,
         onVisibilityChange = viewModel::updateDraftVisibility,
         onCreatePost = viewModel::createPost,
@@ -82,7 +111,9 @@ fun FeedScreenContent(
     onOpenComposer: () -> Unit,
     onCloseComposer: () -> Unit,
     onPickImage: () -> Unit,
+    onTakePhoto: () -> Unit,
     onSelectSourceItem: (FeedSourceItemDto?) -> Unit,
+    onFreeImageTitleChange: (String) -> Unit,
     onCaptionChange: (String) -> Unit,
     onVisibilityChange: (FeedVisibility) -> Unit,
     onCreatePost: () -> Unit,
@@ -137,7 +168,9 @@ fun FeedScreenContent(
                 FeedComposerSheet(
                     uiState = uiState,
                     onPickImage = onPickImage,
+                    onTakePhoto = onTakePhoto,
                     onSelectSourceItem = onSelectSourceItem,
+                    onFreeImageTitleChange = onFreeImageTitleChange,
                     onCaptionChange = onCaptionChange,
                     onVisibilityChange = onVisibilityChange,
                     onCreatePost = onCreatePost,
@@ -172,7 +205,9 @@ private fun FeedScreenPreview() {
             onOpenComposer = {},
             onCloseComposer = {},
             onPickImage = {},
+            onTakePhoto = {},
             onSelectSourceItem = {},
+            onFreeImageTitleChange = {},
             onCaptionChange = {},
             onVisibilityChange = {},
             onCreatePost = {},
@@ -199,7 +234,9 @@ private fun FeedScreenEmptyPreview() {
             onOpenComposer = {},
             onCloseComposer = {},
             onPickImage = {},
+            onTakePhoto = {},
             onSelectSourceItem = {},
+            onFreeImageTitleChange = {},
             onCaptionChange = {},
             onVisibilityChange = {},
             onCreatePost = {},
@@ -280,3 +317,19 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             createdAt = 1_718_000_300_000
         )
     )
+
+private fun createFeedCameraUri(context: Context): Uri {
+    val tempFile = File.createTempFile(
+        "FEED_${System.currentTimeMillis()}_",
+        ".jpg",
+        context.cacheDir
+    ).apply {
+        createNewFile()
+        deleteOnExit()
+    }
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        tempFile
+    )
+}
