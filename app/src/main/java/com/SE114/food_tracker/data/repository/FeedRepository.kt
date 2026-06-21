@@ -10,6 +10,7 @@ import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.data.local.entities.FeedComment
 import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
+import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
 import com.SE114.food_tracker.data.remote.dto.FeedCommentRemoteDTO
 import com.SE114.food_tracker.data.remote.dto.FeedLikeRemoteDTO
 import com.SE114.food_tracker.data.remote.dto.FeedPostRemoteDTO
@@ -142,6 +143,11 @@ class FeedRepository @Inject constructor(
                 .select()
                 .decodeList<ProfileDTO>()
                 .associateBy { it.id }
+
+            val profileEntities = profiles.values.map { it.toCacheEntity() }
+            if (profileEntities.isNotEmpty()) {
+                feedDao.insertUserProfiles(profileEntities)
+            }
 
             val remotePosts = supabaseClient.postgrest.from("post")
                 .select()
@@ -371,6 +377,13 @@ class FeedRepository @Inject constructor(
         this?.displayName?.takeIf { it.isNotBlank() }
             ?: this?.userId?.takeIf { it.isNotBlank() }
             ?: profileId.take(8)
+
+    private fun ProfileDTO.toCacheEntity(): UserProfileCacheEntity =
+        UserProfileCacheEntity(
+            userId = id,
+            displayName = this.displayNameOrFallback(id),
+            avatarUrl = avatarUrl
+        )
 
     private fun stableLikeId(postId: String, userId: String): String =
         UUID.nameUUIDFromBytes("$postId:$userId".toByteArray()).toString()

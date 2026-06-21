@@ -33,6 +33,7 @@ private const val CHAT_DETAIL_ROUTE = "chat_screen/{conversationId}/{conversatio
 private fun bottomBarRouteFor(route: String?): String? =
     when (route) {
         AppDestinations.Friend.route -> AppDestinations.Feed.route
+        AppDestinations.Profile.route -> AppDestinations.Feed.route
         CHAT_DETAIL_ROUTE -> AppDestinations.Chat.route
         else -> route
     }

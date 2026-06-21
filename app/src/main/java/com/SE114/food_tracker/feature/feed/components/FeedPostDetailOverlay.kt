@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.feed.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +66,7 @@ import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.feature.feed.FeedUiState
 import com.SE114.food_tracker.feature.feed.feedFallbackIcon
 import com.SE114.food_tracker.feature.feed.feedImageModelOrNull
+import com.SE114.food_tracker.feature.friend.components.ProfileAvatar
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -72,6 +74,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 fun FeedPostDetailOverlay(
     uiState: FeedUiState,
     onClose: () -> Unit,
+    onNavigateToProfile: (String) -> Unit,
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
     onAddComment: (String, String) -> Unit
@@ -126,6 +129,10 @@ fun FeedPostDetailOverlay(
                         commentText = if (page == uiState.selectedPostIndex) commentText else "",
                         onCommentTextChange = { commentText = it },
                         onToggleLike = onToggleLike,
+                        onNavigateToProfile = { profileId ->
+                            onClose()
+                            onNavigateToProfile(profileId)
+                        },
                         onAddComment = { postId, body ->
                             onAddComment(postId, body)
                             commentText = ""
@@ -159,6 +166,7 @@ private fun FeedPostDetailPage(
     commentText: String,
     onCommentTextChange: (String) -> Unit,
     onToggleLike: (String) -> Unit,
+    onNavigateToProfile: (String) -> Unit,
     onAddComment: (String, String) -> Unit
 ) {
     Column(
@@ -182,6 +190,7 @@ private fun FeedPostDetailPage(
             commentText = commentText,
             onCommentTextChange = onCommentTextChange,
             onToggleLike = onToggleLike,
+            onNavigateToProfile = onNavigateToProfile,
             onAddComment = onAddComment
         )
     }
@@ -239,6 +248,7 @@ private fun FeedDetailPanel(
     commentText: String,
     onCommentTextChange: (String) -> Unit,
     onToggleLike: (String) -> Unit,
+    onNavigateToProfile: (String) -> Unit,
     onAddComment: (String, String) -> Unit
 ) {
     Surface(
@@ -252,6 +262,17 @@ private fun FeedDetailPanel(
                 .padding(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.clickable { onNavigateToProfile(post.ownerId) }
+                ) {
+                    ProfileAvatar(
+                        avatarUrl = post.ownerAvatarUrl,
+                        hasStory = false
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = post.ownerName,

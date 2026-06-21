@@ -9,6 +9,7 @@ import androidx.room.Upsert
 import com.SE114.food_tracker.data.local.entities.FeedComment
 import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
+import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -19,7 +20,8 @@ interface FeedDAO {
         SELECT
             p.post_id AS postId,
             p.owner_id AS ownerId,
-            p.owner_name AS ownerName,
+            COALESCE(u.display_name, p.owner_name) AS ownerName,
+            u.avatar_url AS ownerAvatarUrl,
             p.item_id AS itemId,
             i.name AS itemName,
             c.icon_url AS categoryIconUrl,
@@ -47,6 +49,7 @@ interface FeedDAO {
         FROM feed_post p
         LEFT JOIN item i ON i.item_id = p.item_id
         LEFT JOIN category c ON c.category_id = i.category_id
+        LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
         ORDER BY p.created_at DESC
         LIMIT :limit OFFSET :offset
@@ -97,6 +100,9 @@ interface FeedDAO {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<FeedPost>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUserProfiles(profiles: List<UserProfileCacheEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComment(comment: FeedComment)

@@ -22,28 +22,22 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -52,7 +46,6 @@ import com.SE114.food_tracker.core.designsystem.theme.HintGray
 import com.SE114.food_tracker.core.designsystem.theme.LightPeach
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.core.designsystem.theme.MintGreen
-import com.SE114.food_tracker.core.designsystem.theme.OrangeMain
 import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
 import com.SE114.food_tracker.core.designsystem.theme.TextPrimary
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
@@ -197,47 +190,20 @@ private fun FeedPostTile(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            FeedTilePlaceholder(
-                title = post.itemName ?: post.caption.ifBlank { "Bài viết món ăn" },
-                fallbackIcon = feedFallbackIcon(post.categoryIconUrl, post.imageUrl)
-            )
+            FeedTilePlaceholder(fallbackIcon = feedFallbackIcon(post.categoryIconUrl, post.imageUrl))
         }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.52f)
-                        ),
-                        startY = 110f
-                    )
-                )
-        )
-
-        FeedTileFooter(
-            post = post,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(7.dp)
-        )
     }
 }
 
 @Composable
 private fun FeedTilePlaceholder(
-    title: String,
     fallbackIcon: String
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
@@ -250,92 +216,6 @@ private fun FeedTilePlaceholder(
                 fontSize = 20.sp
             )
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = title,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            color = TextPrimary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-@Composable
-private fun FeedTileFooter(
-    post: FeedPostDto,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = post.ownerName,
-            color = Color.White,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        if (post.caption.isNotBlank()) {
-            Text(
-                text = post.caption,
-                color = Color.White.copy(alpha = 0.88f),
-                fontSize = 10.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            FeedMetric(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Outlined.FavoriteBorder,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp)
-                    )
-                },
-                count = post.likeCount
-            )
-            FeedMetric(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Outlined.ChatBubbleOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp)
-                    )
-                },
-                count = post.commentCount
-            )
-        }
-    }
-}
-
-@Composable
-private fun FeedMetric(
-    icon: @Composable () -> Unit,
-    count: Int
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        modifier = Modifier
-            .background(Color.Black.copy(alpha = 0.24f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 5.dp, vertical = 2.dp)
-    ) {
-        CompositionLocalProvider(LocalContentColor provides Color.White) {
-            icon()
-        }
-        Text(
-            text = count.toString(),
-            color = Color.White,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.SemiBold
-        )
     }
 }
 

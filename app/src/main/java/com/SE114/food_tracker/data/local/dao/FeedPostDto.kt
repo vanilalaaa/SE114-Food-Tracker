@@ -4,6 +4,7 @@ data class FeedPostDto(
     val postId: String,
     val ownerId: String,
     val ownerName: String,
+    val ownerAvatarUrl: String?,
     val itemId: String?,
     val itemName: String?,
     val categoryIconUrl: String?,

@@ -36,6 +36,7 @@ import com.SE114.food_tracker.feature.feed.components.FeedPostDetailOverlay
 @Composable
 fun FeedScreen(
     onNavigateToFriend: () -> Unit,
+    onNavigateToProfile: (String) -> Unit,
     viewModel: FeedViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -51,6 +52,7 @@ fun FeedScreen(
     FeedScreenContent(
         uiState = uiState,
         onNavigateToFriend = onNavigateToFriend,
+        onNavigateToProfile = onNavigateToProfile,
         onPostClick = viewModel::openPostDetail,
         onLoadNextPage = viewModel::loadNextPage,
         onOpenComposer = viewModel::openCreateSheet,
@@ -73,6 +75,7 @@ fun FeedScreen(
 fun FeedScreenContent(
     uiState: FeedUiState,
     onNavigateToFriend: () -> Unit,
+    onNavigateToProfile: (String) -> Unit,
     onPostClick: (String) -> Unit,
     onLoadNextPage: () -> Unit,
     onOpenComposer: () -> Unit,
@@ -145,6 +148,7 @@ fun FeedScreenContent(
         FeedPostDetailOverlay(
             uiState = uiState,
             onClose = onClosePostDetail,
+            onNavigateToProfile = onNavigateToProfile,
             onSelectPostAt = onSelectPostAt,
             onToggleLike = onToggleLike,
             onAddComment = onAddComment
@@ -159,6 +163,7 @@ private fun FeedScreenPreview() {
         FeedScreenContent(
             uiState = FeedUiState(posts = previewFeedPosts()),
             onNavigateToFriend = {},
+            onNavigateToProfile = {},
             onPostClick = {},
             onLoadNextPage = {},
             onOpenComposer = {},
@@ -184,6 +189,7 @@ private fun FeedScreenEmptyPreview() {
         FeedScreenContent(
             uiState = FeedUiState(),
             onNavigateToFriend = {},
+            onNavigateToProfile = {},
             onPostClick = {},
             onLoadNextPage = {},
             onOpenComposer = {},
@@ -208,6 +214,7 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             postId = "preview-1",
             ownerId = "user-1",
             ownerName = "Thảo Uyên",
+            ownerAvatarUrl = null,
             itemId = "item-1",
             itemName = "Matcha latte",
             categoryIconUrl = "🥤",
@@ -223,6 +230,7 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             postId = "preview-2",
             ownerId = "user-2",
             ownerName = "Bảo Anh",
+            ownerAvatarUrl = null,
             itemId = "item-2",
             itemName = "Cơm tấm",
             categoryIconUrl = "🍚",
@@ -238,6 +246,7 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             postId = "preview-3",
             ownerId = "user-3",
             ownerName = "Minh Quan",
+            ownerAvatarUrl = null,
             itemId = null,
             itemName = null,
             categoryIconUrl = null,
@@ -253,6 +262,7 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             postId = "preview-4",
             ownerId = "user-4",
             ownerName = "Ngọc Hân",
+            ownerAvatarUrl = null,
             itemId = "item-4",
             itemName = "Bánh mì",
             categoryIconUrl = "🥖",
