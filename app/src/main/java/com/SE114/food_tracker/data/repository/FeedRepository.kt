@@ -101,6 +101,10 @@ class FeedRepository @Inject constructor(
         )
     }
 
+    suspend fun deletePost(postId: String) {
+        feedDao.softDeletePost(postId, currentUserId())
+    }
+
     suspend fun pushPendingToSupabase(ownerId: String): Boolean {
         var anyError = false
 
@@ -150,13 +154,23 @@ class FeedRepository @Inject constructor(
             }
 
             val remotePosts = supabaseClient.postgrest.from("post")
-                .select()
+                .select {
+                    filter {
+                        eq("is_deleted", false)
+                    }
+                }
                 .decodeList<FeedPostRemoteDTO>()
 
             val postEntities = remotePosts.map { dto ->
                 dto.toEntity(
                     ownerName = profiles[dto.authorId].displayNameOrFallback(dto.authorId)
                 )
+            }
+            val remotePostIds = remotePosts.map { it.id }
+            if (remotePostIds.isEmpty()) {
+                feedDao.deleteAllSyncedPosts()
+            } else {
+                feedDao.deleteSyncedPostsMissingFromRemote(remotePostIds)
             }
             if (postEntities.isNotEmpty()) {
                 feedDao.insertPosts(postEntities)
@@ -220,7 +234,12 @@ class FeedRepository @Inject constructor(
         }
 
         if (post.isDeleted) {
-            supabaseClient.postgrest.from("post").delete {
+            supabaseClient.postgrest.from("post").update(
+                mapOf(
+                    "is_deleted" to true,
+                    "deleted_at" to Instant.fromEpochMilliseconds(post.updatedAt).toString()
+                )
+            ) {
                 filter {
                     eq("id", post.postId)
                     eq("author_id", ownerId)
@@ -315,7 +334,9 @@ class FeedRepository @Inject constructor(
             caption = caption.ifBlank { null },
             imageUrl = remoteImageUrl.ifBlank { null },
             visibility = visibility,
-            createdAt = Instant.fromEpochMilliseconds(createdAt).toString()
+            isDeleted = false,
+            createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
+            deletedAt = null
         )
 
     private fun FeedLike.toRemoteDTO(ownerId: String): FeedLikeRemoteDTO =
@@ -344,7 +365,7 @@ class FeedRepository @Inject constructor(
             caption = caption.orEmpty(),
             visibility = visibility,
             syncStatus = SyncStatus.SYNCED.name,
-            isDeleted = false,
+            isDeleted = isDeleted,
             createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
             updatedAt = Instant.parse(createdAt).toEpochMilliseconds()
         )

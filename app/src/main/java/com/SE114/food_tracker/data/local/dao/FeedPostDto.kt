@@ -22,6 +22,7 @@ data class FeedCommentDto(
     val postId: String,
     val userId: String,
     val displayName: String,
+    val avatarUrl: String?,
     val body: String,
     val createdAt: Long
 )

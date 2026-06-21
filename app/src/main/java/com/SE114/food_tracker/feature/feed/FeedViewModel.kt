@@ -75,6 +75,7 @@ class FeedViewModel @Inject constructor(
         ) { values ->
             @Suppress("UNCHECKED_CAST")
             FeedUiState(
+                currentUserId = feedRepository.currentUserId(),
                 posts = values[0] as List<FeedPostDto>,
                 sourceItems = values[1] as List<FeedSourceItemDto>,
                 selectedPostId = values[2] as String?,
@@ -224,6 +225,20 @@ class FeedViewModel @Inject constructor(
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Add comment failed")
                     _error.value = throwable.message ?: "Không gửi được bình luận"
+                }
+        }
+    }
+
+    fun deletePost(postId: String) {
+        viewModelScope.launch {
+            runCatching { feedRepository.deletePost(postId) }
+                .onSuccess {
+                    closePostDetail()
+                    SyncScheduler.triggerImmediateSync(context)
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Delete post failed")
+                    _error.value = throwable.message ?: "Không xóa được bài viết"
                 }
         }
     }

@@ -66,6 +66,7 @@ fun FeedScreen(
         onClosePostDetail = viewModel::closePostDetail,
         onSelectPostAt = viewModel::selectPostAt,
         onToggleLike = viewModel::toggleLike,
+        onDeletePost = viewModel::deletePost,
         onAddComment = viewModel::addComment
     )
 }
@@ -89,6 +90,7 @@ fun FeedScreenContent(
     onClosePostDetail: () -> Unit,
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
+    onDeletePost: (String) -> Unit,
     onAddComment: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -151,6 +153,7 @@ fun FeedScreenContent(
             onNavigateToProfile = onNavigateToProfile,
             onSelectPostAt = onSelectPostAt,
             onToggleLike = onToggleLike,
+            onDeletePost = onDeletePost,
             onAddComment = onAddComment
         )
     }
@@ -177,6 +180,7 @@ private fun FeedScreenPreview() {
             onClosePostDetail = {},
             onSelectPostAt = {},
             onToggleLike = {},
+            onDeletePost = {},
             onAddComment = { _, _ -> }
         )
     }
@@ -203,6 +207,7 @@ private fun FeedScreenEmptyPreview() {
             onClosePostDetail = {},
             onSelectPostAt = {},
             onToggleLike = {},
+            onDeletePost = {},
             onAddComment = { _, _ -> }
         )
     }

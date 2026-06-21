@@ -7,6 +7,7 @@ import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.data.repository.FeedRepository
 
 data class FeedUiState(
+    val currentUserId: String = "",
     val posts: List<FeedPostDto> = emptyList(),
     val sourceItems: List<FeedSourceItemDto> = emptyList(),
     val selectedPostId: String? = null,

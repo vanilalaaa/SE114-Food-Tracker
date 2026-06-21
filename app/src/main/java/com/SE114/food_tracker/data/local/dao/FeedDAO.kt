@@ -64,15 +64,17 @@ interface FeedDAO {
     @Query(
         """
         SELECT
-            comment_id AS commentId,
-            post_id AS postId,
-            user_id AS userId,
-            display_name AS displayName,
-            body,
-            created_at AS createdAt
-        FROM feed_comment
-        WHERE post_id = :postId AND is_deleted = 0
-        ORDER BY created_at ASC
+            c.comment_id AS commentId,
+            c.post_id AS postId,
+            c.user_id AS userId,
+            COALESCE(u.display_name, c.display_name) AS displayName,
+            u.avatar_url AS avatarUrl,
+            c.body AS body,
+            c.created_at AS createdAt
+        FROM feed_comment c
+        LEFT JOIN user_profile_cache u ON u.user_id = c.user_id
+        WHERE c.post_id = :postId AND c.is_deleted = 0
+        ORDER BY c.created_at ASC
         """
     )
     fun observeComments(postId: String): Flow<List<FeedCommentDto>>
@@ -131,6 +133,12 @@ interface FeedDAO {
     @Query("UPDATE feed_post SET image_url = :imageUrl, updated_at = :updatedAt WHERE post_id = :postId")
     suspend fun updatePostImageUrl(postId: String, imageUrl: String, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("DELETE FROM feed_post WHERE sync_status = 'SYNCED'")
+    suspend fun deleteAllSyncedPosts()
+
+    @Query("DELETE FROM feed_post WHERE sync_status = 'SYNCED' AND post_id NOT IN (:remotePostIds)")
+    suspend fun deleteSyncedPostsMissingFromRemote(remotePostIds: List<String>)
+
     @Query("UPDATE feed_post SET sync_status = 'SYNCED' WHERE post_id = :postId")
     suspend fun markPostSynced(postId: String)
 
@@ -158,8 +166,18 @@ interface FeedDAO {
     )
     suspend fun setLikeDeleted(likeId: String, isDeleted: Boolean, updatedAt: Long)
 
-    @Query("UPDATE feed_post SET is_deleted = 1, sync_status = 'PENDING', updated_at = :updatedAt WHERE post_id = :postId")
-    suspend fun softDeletePost(postId: String, updatedAt: Long = System.currentTimeMillis())
+    @Query(
+        """
+        UPDATE feed_post
+        SET is_deleted = 1, sync_status = 'PENDING', updated_at = :updatedAt
+        WHERE post_id = :postId AND owner_id = :ownerId
+        """
+    )
+    suspend fun softDeletePost(
+        postId: String,
+        ownerId: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
 
     @Transaction
     suspend fun toggleLike(postId: String, userId: String) {
