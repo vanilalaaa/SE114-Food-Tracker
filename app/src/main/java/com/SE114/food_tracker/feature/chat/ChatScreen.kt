@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.feature.chat
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -17,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -26,6 +28,7 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.GroupSettingsDialog
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChatScreen(
@@ -35,18 +38,111 @@ fun ChatScreen(
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit
 ) {
-    // Lấy từ Room DB Realtime lên UI
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // Lấy dữ liệu Realtime từ Room DB local lên UI để lấy mã wallet_id
+    val conversationState by viewModel.getConversationState(conversationId)
+        .collectAsState(initial = null)
     val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
     val currentUserId = viewModel.currentUserId
+
+    val isGroup = conversationState?.isGroup ?: false
+    val hasWallet = conversationState?.walletId != null &&
+            conversationState?.walletId != "wallet_default" &&
+            conversationState?.walletId?.isNotBlank() == true
+
+    // Kiểm tra bất đồng bộ quyền Admin thật từ server
+    var isAdmin by remember { mutableStateOf(false) }
+    LaunchedEffect(conversationId, conversationState) {
+        isAdmin = viewModel.isCurrentUserAdmin(conversationId)
+    }
+
+    // State điều khiển Dialog nhập tên tạo Quỹ nhóm mới
+    var showCreateWalletDialog by remember { mutableStateOf(false) }
+    var walletNameInput by remember { mutableStateOf("") }
+
+    if (showCreateWalletDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateWalletDialog = false },
+            title = {
+                Text(
+                    "Khởi tạo Quỹ Nhóm Mới",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "Nhập tên cho ví quỹ công vụ gắn liền với phòng chat này:",
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = walletNameInput,
+                        onValueChange = { walletNameInput = it },
+                        placeholder = { Text("Ví dụ: Quỹ Ăn Trưa $conversationName") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (walletNameInput.isNotBlank()) {
+                            viewModel.createGroupWallet(
+                                conversationId,
+                                walletNameInput
+                            ) { success ->
+                                if (success) {
+                                    Toast.makeText(
+                                        context,
+                                        "Khởi tạo Quỹ Nhóm thành công! 💰",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        "Lỗi tạo ví, vui lòng thử lại!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                showCreateWalletDialog = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark)
+                ) {
+                    Text("Tạo Quỹ", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateWalletDialog = false }) {
+                    Text("Hủy", color = TextLabelGray)
+                }
+            },
+            containerColor = CardWhite,
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
 
     ChatScreenContent(
         conversationId = conversationId,
         conversationName = conversationName,
         messageList = messages,
         myId = currentUserId,
+        isGroup = isGroup,
+        hasWallet = hasWallet,
+        isAdmin = isAdmin,
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
-
+        onCreateWalletClick = {
+            walletNameInput = "Quỹ của $conversationName"
+            showCreateWalletDialog = true
+        },
         onSendMessage = { text ->
             viewModel.sendTextMessage(conversationId, text)
         },
@@ -72,8 +168,12 @@ fun ChatScreenContent(
     conversationName: String,
     messageList: List<MessageUiModel>,
     myId: String,
+    isGroup: Boolean,
+    hasWallet: Boolean,
+    isAdmin: Boolean,
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit,
+    onCreateWalletClick: () -> Unit,
     onSendMessage: (String) -> Unit,
     onSendImage: (String) -> Unit,
     onRetryMessage: (com.SE114.food_tracker.data.local.entities.Message) -> Unit,
@@ -122,9 +222,24 @@ fun ChatScreenContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onWalletClick() }) {
-                        Text("💰", fontSize = 22.sp)
+                    // Quản lý động nút Tạo quỹ / Xem quỹ
+                    if (isGroup) {
+                        if (hasWallet) {
+                            IconButton(onClick = onWalletClick) {
+                                Text("💰", fontSize = 22.sp)
+                            }
+                        } else if (isAdmin) {
+                            TextButton(onClick = onCreateWalletClick) {
+                                Text(
+                                    "Tạo Quỹ",
+                                    color = StatPinkDark,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
                     }
+
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Settings,
@@ -247,6 +362,9 @@ fun ChatScreenPreview() {
             conversationId = "2",
             conversationName = "Team SE114 - Food Tracker 🥑",
             myId = "vy_id",
+            isGroup = true,
+            hasWallet = true,
+            isAdmin = true,
             messageList = listOf(
                 MessageUiModel(
                     senderId = "azun_id",
@@ -263,6 +381,7 @@ fun ChatScreenPreview() {
             ),
             onBackClick = {},
             onWalletClick = {},
+            onCreateWalletClick = {},
             onSendMessage = {},
             onSendImage = {},
             onRetryMessage = {},

@@ -92,7 +92,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun fetchConversationsFromServer() {
+    fun fetchConversationsFromServer() {
         viewModelScope.launch {
             try {
                 chatRepository.fetchAndSaveConversationsToLocal()
@@ -232,6 +232,40 @@ class ChatViewModel @Inject constructor(
 
     fun resetTransactionStatus() {
         isTransactionSuccess = null
+    }
+
+    // ── PHÂN QUYỀN ADMIN & KHỞI TẠO QUỸ ──
+
+    // Kiểm tra bất đồng bộ quyền Admin thật của người dùng trong phòng chat dựa trên Repository
+    suspend fun isCurrentUserAdmin(conversationId: String): Boolean {
+        if (conversationId == "phong_test_114") return true // Giữ quyền để test phòng mồi local
+        return try {
+            chatRepository.isCurrentUserAdminOf(conversationId)
+        } catch (e: Exception) {
+            println("Lỗi kiểm tra quyền Admin thật: ${e.localizedMessage}")
+            false
+        }
+    }
+
+    // Khởi tạo Quỹ thật từ giao diện và đồng bộ lại danh sách hội thoại cục bộ
+    fun createGroupWallet(conversationId: String, walletName: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                // Tạm thời bốc toàn bộ list thành viên nhóm trống hoặc lấy danh sách động sau này tùy cấu trúc bài đăng
+                val success = chatRepository.createGroupWalletForExistingChat(
+                    conversationId = conversationId,
+                    walletName = walletName,
+                    memberUserIds = emptyList() // Các thành viên phòng chat sẽ tự đồng bộ qua bảng membership phía Backend
+                )
+                if (success) {
+                    fetchConversationsFromServer() // Refresh dữ liệu local Room DB để cập nhật wallet_id mới
+                }
+                onResult(success)
+            } catch (e: Exception) {
+                println("Lỗi luồng xử lý đúc ví trên server: ${e.localizedMessage}")
+                onResult(false)
+            }
+        }
     }
 
     // ── BÁO CÁO (REPORT) ──
