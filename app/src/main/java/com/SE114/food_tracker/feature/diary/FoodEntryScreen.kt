@@ -53,6 +53,7 @@ import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
 import com.SE114.food_tracker.feature.diary.components.FoodInputField
 import com.SE114.food_tracker.feature.diary.components.ManageCategoryBottomSheet
+import com.SE114.food_tracker.feature.diary.components.ShareToggle
 import com.SE114.food_tracker.feature.diary.components.StarRatingBar
 import com.SE114.food_tracker.feature.diary.components.TimeSelector
 import java.util.Calendar
@@ -67,12 +68,12 @@ fun FoodEntryScreen(
     pendingImageUri: Uri? = null,
     categoryDeleteError: String? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int) -> Unit,
+    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean) -> Unit,
     onDelete: ((String) -> Unit)? = null,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
+    onEditCategory: (DiaryCategory, String, String) -> Unit = { _, _, _ -> },
     onCreateCategory: (String, String) -> Unit = { _, _ -> },
-    onUpdateCategory: (DiaryCategory, String, String) -> Unit = { _, _, _ -> },
     onClearCategoryError: () -> Unit = {}
 ) {
     var foodName by remember(existingItem?.itemId, preSelectedCategory) {
@@ -98,6 +99,7 @@ fun FoodEntryScreen(
     }
 
     var rating        by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
+    var isShared      by remember(existingItem?.itemId) { mutableStateOf(existingItem?.isShared ?: false) }
     var nameError     by remember { mutableStateOf<String?>(null) }
     var priceError    by remember { mutableStateOf<String?>(null) }
     var categoryError by remember { mutableStateOf<String?>(null) }
@@ -106,9 +108,9 @@ fun FoodEntryScreen(
 
     var selectedHour by remember(existingItem?.itemId) {
         val initialHour = when (existingItem?.timeType) {
-            0 -> 8   // Nếu là món Sáng cũ -> đưa về 8 giờ mặc định
-            1 -> 12  // Nếu là món Trưa cũ -> đưa về 12 giờ mặc định
-            2 -> 19  // Nếu là món Tối cũ -> đưa về 19 giờ mặc định
+            0 -> 8
+            1 -> 12
+            2 -> 19
             else -> Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         }
         mutableIntStateOf(initialHour)
@@ -158,7 +160,7 @@ fun FoodEntryScreen(
         categoryError = if (selectedCategoryId.isBlank()) "Vui lòng chọn loại món" else null
 
         if (nameError == null && priceError == null && categoryError == null && parsedPrice != null) {
-            onSave(trimmedName, parsedPrice, selectedCategoryId, rating, note.trim(), autoTimeType)
+            onSave(trimmedName, parsedPrice, selectedCategoryId, rating, note.trim(), autoTimeType, isShared)
         }
     }
 
@@ -216,13 +218,15 @@ fun FoodEntryScreen(
             onDismiss           = { showManageCategoriesSheet = false },
             onToggleVisibility  = onToggleCategoryVisibility,
             onDeleteCategory    = onDeleteCategory,
-            onEditCategory      = onUpdateCategory,
+            onEditCategory      = { category, newName, newIconUrl ->
+                onEditCategory(category, newName, newIconUrl)
+            },
             onCreateNew         = { name, emoji ->
                 onCreateCategory(name, emoji)
                 showManageCategoriesSheet = false
             },
-            deleteError         = categoryDeleteError,
-            onClearDeleteError  = onClearCategoryError
+            deleteError        = categoryDeleteError,
+            onClearDeleteError = onClearCategoryError
         )
     }
 
@@ -343,6 +347,11 @@ fun FoodEntryScreen(
             onTimeClick = { showTimePicker = true }
         )
 
+        ShareToggle(
+            isShared      = isShared,
+            onShareChange = { isShared = it }
+        )
+
         Spacer(Modifier.height(16.dp))
 
         Row(
@@ -422,7 +431,7 @@ fun FoodEntryScreenPreview() {
             FoodEntryScreen(
                 categories = previewCategories,
                 onDismiss  = {},
-                onSave     = { _, _, _, _, _, _ -> }
+                onSave     = { _, _, _, _, _, _, _ -> }
             )
         }
     }
