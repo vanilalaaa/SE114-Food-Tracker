@@ -15,7 +15,6 @@ import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +27,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.AppButton
+import com.SE114.food_tracker.core.designsystem.components.AppScaffold
 import com.SE114.food_tracker.core.designsystem.components.AppTextField
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
@@ -71,10 +71,11 @@ private fun CompleteProfileContent(
         else -> null
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    AppScaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
