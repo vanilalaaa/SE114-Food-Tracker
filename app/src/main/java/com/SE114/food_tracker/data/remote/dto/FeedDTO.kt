@@ -11,7 +11,9 @@ data class FeedPostRemoteDTO(
     @SerialName("caption") val caption: String? = null,
     @SerialName("image_url") val imageUrl: String? = null,
     @SerialName("visibility") val visibility: String = "friends",
-    @SerialName("created_at") val createdAt: String
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("deleted_at") val deletedAt: String? = null
 )
 
 @Serializable
