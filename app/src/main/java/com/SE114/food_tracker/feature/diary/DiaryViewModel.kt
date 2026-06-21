@@ -215,7 +215,8 @@ class DiaryViewModel @Inject constructor(
         categoryId: String,
         rating: Int,
         note: String,
-        timeType: Int
+        timeType: Int,
+        isShared: Boolean = false
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -252,6 +253,7 @@ class DiaryViewModel @Inject constructor(
                     rating     = rating.takeIf { it > 0 },
                     note       = note.ifBlank { null },
                     imageUrl   = finalImageUrl,
+                    isShared   = isShared,
                     syncStatus = SyncStatus.PENDING.name,
                     entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
                     createdAt  = now,
@@ -280,7 +282,8 @@ class DiaryViewModel @Inject constructor(
         categoryId: String,
         rating: Int,
         note: String,
-        timeType: Int
+        timeType: Int,
+        isShared: Boolean
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -317,6 +320,7 @@ class DiaryViewModel @Inject constructor(
                         rating     = rating.takeIf { it > 0 },
                         note       = note.ifBlank { null },
                         imageUrl   = finalImageUrl,
+                        isShared   = isShared,
                         syncStatus = SyncStatus.PENDING.name, // Đưa về trạng thái cần sync lại lên server
                         updatedAt  = Clock.System.now().toEpochMilliseconds()
                     )

@@ -59,8 +59,8 @@ fun DiaryScreen(
         onClearCategoryError       = { categoryViewModel.clearError() },
         onLoadDate                 = { diaryViewModel.loadDate(it) },
         onImageSelected            = { diaryViewModel.onImageSelected(it) },
-        onSaveItem                 = { n, p, c, r, no, t -> diaryViewModel.saveItem(n, p, c, r, no, t) },
-        onUpdateItem               = { id, n, p, c, r, no, t -> diaryViewModel.updateItem(id, n, p, c, r, no, t) },
+        onSaveItem                 = { n, p, c, r, no, t, shared -> diaryViewModel.saveItem(n, p, c, r, no, t, shared) },
+        onUpdateItem               = { id, n, p, c, r, no, t, shared -> diaryViewModel.updateItem(id, n, p, c, r, no, t, shared) },
         onDeleteItem               = { diaryViewModel.deleteItem(it) },
         onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
@@ -82,8 +82,8 @@ fun DiaryScreenContent(
     onLoadDate: (LocalDate) -> Unit,
     onImageSelected: (Uri) -> Unit,
     onClearPendingImage: () -> Unit,
-    onSaveItem: (String, Double, String, Int, String, Int) -> Unit,
-    onUpdateItem: (String, String, Double, String, Int, String, Int) -> Unit,
+    onSaveItem: (String, Double, String, Int, String, Int, Boolean) -> Unit,
+    onUpdateItem: (String, String, Double, String, Int, String, Int, Boolean) -> Unit,
     onDeleteItem: (String) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
@@ -123,7 +123,6 @@ fun DiaryScreenContent(
 
     if (showDatePicker) {
         MonthYearPickerDialog(
-            // TỐI ƯU 1: Lấy trực tiếp trường dữ liệu từ uiState.selectedDate
             currentMonth = uiState.selectedDate.monthNumber,
             currentYear  = uiState.selectedDate.year,
             onDismiss    = { showDatePicker = false },
@@ -262,11 +261,11 @@ fun DiaryScreenContent(
                         preSelectedCategory = null
                         onClearPendingImage()
                     },
-                    onSave = { name, price, categoryId, rating, note, timeType ->
+                    onSave = { name, price, categoryId, rating, note, timeType, isShared ->
                         if (editingItem == null) {
-                            onSaveItem(name, price, categoryId, rating, note, timeType)
+                            onSaveItem(name, price, categoryId, rating, note, timeType, isShared)
                         } else {
-                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType)
+                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType, isShared)
                         }
                         showEntryScreen     = false
                         selectedItemForEdit = null
@@ -311,8 +310,8 @@ fun DiaryScreenPreview() {
             onAddTriggered             = {},
             onLoadDate                 = {},
             onImageSelected            = {},
-            onSaveItem                 = { _, _, _, _, _, _ -> },
-            onUpdateItem               = { _, _, _, _, _, _, _ -> },
+            onSaveItem                 = { _, _, _, _, _, _, _ -> },
+            onUpdateItem               = { _, _, _, _, _, _, _, _ -> },
             onDeleteItem               = {},
             onDeleteCategory           = {},
             onToggleCategoryVisibility = {},
