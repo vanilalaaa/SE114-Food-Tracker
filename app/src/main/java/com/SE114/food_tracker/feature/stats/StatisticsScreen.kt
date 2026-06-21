@@ -1,6 +1,8 @@
 package com.SE114.food_tracker.feature.stats
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,67 +14,56 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.core.designsystem.components.*
+import com.SE114.food_tracker.core.util.TimeFrame
 import com.SE114.food_tracker.feature.stats.components.*
 import com.SE114.food_tracker.core.designsystem.theme.*
+import com.SE114.food_tracker.core.util.formatVndExact
+import com.SE114.food_tracker.core.util.formatVndShort
 
 @Composable
-fun StatisticsScreen() {
+fun StatisticsScreen(
+    viewModel: StatisticsViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
 
-    // 4 tab thời gian
-    var selectedTab by remember { mutableStateOf(0) }
-
-    // 2 tab nội dung
-    var selectedContentTab by remember { mutableStateOf(1) }
-
-    // Quản lý ngân sách
-    var dailyBudget by remember { mutableStateOf(100000f) }
-    var weeklyBudget by remember { mutableStateOf(500000f) }
-    var monthlyBudget by remember { mutableStateOf(2000000f) }
-    var yearlyBudget by remember { mutableStateOf(24000000f) }
-
+    // Budget dialog state (purely local UI)
     var showBudgetDialog by remember { mutableStateOf(false) }
     var budgetInput by remember { mutableStateOf("") }
-
-    val totalSpendingAmount = 120000f
-
-    val currentBudget = when (selectedTab) {
-        1 -> weeklyBudget
-        2 -> monthlyBudget
-        3 -> yearlyBudget
-        else -> dailyBudget
-    }
-
-    val remainingBudget = currentBudget - totalSpendingAmount
-    val isBudgetExceeded = remainingBudget < 0
-    val isWeeklyMode = selectedTab != 0
+    var showCalendarDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             StatisticsTopBar(
-                dateText = when (selectedTab) {
-                    1 -> "Tuần 23 (01/06 - 07/06)"
-                    2 -> "Tháng 06/2026"
-                    3 -> "Năm 2026"
-                    else -> "03/04/2026"
-                },
+                dateText = uiState.headerLabel,
                 onDateClick = {
-                    budgetInput = currentBudget.toInt().toString()
-                    showBudgetDialog = true
+                    // TopBar date area → always opens the CalendarCard picker
+                    showCalendarDialog = true
                 },
-                onNextClick = {},
-                onPreviousClick = {}
+                onNextClick     = { viewModel.onNext() },
+                onPreviousClick = { viewModel.onPrevious() }
             )
-        },
-        bottomBar = {
-            BottomBar(onItemSelected = {})
         },
         containerColor = MainBackground
     ) { innerPadding ->
+
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = StatPinkDark)
+            }
+            return@Scaffold
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -82,161 +73,342 @@ fun StatisticsScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            TimeRangeSelector(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
+            // ── Time-frame selector ──────────────────────────────────────────
+            TimeRangeSelector(
+                selectedTab   = uiState.timeFrame.toTabIndex(),
+                onTabSelected = { viewModel.onTimeFrameSelected(it.toTimeFrame()) }
+            )
 
+            // ── Content tab (Chi tiêu / Phân tích) ──────────────────────────
             TabRow(
-                selectedTabIndex = selectedContentTab,
-                containerColor = MainBackground,
-                contentColor = StatPinkDark
+                selectedTabIndex = uiState.contentTab.ordinal,
+                containerColor   = MainBackground,
+                contentColor     = StatPinkDark
             ) {
                 Tab(
-                    selected = selectedContentTab == 0,
-                    onClick = { selectedContentTab = 0 },
-                    text = { Text("Chi tiêu", fontWeight = FontWeight.Bold) }
+                    selected = uiState.contentTab == ContentTab.EXPENSE,
+                    onClick  = { viewModel.onContentTabSelected(ContentTab.EXPENSE) },
+                    text     = { Text("Chi tiêu", fontWeight = FontWeight.Bold) }
                 )
                 Tab(
-                    selected = selectedContentTab == 1,
-                    onClick = { selectedContentTab = 1 },
-                    text = { Text("Phân tích", fontWeight = FontWeight.Bold) }
+                    selected = uiState.contentTab == ContentTab.ANALYSIS,
+                    onClick  = { viewModel.onContentTabSelected(ContentTab.ANALYSIS) },
+                    text     = { Text("Phân tích", fontWeight = FontWeight.Bold) }
                 )
             }
 
-            if (isBudgetExceeded) {
+            // ── Budget exceeded banner ───────────────────────────────────────
+            AnimatedVisibility(
+                visible = uiState.budget.isExceeded,
+                enter   = fadeIn(),
+                exit    = fadeOut()
+            ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF2F2)),
-                    shape = RoundedCornerShape(16.dp)
+                    colors   = CardDefaults.cardColors(containerColor = Color(0xFFFDF2F2)),
+                    shape    = RoundedCornerShape(16.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier          = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("⚠️", fontSize = 16.sp, modifier = Modifier.padding(end = 8.dp))
                         Text(
-                            text = "Chi tiêu hiện tại đã vượt quá ngân sách kỳ này!",
-                            color = Color(0xFF9B1C1C),
-                            fontSize = 12.sp,
+                            text       = "Chi tiêu hiện tại đã vượt quá ngân sách kỳ này!",
+                            color      = TextWarning,
+                            fontSize   = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
             }
 
-            if (selectedContentTab == 0) {
-                // ================== CHI TIÊU ==================
+            // ════════════════════════════════════════════════════════════════
+            // CHI TIÊU tab
+            // ════════════════════════════════════════════════════════════════
+            if (uiState.contentTab == ContentTab.EXPENSE) {
+
+                // ── Budget summary grid (tap to open budget dialog) ──────────
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            budgetInput = currentBudget.toInt().toString()
+                            val current = when (uiState.timeFrame) {
+                                TimeFrame.DAY   -> uiState.budget.daily
+                                TimeFrame.WEEK  -> uiState.budget.weekly
+                                TimeFrame.MONTH -> uiState.budget.monthly
+                                TimeFrame.YEAR  -> uiState.budget.yearly
+                            }
+                            budgetInput = current?.toInt()?.toString() ?: ""
                             showBudgetDialog = true
                         }
                 ) {
                     StatisticsSummaryGrid(
-                        totalMeals = "${currentBudget.toInt() / 1000}K",
-                        totalSpending = "${totalSpendingAmount.toInt() / 1000}K",
-                        averagePerMeal = if (isBudgetExceeded) "-${-remainingBudget.toInt() / 1000}K" else "${remainingBudget.toInt() / 1000}K"
+                        totalMeals    = uiState.budget.limit?.formatVndShort() ?: "—",
+                        totalSpending = uiState.summary.totalSpent.formatVndShort(),
+                        averagePerMeal = if (uiState.budget.hasLimit) {
+                            val rem = uiState.budget.remaining
+                            if (rem < 0) "-${(-rem).formatVndShort()}" else rem.formatVndShort()
+                        } else "—",
+                        label1 = "NGÂN SÁCH",
+                        label2 = "ĐÃ CHI",
+                        label3 = "CÒN LẠI"
                     )
                 }
 
-                ChartCard(
-                    title = "Chi tiêu theo buổi",
-                    data = listOf(Pair("Sáng", 20), Pair("Trưa", 40), Pair("Chiều", 60), Pair("Tối", 0))
-                )
-
-               //================== BIỂU ĐỒ TRÒN ==================
-                LocalDonutChartCard(
-                    title = "Tỷ trọng chi tiêu theo danh mục",
-                    categories = listOf(
-                        DonutSegment("Mì & Phở", 70000f, Color(0xFFE8AEB4)),
-                        DonutSegment("Cơm", 30000f, Color(0xFFFBE3B5)),
-                        DonutSegment("Nước uống", 20000f, Color(0xFFAED9E0))
+                // ── Bar chart: spend by session/day/month ────────────────────
+                if (uiState.barChartData.isNotEmpty()) {
+                    ChartCard(
+                        title = when (uiState.timeFrame) {
+                            TimeFrame.DAY   -> "Chi tiêu theo buổi"
+                            TimeFrame.WEEK  -> "Chi tiêu theo ngày"
+                            TimeFrame.MONTH -> "Chi tiêu theo ngày"
+                            TimeFrame.YEAR  -> "Chi tiêu theo tháng"
+                        },
+                        data = uiState.barChartData.map { bar ->
+                            bar.label to bar.value   // Double — no lossy toInt()
+                        }
                     )
-                )
+                }
 
-                PopularFoodCard(
-                    foodList = listOf(PopularFoodData(name = "Phở Hà Nội", recordCount = "1"))
-                )
-
-                DetailCardSection(
-                    dataGroups = listOf(
-                        DayGroup(
-                            dateLabel = "Thứ Sáu, 03/04",
-                            meals = listOf(
-                                MealRecord("15:20", "Phở Hà Nội", "Mì & Phở", "70k đ"),
-                                MealRecord("18:45", "Cơm tấm", "Cơm", "30k đ")
+                // ── Donut chart: spend by category ───────────────────────────
+                if (uiState.donutData.isNotEmpty()) {
+                    val donutColors = listOf(
+                        DonutSegment1,
+                        DonutSegment2,
+                        DonutSegment3,
+                        DonutSegment4,
+                        DonutSegment5,
+                        DonutSegment6,
+                        DonutSegment7,
+                        DonutSegment8
+                    )
+                    LocalDonutChartCard(
+                        title      = "Tỷ trọng chi tiêu theo danh mục",
+                        categories = uiState.donutData.mapIndexed { i, slice ->
+                            DonutSegment(
+                                label = slice.label,
+                                value = slice.value.toFloat(),
+                                color = donutColors[i % donutColors.size]
                             )
+                        }
+                    )
+                }
+
+                // ── Detail meal list ─────────────────────────────────────────
+                if (uiState.detailItems.isNotEmpty()) {
+                    val isWeeklyMode = uiState.timeFrame != TimeFrame.DAY
+                    DetailCardSection(
+                        dataGroups   = uiState.detailItems.toDetailDayGroups(isWeeklyMode),
+                        isWeeklyMode = isWeeklyMode
+                    )
+                } else {
+                    Box(
+                        modifier          = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment  = Alignment.Center
+                    ) {
+                        Text(
+                            text      = "Chưa có món ăn nào trong kỳ này",
+                            color     = TextLabelGray,
+                            fontSize  = 14.sp
                         )
-                    ),
-                    isWeeklyMode = isWeeklyMode
-                )
+                    }
+                }
+
             } else {
-                // ================== PHÂN TÍCH ==================
-                LocalLineTrendChartCard(
-                    title = "Dự báo xu hướng kỳ tới",
-                    points = listOf(45f, 70f, 110f, 130f)
-                )
+                // ════════════════════════════════════════════════════════════
+                // PHÂN TÍCH tab
+                // ════════════════════════════════════════════════════════════
+
+                if (uiState.trendForecast.points.size >= 3) {
+                    LocalLineTrendChartCard(
+                        title    = "Dự báo xu hướng kỳ tới",
+                        forecast = uiState.trendForecast
+                    )
+                }
+
+                // ── Wallet Destroyer ──────────────────────────────────────────
+                WalletDestroyerCard(item = uiState.walletDestroyer)
+
+                // ── Top categories by spend ───────────────────────────────────
+                if (uiState.topCategories.isNotEmpty()) {
+                    TopCategoriesCard(categories = uiState.topCategories)
+                }
 
                 Text(
-                    text = "CHỈ SỐ CHUYÊN SÂU",
-                    style = StatSectionTitleStyle,
-                    color = TextPrimaryStat,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    text      = "CHỈ SỐ CHUYÊN SÂU",
+                    style     = StatSectionTitleStyle,
+                    color     = TextPrimaryStat,
+                    fontSize  = 14.sp,
+                    modifier  = Modifier.padding(start = 4.dp, top = 4.dp)
                 )
 
                 InsightDashboardGrid(
-                    topFood = "Phở Hà Nội",
-                    topCategory = "Mì & Phở",
-                    variationText = "+15.4% (Tăng)"
+                    topFood       = uiState.walletDestroyer?.name ?: "—",
+                    topCategory   = uiState.topCategories.firstOrNull()?.let {
+                        "${it.iconUrl} ${it.name}"
+                    } ?: "—",
+                    variationText = uiState.summary.let { s ->
+                        if (s.previousPeriodTotal == 0.0) "—"
+                        else {
+                            val pct = s.percentChange
+                            val sign = if (pct >= 0) "+" else ""
+                            val trend = if (s.isIncrease) "Tăng" else "Giảm"
+                            "$sign${"%.1f".format(pct)}% ($trend)"
+                        }
+                    }
                 )
+
+                val insightText = buildInsightText(uiState)
+                InsightCard(insightText = insightText)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
 
-    // --- DIALOG ĐẶT NGÂN SÁCH ---
+    // ── Budget dialog ────────────────────────────────────────────────────────
     if (showBudgetDialog) {
+        val periodLabel = when (uiState.timeFrame) {
+            TimeFrame.DAY   -> "Ngày"
+            TimeFrame.WEEK  -> "Tuần"
+            TimeFrame.MONTH -> "Tháng"
+            TimeFrame.YEAR  -> "Năm"
+        }
         AlertDialog(
             onDismissRequest = { showBudgetDialog = false },
-            title = { Text("Đặt ngân sách " + when (selectedTab) { 1 -> "Tuần" 2 -> "Tháng" 3 -> "Năm" else -> "Ngày" }, fontWeight = FontWeight.Bold) },
+            title = {
+                Text("Đặt ngân sách $periodLabel", fontWeight = FontWeight.Bold)
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Hạn mức mong muốn (đ):")
                     OutlinedTextField(
-                        value = budgetInput,
+                        value         = budgetInput,
                         onValueChange = { budgetInput = it },
-                        label = { Text("Số tiền") },
-                        modifier = Modifier.fillMaxWidth()
+                        label         = { Text("Số tiền") },
+                        modifier      = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        val value = budgetInput.toFloatOrNull() ?: 0f
-                        when (selectedTab) {
-                            1 -> weeklyBudget = value
-                            2 -> monthlyBudget = value
-                            3 -> yearlyBudget = value
-                            else -> dailyBudget = value
-                        }
-                        showBudgetDialog = false
-                    }
-                ) { Text("Lưu lại") }
+                Button(onClick = {
+                    val value = budgetInput.toDoubleOrNull()
+                    viewModel.saveBudget(
+                        daily   = if (uiState.timeFrame == TimeFrame.DAY)   value else uiState.budget.daily,
+                        weekly  = if (uiState.timeFrame == TimeFrame.WEEK)  value else uiState.budget.weekly,
+                        monthly = if (uiState.timeFrame == TimeFrame.MONTH) value else uiState.budget.monthly,
+                        yearly  = if (uiState.timeFrame == TimeFrame.YEAR)  value else uiState.budget.yearly
+                    )
+                    showBudgetDialog = false
+                }) { Text("Lưu lại") }
             },
             dismissButton = {
                 Button(onClick = { showBudgetDialog = false }) { Text("Hủy") }
             }
         )
     }
+
+    // ── Calendar picker dialog ───────────────────────────────────────────────
+    if (showCalendarDialog) {
+        val anchor = uiState.anchorDate
+        if (anchor != null) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { showCalendarDialog = false }
+            ) {
+                DayPickerDialog(
+                    selectedYear       = anchor.year,
+                    selectedMonth      = anchor.monthNumber,
+                    onDateClick        = { day ->
+                        viewModel.onDateSelected(day)
+                        showCalendarDialog = false
+                    },
+                    onMonthYearChanged = { month, year ->
+                        viewModel.onYearMonthSelected(month, year)
+                    },
+                    hasDataDates       = uiState.datesWithData
+                )
+            }
+        }
+    }
 }
 
-@Preview(showSystemUi = true)
-@Composable
-fun StatisticsScreenPreview() {
-    FoodTrackerTheme {
-        StatisticsScreen()
+// ─── Mappers & helpers ────────────────────────────────────────────────────────
+
+/** Convert tab index (0..3) → [TimeFrame] */
+private fun Int.toTimeFrame(): TimeFrame = when (this) {
+    0    -> TimeFrame.DAY
+    1    -> TimeFrame.WEEK
+    2    -> TimeFrame.MONTH
+    else -> TimeFrame.YEAR
+}
+
+/** Convert [TimeFrame] → tab index for [TimeRangeSelector] */
+private fun TimeFrame.toTabIndex(): Int = when (this) {
+    TimeFrame.DAY   -> 0
+    TimeFrame.WEEK  -> 1
+    TimeFrame.MONTH -> 2
+    TimeFrame.YEAR  -> 3
+}
+
+/**
+ * Groups a flat [DetailItem] list into [DayGroup]s ready for [DetailCardSection].
+ *
+ * - DAY mode   : single group, no date header
+ * - other modes: one group per unique [DetailItem.dateLabel], ordered by date DESC
+ */
+private fun List<DetailItem>.toDetailDayGroups(isWeeklyMode: Boolean): List<DayGroup> {
+    if (isEmpty()) return emptyList()
+
+    return if (!isWeeklyMode) {
+        listOf(
+            DayGroup(
+                dateLabel = null,
+                meals     = map { it.toMealRecord() }
+            )
+        )
+    } else {
+        val ordered = LinkedHashMap<String, MutableList<DetailItem>>()
+        forEach { item ->
+            ordered.getOrPut(item.dateLabel) { mutableListOf() }.add(item)
+        }
+        ordered.map { (label, items) ->
+            DayGroup(
+                dateLabel = label,
+                meals     = items.map { it.toMealRecord() }
+            )
+        }
+    }
+}
+
+private fun DetailItem.toMealRecord(): MealRecord = MealRecord(
+    time      = timeLabel,
+    name      = name,
+    category  = categoryName,
+    price     = "${price.formatVndExact()} đ",
+    iconText  = categoryIconUrl,
+    imageUrl  = imageUrl
+)
+
+/** Generate a simple insight sentence from the current UiState. */
+private fun buildInsightText(state: StatisticsUiState): String {
+    val destroyer = state.walletDestroyer
+    val topCat    = state.topCategories.firstOrNull()
+
+    return when {
+        state.budget.isExceeded ->
+            "Bạn đã vượt ngân sách ${(-state.budget.remaining).formatVndShort()}đ — hãy điều chỉnh chi tiêu!"
+        destroyer != null ->
+            "\"${destroyer.name}\" là món tốn nhất kỳ này (${destroyer.price.formatVndShort()}đ)"
+        topCat != null ->
+            "Danh mục tốn nhiều nhất: ${topCat.iconUrl} ${topCat.name} (${topCat.total.formatVndShort()}đ)"
+        state.summary.itemCount == 0 ->
+            "Chưa có dữ liệu — hãy ghi nhật ký món ăn đầu tiên!"
+        state.summary.isIncrease ->
+            "Chi tiêu tăng ${"%.1f".format(state.summary.percentChange)}% so với kỳ trước"
+        else ->
+            "Chi tiêu giảm ${"%.1f".format(-state.summary.percentChange)}% so với kỳ trước 🎉"
     }
 }

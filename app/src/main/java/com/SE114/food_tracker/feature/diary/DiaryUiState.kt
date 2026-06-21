@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.diary
 
+import android.net.Uri
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -35,6 +36,7 @@ data class DiaryItem(
 
 data class DiaryUiState(
     val items: List<DiaryItem> = emptyList(),
+    val monthlyItems: List<DiaryItem> = emptyList(),
     val categories: List<DiaryCategory> = emptyList(),
     val selectedDate: LocalDate = currentLocalDate(),
     val selectedCategoryId: String? = null,
@@ -43,7 +45,10 @@ data class DiaryUiState(
     val itemCount: Int = 0,
     val streak: Int = 0,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    // Local URI of a picked/captured image waiting to be saved with the next item.
+    // Null when no image has been selected. Shown as a preview in FoodEntryScreen.
+    val pendingImageUri: Uri? = null
 ) {
     val selectedYear: Int = selectedDate.year
     val selectedMonth: Int = selectedDate.monthNumber

@@ -1,0 +1,39 @@
+package com.SE114.food_tracker.feature.friend.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.SE114.food_tracker.data.local.dao.FriendItemDto
+import com.SE114.food_tracker.core.designsystem.theme.*
+
+@Composable
+fun FriendListItem(friend: FriendItemDto, hasStory: Boolean, onUnfriend: (String) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ProfileAvatar(avatarUrl = friend.avatarUrl, hasStory = hasStory)
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Text(
+            text = friend.displayName,
+            color = TextPrimary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            modifier = Modifier.weight(1f)
+        )
+
+        IconButton(onClick = { onUnfriend(friend.friendshipId) }) {
+            Icon(Icons.Default.Clear, contentDescription = "Xóa", tint = HintGray)
+        }
+    }
+}

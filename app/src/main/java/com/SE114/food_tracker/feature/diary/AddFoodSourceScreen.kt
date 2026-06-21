@@ -1,5 +1,7 @@
 package com.SE114.food_tracker.feature.diary
 
+import android.content.Context
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,8 +14,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -25,33 +27,51 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.SE114.food_tracker.core.designsystem.theme.*
+import timber.log.Timber
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFoodSourceScreen(
     categories: List<DiaryCategory> = emptyList(),
     onBack: () -> Unit,
-    onCameraSelected: () -> Unit,
-    onGallerySelected: () -> Unit,
+    onImageCaptured: (Uri) -> Unit, // Callback truyền Uri hình ảnh vừa chụp/chọn lên cho màn hình cha
     onPresetSelected: (DiaryCategory) -> Unit = {},
     onManualSelected: () -> Unit = {}
 ) {
     var showPresetSheet by remember { mutableStateOf(false) }
     var showRecentSheet by remember { mutableStateOf(false) }
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) onGallerySelected()
+    val context = LocalContext.current
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    // ── XỬ LÝ PICK GALLERY TẠI ĐÂY ──────────────────────────────────────────
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onImageCaptured(uri)
+        }
     }
 
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) onCameraSelected()
+    // ── XỬ LÝ CHỤP CAMERA TẠI ĐÂY ──────────────────────────────────────────
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { isSuccess: Boolean ->
+        if (isSuccess) {
+            tempCameraUri?.let { uri ->
+                onImageCaptured(uri)
+            }
+        }
     }
 
     Surface(
@@ -83,13 +103,26 @@ fun AddFoodSourceScreen(
                     label = "Chụp ảnh",
                     icon = Icons.Outlined.PhotoCamera,
                     modifier = Modifier.weight(1f),
-                    onClick = { cameraLauncher.launch(null) }
+                    onClick = {
+                        runCatching { createTempImageUri(context) }
+                            .onSuccess { uri ->
+                                tempCameraUri = uri
+                                cameraLauncher.launch(uri)
+                            }
+                            .onFailure { e ->
+                                Timber.e(e, "Không tạo được file tạm để chụp ảnh")
+                            }
+                    }
                 )
                 SourceCard(
                     label = "Thư viện",
                     icon = Icons.Outlined.Image,
                     modifier = Modifier.weight(1f),
-                    onClick = { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                    onClick = {
+                        galleryLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
                 )
             }
 
@@ -151,8 +184,8 @@ fun AddFoodSourceScreen(
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp), // Thu hẹp khoảng cách ngang
-                        verticalArrangement = Arrangement.spacedBy(14.dp), // Thu hẹp khoảng cách dọc
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.fillMaxSize().padding(bottom = 32.dp)
                     ) {
                         items(categories) { category ->
@@ -166,18 +199,18 @@ fun AddFoodSourceScreen(
                                         onPresetSelected(category)
                                         onManualSelected()
                                     }
-                                    .padding(vertical = 12.dp, horizontal = 4.dp) // Làm item nhỏ nhắn lại
+                                    .padding(vertical = 12.dp, horizontal = 4.dp)
                             ) {
-                                Text(category.iconUrl ?: "🍽️", fontSize = 26.sp) // Thu nhỏ emoji
+                                Text(category.iconUrl ?: "🍽️", fontSize = 26.sp)
                                 Spacer(Modifier.height(8.dp))
                                 Text(
                                     text = category.name,
-                                    fontSize = 10.sp, // Thu nhỏ font chữ
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Medium,
                                     textAlign = TextAlign.Center,
                                     color = Color.DarkGray,
-                                    maxLines = 1, // Ép chỉ hiển thị 1 dòng
-                                    overflow = TextOverflow.Ellipsis // Nếu tên dài quá thì cắt thành "..."
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -216,6 +249,22 @@ fun AddFoodSourceScreen(
             }
         }
     }
+}
+
+private fun createTempImageUri(context: Context): Uri {
+    val tempFile = File.createTempFile(
+        "JPEG_${System.currentTimeMillis()}_",
+        ".jpg",
+        context.cacheDir
+    ).apply {
+        createNewFile()
+        deleteOnExit()
+    }
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        tempFile
+    )
 }
 
 @Composable
@@ -277,22 +326,5 @@ fun QuickActionItem(title: String, subtitle: String, icon: ImageVector, iconBgCo
             }
             Icon(Icons.Default.ChevronRight, null, tint = Color.LightGray)
         }
-    }
-}
-
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun AddFoodSourcePreview() {
-    FoodTrackerTheme {
-        AddFoodSourceScreen(
-            categories = listOf(
-                DiaryCategory("1", "Cơm", "🍚", isSystem = true),
-                DiaryCategory("2", "Phở", "🍜", isSystem = true),
-                DiaryCategory("3", "Bánh mì", "🥖", isSystem = true),
-                DiaryCategory("4", "Đồ uống", "🥤", isSystem = true),
-                DiaryCategory("5", "Tráng miệng", "🍰", isSystem = true)
-            ),
-            onBack = {}, onCameraSelected = {}, onGallerySelected = {}
-        )
     }
 }

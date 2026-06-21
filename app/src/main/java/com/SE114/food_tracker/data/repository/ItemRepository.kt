@@ -5,6 +5,7 @@ import com.SE114.food_tracker.data.local.dao.CategoryExpense
 import com.SE114.food_tracker.data.local.dao.ItemDAO
 import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.feature.diary.DiaryItem
+import com.SE114.food_tracker.core.sync.SyncStatus
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,8 @@ class ItemRepository @Inject constructor(
     fun getAllItems(): Flow<List<Item>> = itemDAO.getAllItems()
 
     fun getCurrentUserId(): String? = supabaseClient.auth.currentUserOrNull()?.id
+
+    suspend fun getItemByIdOneShot(id: String): Item? = itemDAO.getItemByIdOneShot(id)
 
     fun getItemsByDay(start: Long, end: Long): Flow<List<Item>> =
         itemDAO.getItemsByDay(start, end)
@@ -61,13 +64,19 @@ class ItemRepository @Inject constructor(
 
     suspend fun insert(item: Item) {
         val pendingItem = item.copy(
-            syncStatus = com.SE114.food_tracker.core.sync.SyncStatus.PENDING.name,
+            syncStatus = SyncStatus.PENDING.name,
             updatedAt = System.currentTimeMillis()
         )
         itemDAO.insertItem(pendingItem)
     }
 
-    suspend fun update(item: Item) = itemDAO.updateItem(item)
+    suspend fun update(item: Item) {
+        val pendingItem = item.copy(
+            syncStatus = SyncStatus.PENDING.name,
+            updatedAt  = System.currentTimeMillis()
+        )
+        itemDAO.updateItem(pendingItem)
+    }
 
     suspend fun delete(item: Item) = itemDAO.deleteItem(item)
 

@@ -11,5 +11,6 @@ data class CategoryDTO(
     @SerialName("icon_url")   val iconUrl: String,
     @SerialName("is_hidden")  val isHidden: Boolean = false,
     @SerialName("is_system")  val isSystem: Boolean = false,
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
     @SerialName("created_at") val createdAt: String
 )
