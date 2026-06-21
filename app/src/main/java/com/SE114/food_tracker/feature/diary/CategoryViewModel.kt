@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.diary
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.sync.SyncStatus
 import com.SE114.food_tracker.data.local.entities.Category
 import com.SE114.food_tracker.data.repository.CategoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,6 +36,8 @@ class CategoryViewModel @Inject constructor(
                 initialValue = emptyList()
             )
 
+    // All categories (including hidden) — feeds the "manage categories" sheet so a
+    // hidden category can still be found and un-hidden there.
     val allCategories: StateFlow<List<DiaryCategory>> =
         categoryRepository.getAllCategories()
             .map { categories -> categories.map { it.toDiaryCategory() } }
@@ -64,9 +67,35 @@ class CategoryViewModel @Inject constructor(
                         iconUrl    = iconUrl,
                         isHidden   = false,
                         isSystem   = false,
-                        syncStatus = "PENDING",
+                        syncStatus = SyncStatus.PENDING.name,
                         createdAt  = now,
                         updatedAt  = now
+                    )
+                )
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
+    fun editCategory(category: DiaryCategory, newName: String, newIconUrl: String) {
+        if (category.isSystem) {
+            _error.value = "Danh mục hệ thống không thể chỉnh sửa."
+            return
+        }
+        val trimmedName = newName.trim()
+        if (trimmedName.isBlank()) {
+            _error.value = "Tên danh mục không được để trống."
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                val existing = categoryRepository.getCategoryByIdOneShot(category.categoryId)
+                    ?: error("Không tìm thấy danh mục để cập nhật")
+                categoryRepository.updateCategory(
+                    existing.copy(
+                        name       = trimmedName,
+                        iconUrl    = newIconUrl,
+                        syncStatus = SyncStatus.PENDING.name,
+                        updatedAt  = System.currentTimeMillis()
                     )
                 )
             }.onFailure { _error.value = it.message }
@@ -79,29 +108,6 @@ class CategoryViewModel @Inject constructor(
                 categoryRepository.updateCategoryVisibility(
                     categoryId = category.categoryId,
                     isHidden = !category.isHidden
-                )
-            }.onFailure { _error.value = it.message }
-        }
-    }
-
-    fun updateCategory(category: DiaryCategory, name: String, iconUrl: String) {
-        if (category.isSystem) {
-            _error.value = "Danh mục hệ thống không thể chỉnh sửa."
-            return
-        }
-
-        val trimmedName = name.trim()
-        if (trimmedName.isBlank()) {
-            _error.value = "Tên danh mục không được để trống."
-            return
-        }
-
-        viewModelScope.launch {
-            runCatching {
-                categoryRepository.updateCustomCategoryDetails(
-                    categoryId = category.categoryId,
-                    name = trimmedName,
-                    iconUrl = iconUrl
                 )
             }.onFailure { _error.value = it.message }
         }
@@ -128,15 +134,6 @@ class CategoryViewModel @Inject constructor(
 
     private fun Category.toDiaryCategory(): DiaryCategory =
         DiaryCategory(
-            categoryId = categoryId,
-            name       = name,
-            iconUrl    = iconUrl,
-            isHidden   = isHidden,
-            isSystem   = isSystem
-        )
-
-    private fun DiaryCategory.toEntity(): Category =
-        Category(
             categoryId = categoryId,
             name       = name,
             iconUrl    = iconUrl,
