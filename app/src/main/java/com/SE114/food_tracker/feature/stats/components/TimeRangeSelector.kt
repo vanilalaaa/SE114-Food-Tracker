@@ -49,13 +49,13 @@ fun TimeRangeSelector(
                     text = text,
                     style = if (isActive) StatTabActiveStyle else StatTabInactiveStyle,
                     modifier = Modifier
+                        .padding(vertical = 4.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
                             onTabSelected(index)
                         }
-                        .padding(vertical = 4.dp)
                 )
             }
         }

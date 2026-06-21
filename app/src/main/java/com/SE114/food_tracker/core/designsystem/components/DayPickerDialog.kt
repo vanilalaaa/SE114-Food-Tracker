@@ -1,7 +1,6 @@
-package com.SE114.food_tracker.feature.diary.components
+package com.SE114.food_tracker.core.designsystem.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -9,69 +8,43 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
-import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
-import com.SE114.food_tracker.feature.diary.DiaryItem
 import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
-import kotlinx.datetime.toLocalDateTime
 
 @Composable
-fun CalendarCard(
+fun DayPickerDialog(
     selectedYear: Int,
     selectedMonth: Int,
     onDateClick: (Int) -> Unit,
+    onMonthYearChanged: (month: Int, year: Int) -> Unit,
     hasDataDates: List<Int> = emptyList(),
-    monthlyItems: List<DiaryItem> = emptyList(),
     scale: Float = 1f
 ) {
     val days = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
     val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
-    val previewsByDay = remember(selectedYear, selectedMonth, monthlyItems) {
-        monthlyItems
-            .filter { item ->
-                val date = Instant.fromEpochMilliseconds(item.entryDate)
-                    .toLocalDateTime(TimeZone.UTC)
-                    .date
-                date.year == selectedYear && date.monthNumber == selectedMonth
-            }
-            .groupBy { item ->
-                Instant.fromEpochMilliseconds(item.entryDate)
-                    .toLocalDateTime(TimeZone.UTC)
-                    .date
-                    .dayOfMonth
-            }
-            .mapValues { (_, items) ->
-                items
-                    .sortedByDescending { it.createdAt }
-                    .map { item ->
-                        CalendarFoodPreview(
-                            imageUrl = item.imageUrl,
-                            fallback = item.categoryIconUrl
-                                .ifBlank { item.categoryName.firstOrNull()?.uppercase() ?: "?" }
-                        )
-                    }
-            }
-    }
+
+    var showMonthPicker by remember { mutableStateOf(false) }
 
     val calendarGridItems = remember(selectedYear, selectedMonth) {
         val firstDayOfMonth = LocalDate(selectedYear, selectedMonth, 1)
@@ -80,22 +53,96 @@ fun CalendarCard(
         val nextMonth = if (selectedMonth == 12) 1 else selectedMonth + 1
         val nextMonthYear = if (selectedMonth == 12) selectedYear + 1 else selectedYear
         val firstDayOfNextMonth = LocalDate(nextMonthYear, nextMonth, 1)
-        val lastDayOfMonth = firstDayOfNextMonth.minus(kotlinx.datetime.DatePeriod(days = 1)).dayOfMonth
+        val lastDayOfMonth = firstDayOfNextMonth.minus(DatePeriod(days = 1)).dayOfMonth
 
         List(emptySlotsBefore) { null } + (1..lastDayOfMonth).toList()
+    }
+
+    // Helper: compute prev/next month+year without going out of bounds
+    fun prevMonth(): Pair<Int, Int> =
+        if (selectedMonth == 1) 12 to selectedYear - 1
+        else selectedMonth - 1 to selectedYear
+
+    fun nextMonth(): Pair<Int, Int> =
+        if (selectedMonth == 12) 1 to selectedYear + 1
+        else selectedMonth + 1 to selectedYear
+
+    if (showMonthPicker) {
+        MonthYearPickerDialog(
+            currentMonth = selectedMonth,
+            currentYear  = selectedYear,
+            onDismiss    = { showMonthPicker = false },
+            onConfirm    = { month, year ->
+                showMonthPicker = false
+                onMonthYearChanged(month, year)
+            }
+        )
     }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 16.dp)
-            .height(410.dp),
+            .height(450.dp),          // +40dp to accommodate the new header row
         shape = RoundedCornerShape(28.dp),
         color = Color.White,
         shadowElevation = 8.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
+            // ── Month-year navigation header ─────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    val (m, y) = prevMonth()
+                    onMonthYearChanged(m, y)
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowLeft,
+                        contentDescription = "Tháng trước",
+                        tint = Color.Black
+                    )
+                }
+
+                // Clickable "tháng 6 2026 ▼" label
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showMonthPicker = true }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "tháng $selectedMonth $selectedYear",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Chọn tháng/năm",
+                        tint = Color.Black
+                    )
+                }
+
+                IconButton(onClick = {
+                    val (m, y) = nextMonth()
+                    onMonthYearChanged(m, y)
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowRight,
+                        contentDescription = "Tháng sau",
+                        tint = Color.Black
+                    )
+                }
+            }
+
+            // ── Day-of-week header row ────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
@@ -120,9 +167,10 @@ fun CalendarCard(
             ) {
                 items(calendarGridItems) { date ->
                     if (date != null) {
-                        val isToday = (date == today.dayOfMonth && selectedMonth == today.monthNumber && selectedYear == today.year)
-                        val dayPreviews = previewsByDay[date].orEmpty()
-                        val hasData = dayPreviews.isNotEmpty() || hasDataDates.contains(date)
+                        val isToday = (date == today.dayOfMonth
+                                && selectedMonth == today.monthNumber
+                                && selectedYear == today.year)
+                        val hasData = hasDataDates.contains(date)
 
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -162,11 +210,24 @@ fun CalendarCard(
 
                             Spacer(Modifier.height(4.dp))
 
-                            FoodPreviewStack(
-                                previews = dayPreviews,
-                                hasData = hasData,
-                                scale = scale
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size((24 * scale).dp)
+                                    .background(
+                                        if (hasData) Color.White else Color.Transparent,
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (hasData) {
+                                    Icon(
+                                        Icons.Default.Restaurant,
+                                        null,
+                                        modifier = Modifier.size((12 * scale).dp),
+                                        tint = OrangeMain
+                                    )
+                                }
+                            }
                         }
                     } else {
                         Spacer(modifier = Modifier.size(36.dp))
@@ -177,94 +238,15 @@ fun CalendarCard(
     }
 }
 
-@Composable
-private fun FoodPreviewStack(
-    previews: List<CalendarFoodPreview>,
-    hasData: Boolean,
-    scale: Float
-) {
-    if (!hasData) {
-        Spacer(modifier = Modifier.height(42.dp))
-        return
-    }
-
-    val avatarSize = (30f * scale.coerceIn(0.9f, 1.15f)).dp
-    val horizontalStep = (avatarSize.value * 0.56f).dp
-    val verticalStep = (avatarSize.value * 0.44f).dp
-    val stackWidth = (avatarSize.value + horizontalStep.value * 1.5f).dp
-    val stackHeight = (avatarSize.value + verticalStep.value).dp
-
-    Box(
-        modifier = Modifier.size(width = stackWidth, height = stackHeight),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        previews.take(4).forEachIndexed { index, preview ->
-            val xOffset = when (index) {
-                0 -> 0.dp
-                1 -> horizontalStep
-                2 -> (horizontalStep.value * 0.5f).dp
-                else -> (horizontalStep.value * 1.5f).dp
-            }
-            val yOffset = if (index < 2) 0.dp else verticalStep
-
-            CalendarFoodAvatar(
-                preview = preview,
-                size = avatarSize,
-                modifier = Modifier
-                    .offset(x = xOffset, y = yOffset)
-                    .zIndex(index.toFloat())
-            )
-        }
-    }
-}
-
-@Composable
-private fun CalendarFoodAvatar(
-    preview: CalendarFoodPreview,
-    size: Dp,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(LightPeach)
-            .border(2.dp, Color.White, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        if (!preview.imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = preview.imageUrl,
-                contentDescription = "Ảnh món ăn",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Text(
-                text = preview.fallback,
-                color = OrangeMain,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-private data class CalendarFoodPreview(
-    val imageUrl: String?,
-    val fallback: String
-)
-
 @Preview(showBackground = true)
 @Composable
-fun CalendarCardPreview() {
+fun DayPickerDialog() {
     FoodTrackerTheme {
-        CalendarCard(
-            selectedYear = 2026,
-            selectedMonth = 6,
-            onDateClick = {}
+        DayPickerDialog(
+            selectedYear       = 2026,
+            selectedMonth      = 6,
+            onDateClick        = {},
+            onMonthYearChanged = { _, _ -> }
         )
     }
 }
