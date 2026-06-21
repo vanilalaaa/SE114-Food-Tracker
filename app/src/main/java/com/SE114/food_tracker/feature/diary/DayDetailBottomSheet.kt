@@ -37,6 +37,7 @@ import com.SE114.food_tracker.feature.diary.components.PrimaryButton
 import com.SE114.food_tracker.feature.diary.components.StatBox
 import com.SE114.food_tracker.feature.diary.components.getEmojiByName
 import kotlinx.datetime.LocalDate
+import com.SE114.food_tracker.core.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,11 +86,7 @@ fun DayDetailBottomSheetContent(
     val scrollState = rememberScrollState()
 
     val totalEntry = items.sumOf { it.price }
-    val displayTotal = if (totalEntry >= 1000) {
-        "${(totalEntry / 1000).toInt()}k đ"
-    } else {
-        "${totalEntry.toInt()}k đ"
-    }
+    val displayTotal = totalEntry.formatVndShort()
 
     val dayOfWeekLabel = when (selectedDate.dayOfWeek.ordinal) {
         0 -> "Thứ Hai"
