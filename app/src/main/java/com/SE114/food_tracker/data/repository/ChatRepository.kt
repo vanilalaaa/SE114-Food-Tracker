@@ -55,6 +55,17 @@ class ChatRepository @Inject constructor(
         @SerialName("wallet_id") val walletId: String? = null
     )
 
+    // 🔥 DTO DÀNH RIÊNG CHO TÍNH NĂNG BÁO CÁO (REPORT)
+    @Serializable
+    data class SupabaseReportDto(
+        @SerialName("id") val id: String? = null,
+        @SerialName("reporter_id") val reporterId: String,
+        @SerialName("target_id") val targetId: String,
+        @SerialName("reason") val reason: String,
+        @SerialName("note") val note: String?,
+        @SerialName("status") val status: String = "pending"
+    )
+
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
 
     // Quản lý danh sách các phòng chat đang kết nối realtime bằng Map thay vì biến đơn
@@ -431,7 +442,7 @@ class ChatRepository @Inject constructor(
     suspend fun executeWalletTransaction(
         conversationId: String,
         amount: Double,
-        txType: String, // Nhận diện rõ ràng: "deposit", "withdrawal", "purchase"
+        txType: String,
         note: String,
         itemId: String? = null
     ): Boolean {
@@ -526,6 +537,48 @@ class ChatRepository @Inject constructor(
         } catch (e: Exception) {
             println("Lỗi lấy lịch sử giao dịch từ server: ${e.localizedMessage}")
             emptyList()
+        }
+    }
+
+    // ── BÁO CÁO (REPORT) ──
+
+    // 1. Kiểm tra xem mình đã từng báo cáo mục tiêu này trước đây chưa để hiện cảnh báo trên UI
+    suspend fun checkIfAlreadyReported(targetId: String): Boolean {
+        return try {
+            val currentUserId = getAuthenticatedUserId()
+            val response = supabaseClient.from("reports").select {
+                filter {
+                    eq("reporter_id", currentUserId)
+                    eq("target_id", targetId)
+                }
+            }.decodeList<SupabaseReportDto>()
+            response.isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // 2. Thực hiện chèn một dòng báo cáo mới ẩn danh lên máy chủ Supabase
+    suspend fun submitReport(targetId: String, reason: String, note: String?): Boolean {
+        return try {
+            val currentUserId = getAuthenticatedUserId()
+
+            // Không tự báo cáo chính mình (Check Constraint phía Client)
+            if (currentUserId == targetId) return false
+
+            val reportDto = SupabaseReportDto(
+                reporterId = currentUserId,
+                targetId = targetId,
+                reason = reason,
+                note = note,
+                status = "pending"
+            )
+
+            supabaseClient.from("reports").insert(reportDto)
+            true
+        } catch (e: Exception) {
+            println("Lỗi luồng xử lý đẩy dữ liệu báo cáo lên server: ${e.localizedMessage}")
+            false
         }
     }
 

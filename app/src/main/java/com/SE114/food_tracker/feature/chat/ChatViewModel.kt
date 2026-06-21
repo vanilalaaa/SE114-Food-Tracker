@@ -32,7 +32,6 @@ class ChatViewModel @Inject constructor(
         get() = chatRepository.getAuthenticatedUserId()
 
     // ── STATE QUẢN LÝ DỮ LIỆU QUỸ NHÓM THẬT CHO UI QUAN SÁT ──
-    // Đọc trạng thái động từ Companion Object tĩnh để không bị reset khi nhấn Back
     var walletBalance by mutableStateOf(mockBalance)
         private set
 
@@ -40,6 +39,9 @@ class ChatViewModel @Inject constructor(
         _mockWalletTransactions.asStateFlow()
 
     var isTransactionSuccess by mutableStateOf<Boolean?>(null)
+        private set
+
+    var isAlreadyReported by mutableStateOf(false)
         private set
 
     // KHỐI BỘ NHỚ TĨNH (COMPANION OBJECT) BẢO VỆ DỮ LIỆU KHÔNG BỊ RESET KHI THOÁT RA VÀO LẠI
@@ -173,10 +175,8 @@ class ChatViewModel @Inject constructor(
         return chatDAO.getAllConversations()
     }
 
-
     // Hàm gọi bốc số dư và lịch sử giao dịch thật từ Server về máy
     fun loadWalletData(conversationId: String) {
-        // Nếu là phòng test mock data, giữ nguyên dữ liệu tĩnh, không ghi đè dữ liệu rỗng từ server lên
         if (conversationId == "phong_test_114") {
             walletBalance = mockBalance
             return
@@ -189,7 +189,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-
     // Hàm xử lý kích hoạt giao dịch từ Giao diện gửi lên
     fun executeWalletTransaction(
         conversationId: String,
@@ -198,7 +197,6 @@ class ChatViewModel @Inject constructor(
         note: String
     ) {
         viewModelScope.launch {
-            // NẾU LÀ PHÒNG TEST MOCK DATA: Giữ nguyên logic cũ cho phòng mồi để kiểm thử UI
             if (conversationId == "phong_test_114") {
                 val finalAmount = if (isDeposit) amount else -amount
                 mockBalance += finalAmount
@@ -216,17 +214,16 @@ class ChatViewModel @Inject constructor(
             } else {
                 val transactionType = if (isDeposit) "deposit" else "withdrawal"
 
-                // Gọi sang hàm RPC thật bảo mật chống tranh chấp trên Supabase
                 val success = chatRepository.executeWalletTransaction(
                     conversationId = conversationId,
                     amount = amount,
                     txType = transactionType,
                     note = note,
-                    itemId = null // Giao dịch nộp/rút trực tiếp từ màn hình Ví không gắn với món ăn cụ thể
+                    itemId = null
                 )
 
                 if (success) {
-                    loadWalletData(conversationId) // Tải lại số dư và lịch sử giao dịch thật mới nhất từ server
+                    loadWalletData(conversationId)
                 }
                 isTransactionSuccess = success
             }
@@ -235,6 +232,23 @@ class ChatViewModel @Inject constructor(
 
     fun resetTransactionStatus() {
         isTransactionSuccess = null
+    }
+
+    // ── BÁO CÁO (REPORT) ──
+
+    // Kiểm tra xem reporter hiện tại đã từng gửi báo cáo cho mục tiêu này chưa để gài cảnh báo lên UI
+    fun checkReportStatus(targetId: String) {
+        viewModelScope.launch {
+            isAlreadyReported = chatRepository.checkIfAlreadyReported(targetId)
+        }
+    }
+
+    // Gửi báo cáo thật lên Supabase và nhận kết quả thông qua callback lambda để Toast
+    fun sendReport(targetId: String, reason: String, note: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = chatRepository.submitReport(targetId, reason, note.ifBlank { null })
+            onResult(success)
+        }
     }
 
     private fun formatToTime(timestamp: Long): String {
