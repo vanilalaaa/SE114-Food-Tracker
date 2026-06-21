@@ -25,6 +25,9 @@ class CategoryRepository @Inject constructor(
     suspend fun updateCustomCategoryDetails(categoryId: String, name: String, iconUrl: String) =
         categoryDAO.updateCustomCategoryDetails(categoryId, name, iconUrl)
 
+    suspend fun updateCategoryVisibility(categoryId: String, isHidden: Boolean) =
+        categoryDAO.updateCategoryVisibility(categoryId, isHidden)
+
     suspend fun countActiveItemsForCategory(categoryId: String): Int =
         categoryDAO.countActiveItemsForCategory(categoryId)
 

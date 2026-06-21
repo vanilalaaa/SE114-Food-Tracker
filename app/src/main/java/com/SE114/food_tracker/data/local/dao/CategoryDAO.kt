@@ -23,6 +23,16 @@ interface CategoryDAO {
         updatedAt: Long = System.currentTimeMillis()
     )
 
+    @Query(
+        "UPDATE category SET is_hidden = :isHidden, sync_status = 'PENDING', updated_at = :updatedAt " +
+            "WHERE category_id = :categoryId AND is_deleted = 0"
+    )
+    suspend fun updateCategoryVisibility(
+        categoryId: String,
+        isHidden: Boolean,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
     // Soft-delete: marks is_deleted = 1 and queues for sync. Only for custom (is_system = false).
     @Query("UPDATE category SET is_deleted = 1, sync_status = 'PENDING', updated_at = :updatedAt WHERE category_id = :categoryId AND is_system = 0")
     suspend fun softDeleteCategory(categoryId: String, updatedAt: Long = System.currentTimeMillis())

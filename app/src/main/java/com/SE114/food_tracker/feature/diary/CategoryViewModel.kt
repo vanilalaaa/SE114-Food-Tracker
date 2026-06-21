@@ -35,6 +35,19 @@ class CategoryViewModel @Inject constructor(
                 initialValue = emptyList()
             )
 
+    val allCategories: StateFlow<List<DiaryCategory>> =
+        categoryRepository.getAllCategories()
+            .map { categories -> categories.map { it.toDiaryCategory() } }
+            .catch { throwable ->
+                _error.value = throwable.message
+                emit(emptyList())
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+
     fun addCategory(name: String, iconUrl: String) {
         val userId = categoryRepository.getCurrentUserId()
         if (userId == null) {
@@ -63,8 +76,9 @@ class CategoryViewModel @Inject constructor(
     fun toggleVisibility(category: DiaryCategory) {
         viewModelScope.launch {
             runCatching {
-                categoryRepository.updateCategory(
-                    category.toEntity().copy(isHidden = !category.isHidden)
+                categoryRepository.updateCategoryVisibility(
+                    categoryId = category.categoryId,
+                    isHidden = !category.isHidden
                 )
             }.onFailure { _error.value = it.message }
         }
