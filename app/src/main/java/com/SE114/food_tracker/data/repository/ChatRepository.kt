@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,6 +30,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonObject
 
 @Singleton
 class ChatRepository @Inject constructor(
@@ -55,33 +59,34 @@ class ChatRepository @Inject constructor(
         @SerialName("wallet_id") val walletId: String? = null
     )
 
-    // 🔥 DTO DÀNH RIÊNG CHO TÍNH NĂNG BÁO CÁO (REPORT)
     @Serializable
-    data class SupabaseReportDto(
-        @SerialName("id") val id: String? = null,
-        @SerialName("reporter_id") val reporterId: String,
-        @SerialName("target_id") val targetId: String,
-        @SerialName("reason") val reason: String,
-        @SerialName("note") val note: String?,
-        @SerialName("status") val status: String = "pending"
+    data class SupabaseParticipantDto(
+        @SerialName("conversation_id") val conversationId: String,
+        @SerialName("user_id") val userId: String,
+        @SerialName("is_admin") val isAdmin: Boolean
+    )
+    @Serializable
+    data class ProfileNameDto(
+        @SerialName("display_name") val displayName: String? = null
     )
 
+    @Serializable
+    data class GroupMemberResponseDto(
+        @SerialName("user_id") val userId: String,
+        @SerialName("profiles") val profiles: ProfileNameDto? = null
+    )
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
-
-    // Quản lý danh sách các phòng chat đang kết nối realtime bằng Map thay vì biến đơn
     private val activeChannels = mutableMapOf<String, RealtimeChannel>()
 
     private fun parseServerTimeToLong(serverTimeStr: String?): Long {
         if (serverTimeStr.isNullOrBlank()) return System.currentTimeMillis()
         return try {
-            val sdf =
-                java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", java.util.Locale.US)
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", java.util.Locale.US)
             val date = sdf.parse(serverTimeStr)
             date?.time ?: System.currentTimeMillis()
         } catch (e: Exception) {
             try {
-                val sdfBackup =
-                    java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+                val sdfBackup = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
                 val date = sdfBackup.parse(serverTimeStr)
                 date?.time ?: System.currentTimeMillis()
             } catch (e2: Exception) {
@@ -91,7 +96,7 @@ class ChatRepository @Inject constructor(
     }
 
     fun getAuthenticatedUserId(): String {
-        return supabaseClient.auth.currentUserOrNull()?.id ?: "vy_id"
+        return supabaseClient.auth.currentUserOrNull()?.id?.lowercase() ?: ""
     }
 
     fun getMessagesStream(conversationId: String): Flow<List<Message>> {
@@ -105,35 +110,33 @@ class ChatRepository @Inject constructor(
     suspend fun fetchAndSaveConversationsToLocal() {
         try {
             val currentUserId = getAuthenticatedUserId()
+            if (currentUserId.isBlank()) {
+                println("CẢNH BÁO: Không thể fetch phòng chat vì currentUserId đang trống!")
+                return
+            }
+
             val myParticipations = supabaseClient.from("conversation_participant")
                 .select {
                     filter { eq("user_id", currentUserId) }
                 }.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
 
             myParticipations.forEach { part ->
-                val convId =
-                    part["conversation_id"]?.toString()?.replace("\"", "") ?: return@forEach
+                val convId = part["conversation_id"]?.toString()?.replace("\"", "") ?: return@forEach
                 try {
+                    // 🔥 ĐA FIX: Dùng trực tiếp DTO Class thay vì dùng Map thô để tránh dấu nháy kép bọc tên nhóm
                     val response = supabaseClient.from("conversation")
                         .select {
                             filter { eq("id", convId) }
-                        }.decodeSingle<Map<String, kotlinx.serialization.json.JsonElement>>()
-
-                    val cName = response["name"]?.toString()?.replace("\"", "")?.let {
-                        if (it == "null") null else it
-                    }
-                    val cIsGroup = response["is_group"]?.toString()?.toBoolean() ?: false
-                    val cWalletId = response["wallet_id"]?.toString()?.replace("\"", "")?.let {
-                        if (it == "null") null else it
-                    }
+                        }.decodeSingle<SupabaseConversationDto>()
 
                     val localConversation = LocalConversation(
-                        id = convId,
-                        name = cName ?: "Trò chuyện 1-1",
-                        isGroup = cIsGroup,
-                        walletId = cWalletId ?: "wallet_default"
+                        id = response.id,
+                        name = response.name ?: "Trò chuyện 1-1",
+                        isGroup = response.isGroup,
+                        walletId = response.walletId ?: "wallet_default"
                     )
                     chatDAO.insertConversation(localConversation)
+                    println("Đồng bộ thành công phòng chat local: ${response.name}")
                 } catch (e: Exception) {
                     println("Lỗi bốc chi tiết phòng chat $convId: ${e.localizedMessage}")
                 }
@@ -151,17 +154,23 @@ class ChatRepository @Inject constructor(
 
             try {
                 val channel = supabaseClient.channel("chat_channel_$conversationId")
-                val changeFlow =
-                    channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-                        table = "message"
-                    }
 
+                // 1. Luồng nghe tin nhắn mới công vụ
+                val changeFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    table = "message"
+                }
+
+                // 🔥 2. ĐÃ FIX: Thêm luồng lắng nghe UPDATE bảng conversation để đổi tên nhóm realtime!
+                val conversationUpdateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                    table = "conversation"
+                }
+
+                // Lắng nghe tin nhắn
                 repositoryScope.launch {
                     changeFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
                         val currentUserId = getAuthenticatedUserId()
 
-                        // Kiểm tra tin nhắn có thuộc về phòng chat này hay không
                         if (dto.conversationId == conversationId && dto.senderId != currentUserId) {
                             val incomingMessage = Message(
                                 localId = dto.id ?: UUID.randomUUID().toString(),
@@ -175,6 +184,23 @@ class ChatRepository @Inject constructor(
                                 createdAt = parseServerTimeToLong(dto.createdAt)
                             )
                             chatDAO.insertMessage(incomingMessage)
+                        }
+                    }
+                }
+
+                // 🔥 Lắng nghe đổi tên nhóm realtime dội về từ server
+                repositoryScope.launch {
+                    conversationUpdateFlow.collect { action ->
+                        val updatedDto = action.decodeRecord<SupabaseConversationDto>()
+                        if (updatedDto.id == conversationId) {
+                            val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
+                            currentConv?.let {
+                                chatDAO.insertConversation(it.copy(
+                                    name = updatedDto.name ?: it.name,
+                                    walletId = updatedDto.walletId ?: it.walletId
+                                ))
+                                println("Realtime: Đã cập nhật live tên nhóm mới: ${updatedDto.name}")
+                            }
                         }
                     }
                 }
@@ -272,16 +298,8 @@ class ChatRepository @Inject constructor(
                 .insert(mapOf("id" to newChatUuid, "is_group" to false, "name" to null))
 
             val participantRows = listOf(
-                mapOf(
-                    "conversation_id" to newChatUuid,
-                    "user_id" to currentUserId,
-                    "is_admin" to false
-                ),
-                mapOf(
-                    "conversation_id" to newChatUuid,
-                    "user_id" to friendUserId,
-                    "is_admin" to false
-                )
+                mapOf("conversation_id" to newChatUuid, "user_id" to currentUserId, "is_admin" to false),
+                mapOf("conversation_id" to newChatUuid, "user_id" to friendUserId, "is_admin" to false)
             )
             supabaseClient.from("conversation_participant").insert(participantRows)
             newChatUuid
@@ -295,31 +313,40 @@ class ChatRepository @Inject constructor(
         return try {
             val groupUuid = UUID.randomUUID().toString()
 
-            // Tạo phòng nhóm ban đầu (Chưa kích hoạt Ví Quỹ theo đúng kịch bản nút bấm riêng biệt)
-            val conversationMap = mapOf(
-                "id" to groupUuid,
-                "is_group" to true,
-                "name" to groupName,
-                "wallet_id" to null
+            val newConversation = SupabaseConversationDto(
+                id = groupUuid,
+                name = groupName,
+                isGroup = true,
+                walletId = null
             )
-            supabaseClient.from("conversation").insert(conversationMap)
+
+            supabaseClient.from("conversation").insert(newConversation)
 
             val currentUserId = getAuthenticatedUserId()
             val allMembers = (memberUserIds + currentUserId).distinct()
+
             val participantRows = allMembers.map { userId ->
-                mapOf(
-                    "conversation_id" to groupUuid,
-                    "user_id" to userId,
-                    "is_admin" to (userId == currentUserId)
+                SupabaseParticipantDto(
+                    conversationId = groupUuid,
+                    userId = userId,
+                    isAdmin = userId == currentUserId
                 )
             }
             supabaseClient.from("conversation_participant").insert(participantRows)
 
+            val localGroup = LocalConversation(
+                id = groupUuid,
+                name = groupName,
+                isGroup = true,
+                walletId = "wallet_default"
+            )
+            chatDAO.insertConversation(localGroup)
+
             sendSystemMessage(groupUuid, "Hệ thống: Nhóm '$groupName' đã được khởi tạo thành công.")
-            groupUuid
+            return groupUuid
         } catch (e: Exception) {
-            println("Lỗi tạo nhóm: ${e.localizedMessage}")
-            null
+            println("Lỗi hệ thống tạo nhóm: ${e.localizedMessage}")
+            return null
         }
     }
 
@@ -332,21 +359,65 @@ class ChatRepository @Inject constructor(
                         eq("conversation_id", conversationId)
                         eq("user_id", currentUserId)
                     }
-                }.decodeSingle<Map<String, Boolean>>()
-            response["is_admin"] ?: false
+                }.decodeSingle<Map<String, kotlinx.serialization.json.JsonElement>>()
+
+            response["is_admin"]?.toString()?.replace("\"", "")?.toBoolean() ?: false
         } catch (e: Exception) {
+            println("Lỗi kiểm tra quyền Admin: ${e.localizedMessage}")
             false
+        }
+    }
+
+    suspend fun fetchGroupMembersFromServer(conversationId: String): List<Pair<String, String>> {
+        return try {
+            // 🔥 ĐÃ FIX: Gọi chính xác "profile(display_name)" số ít theo đúng Database của Vy
+            val response = supabaseClient.from("conversation_participant")
+                .select(io.github.jan.supabase.postgrest.query.Columns.raw("user_id, profile(display_name)")) {
+                    filter { eq("conversation_id", conversationId) }
+                }.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
+
+            response.map { row ->
+                val userId = row["user_id"]?.toString()?.replace("\"", "") ?: ""
+
+                // 🔥 ĐÃ FIX: Bốc object "profile" con và lấy display_name chuẩn chỉ
+                val profileElement = row["profile"]
+                val displayName = try {
+                    if (profileElement != null) {
+                        profileElement.jsonObject["display_name"]?.jsonPrimitive?.content ?: "Thành viên nhóm"
+                    } else {
+                        "Thành viên nhóm"
+                    }
+                } catch (e: Exception) {
+                    "Thành viên nhóm"
+                }
+
+                Pair(userId, displayName)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("Lỗi bốc danh sách thành viên thật từ server: ${e.localizedMessage}")
+            emptyList()
         }
     }
 
     suspend fun updateGroupName(conversationId: String, newName: String) {
         try {
+            // Cập nhật tên nhóm lên server Supabase
             supabaseClient.from("conversation").update(mapOf("name" to newName)) {
                 filter { eq("id", conversationId) }
             }
-            sendSystemMessage(conversationId, "Hệ thống: Tên nhóm đã đổi thành '$newName'")
+
+            // Cập nhật trực tiếp xuống Room DB local để hiển thị live lập tức cho mình
+            val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
+            currentConv?.let {
+                chatDAO.insertConversation(it.copy(name = newName))
+            }
+
+            // Bắn tin nhắn hệ thống realtime để các máy khác cùng đổi tên theo
+            sendSystemMessage(conversationId, "Tên nhóm đã được đổi thành '$newName'")
+            println("Đổi tên nhóm thành công!")
         } catch (e: Exception) {
-            println("Lỗi đổi tên: ${e.localizedMessage}")
+            println("Lỗi đổi tên nhóm: ${e.localizedMessage}")
         }
     }
 
@@ -358,7 +429,11 @@ class ChatRepository @Inject constructor(
                     eq("user_id", userIdToKick)
                 }
             }
-            sendSystemMessage(conversationId, "Hệ thống: Admin đã mời $memberName rời khỏi nhóm.")
+
+            // 🔥 Làm mới dữ liệu cục bộ sau khi kick thành viên
+            fetchAndSaveConversationsToLocal()
+
+            sendSystemMessage(conversationId, "Admin đã mời $memberName rời khỏi nhóm.")
         } catch (e: Exception) {
             println("Lỗi kích thành viên: ${e.localizedMessage}")
         }
@@ -380,10 +455,10 @@ class ChatRepository @Inject constructor(
         memberUserIds: List<String>
     ): Boolean {
         return try {
-            val walletUuid = "wallet_${UUID.randomUUID().toString().take(8)}"
+            // 🔥 ĐÃ FIX: Sinh UUID chuẩn 100% để Postgres chịu nhận kiểu dữ liệu uuid cho khóa chính
+            val walletUuid = UUID.randomUUID().toString()
             val currentUserId = getAuthenticatedUserId()
 
-            // 1. Tạo bản ghi ví mới trong group_wallet (balance ban đầu = 0)
             supabaseClient.from("group_wallet").insert(
                 mapOf(
                     "id" to walletUuid,
@@ -393,7 +468,6 @@ class ChatRepository @Inject constructor(
                 )
             )
 
-            // 2. Thiết lập wallet_membership cho tất cả thành viên (role='owner' cho Admin, 'member' cho còn lại)
             val allMembers = (memberUserIds + currentUserId).distinct()
             val membershipRows = allMembers.map { userId ->
                 mapOf(
@@ -404,18 +478,24 @@ class ChatRepository @Inject constructor(
             }
             supabaseClient.from("wallet_membership").insert(membershipRows)
 
-            // 3. Cập nhật liên kết khóa ngoại conversation.wallet_id = id của quỹ vừa tạo
             supabaseClient.from("conversation").update(mapOf("wallet_id" to walletUuid)) {
                 filter { eq("id", conversationId) }
             }
 
+            // Cập nhật ID ví mới trực tiếp vào Room local để kích hoạt hiển thị nút Quỹ lập tức
+            val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
+            currentConv?.let {
+                chatDAO.insertConversation(it.copy(walletId = walletUuid))
+            }
+
             sendSystemMessage(
                 conversationId,
-                "Hệ thống: Quỹ nhóm '$walletName' đã được Admin thiết lập thành công."
+                "Quỹ nhóm '$walletName' đã được Admin thiết lập thành công."
             )
             true
         } catch (e: Exception) {
             e.printStackTrace()
+            println("Lỗi luồng tạo ví quỹ nhóm: ${e.localizedMessage}")
             false
         }
     }
@@ -464,15 +544,9 @@ class ChatRepository @Inject constructor(
                     )
                     sendSystemMessage(
                         conversationId,
-                        "Hệ thống: Thành viên đã nộp ${
-                            String.format(
-                                "%,.0f",
-                                amount
-                            )
-                        }đ vào quỹ nhóm. Nội dung: $note"
+                        "Thành viên đã nộp ${String.format("%,.0f", amount)}đ vào quỹ nhóm. Nội dung: $note"
                     )
                 }
-
                 "withdrawal" -> {
                     supabaseClient.postgrest.rpc(
                         function = "rpc_wallet_withdraw",
@@ -484,15 +558,9 @@ class ChatRepository @Inject constructor(
                     )
                     sendSystemMessage(
                         conversationId,
-                        "Hệ thống: Admin đã rút ${
-                            String.format(
-                                "%,.0f",
-                                amount
-                            )
-                        }đ từ quỹ nhóm. Nội dung: $note"
+                        "Admin đã rút ${String.format("%,.0f", amount)}đ từ quỹ nhóm. Nội dung: $note"
                     )
                 }
-
                 "purchase" -> {
                     supabaseClient.postgrest.rpc(
                         function = "rpc_wallet_purchase",
@@ -505,12 +573,7 @@ class ChatRepository @Inject constructor(
                     )
                     sendSystemMessage(
                         conversationId,
-                        "Hệ thống: Quỹ nhóm đã chi tiêu ${
-                            String.format(
-                                "%,.0f",
-                                amount
-                            )
-                        }đ để mua món công vụ. Nội dung: $note"
+                        "Quỹ nhóm đã chi tiêu ${String.format("%,.0f", amount)}đ để mua món công vụ. Nội dung: $note"
                     )
                 }
             }
@@ -528,7 +591,6 @@ class ChatRepository @Inject constructor(
                 .decodeSingle<SupabaseConversationDto>()
             val walletId = convResponse.walletId ?: return emptyList()
 
-            // Thực hiện query sắp xếp DESC theo thời gian tạo như BA quy định
             supabaseClient.from("wallet_transaction")
                 .select {
                     filter { eq("wallet_id", walletId) }
@@ -539,46 +601,48 @@ class ChatRepository @Inject constructor(
             emptyList()
         }
     }
+    // 🔥 BẢN CHỐT HẠ: Vá triệt để lỗi mất ảnh do lệch mapping Room cục bộ khi khởi động lại app
+    suspend fun syncMessagesFromServer(conversationId: String) {
+        try {
+            val remoteMessages = supabaseClient.from("message")
+                .select {
+                    filter { eq("conversation_id", conversationId) }
+                }.decodeList<SupabaseMessageDto>()
 
-    // ── BÁO CÁO (REPORT) ──
+            remoteMessages.forEach { dto ->
+                // Kiểm tra xem dưới máy đã có tin nhắn này chưa qua ID Server (cột "id" dưới Room)
+                val existingLocalMessage = dto.id?.let { chatDAO.getMessageByServerId(it) }
 
-    // 1. Kiểm tra xem mình đã từng báo cáo mục tiêu này trước đây chưa để hiện cảnh báo trên UI
-    suspend fun checkIfAlreadyReported(targetId: String): Boolean {
-        return try {
-            val currentUserId = getAuthenticatedUserId()
-            val response = supabaseClient.from("reports").select {
-                filter {
-                    eq("reporter_id", currentUserId)
-                    eq("target_id", targetId)
+                if (existingLocalMessage != null) {
+                    // Nếu đã có: Cập nhật đè link ảnh xịn từ server vào dòng cũ
+                    val updatedMessage = existingLocalMessage.copy(
+                        serverId = dto.id,
+                        body = dto.body,
+                        imageUrl = dto.imageUrl ?: existingLocalMessage.imageUrl, // Giữ chặt link ảnh web
+                        syncStatus = MessageSyncStatus.SENT,
+                        createdAt = parseServerTimeToLong(dto.createdAt)
+                    )
+                    chatDAO.updateMessage(updatedMessage)
+                } else {
+                    // Nếu chưa có (Cài lại app mới tinh): Tạo dòng mới chuẩn đét cấu trúc Entity của Vy
+                    val newLocalMessage = Message(
+                        localId = dto.id ?: UUID.randomUUID().toString(), // Dùng ID server làm khóa chính local để đồng bộ 1-1
+                        serverId = dto.id, // Gán ID server vào biến serverId (Cột "id" SQLite)
+                        conversationId = dto.conversationId,
+                        senderId = dto.senderId,
+                        body = dto.body,
+                        imageUrl = dto.imageUrl, // 🔥 ĐÃ GHÌ CHẶT: Gán link ảnh từ server vào đây nhe Vy!
+                        isSystem = dto.isSystem,
+                        syncStatus = MessageSyncStatus.SENT,
+                        createdAt = parseServerTimeToLong(dto.createdAt)
+                    )
+                    chatDAO.insertMessage(newLocalMessage)
                 }
-            }.decodeList<SupabaseReportDto>()
-            response.isNotEmpty()
+            }
+            println("Đồng bộ thông minh hoàn tất! Toàn bộ link ảnh quá khứ đã được găm chặt xuống Room.")
         } catch (e: Exception) {
-            false
-        }
-    }
-
-    // 2. Thực hiện chèn một dòng báo cáo mới ẩn danh lên máy chủ Supabase
-    suspend fun submitReport(targetId: String, reason: String, note: String?): Boolean {
-        return try {
-            val currentUserId = getAuthenticatedUserId()
-
-            // Không tự báo cáo chính mình (Check Constraint phía Client)
-            if (currentUserId == targetId) return false
-
-            val reportDto = SupabaseReportDto(
-                reporterId = currentUserId,
-                targetId = targetId,
-                reason = reason,
-                note = note,
-                status = "pending"
-            )
-
-            supabaseClient.from("reports").insert(reportDto)
-            true
-        } catch (e: Exception) {
-            println("Lỗi luồng xử lý đẩy dữ liệu báo cáo lên server: ${e.localizedMessage}")
-            false
+            e.printStackTrace()
+            println("Lỗi luồng đồng bộ: ${e.localizedMessage}")
         }
     }
 
@@ -587,43 +651,58 @@ class ChatRepository @Inject constructor(
     private suspend fun performNetworkSend(message: Message) {
         try {
             var finalImageUrl = message.imageUrl
+            val currentUserId = getAuthenticatedUserId()
 
-            if (message.imageUrl != null && message.imageUrl.startsWith("content://")) {
-                val uri = Uri.parse(message.imageUrl)
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val fileBytes = inputStream?.use { it.readBytes() }
+            // 🔥 BƯỚC 1: BẮT BUỘC CHỜ UPLOAD ẢNH XONG MỚI ĐƯỢC CHẠY TIẾP
+            if (message.imageUrl != null && (message.imageUrl.startsWith("content://") || message.imageUrl.startsWith("file://"))) {
+                try {
+                    val uri = android.net.Uri.parse(message.imageUrl)
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    val fileBytes = inputStream?.use { it.readBytes() }
 
-                if (fileBytes != null) {
-                    val storageBucket = supabaseClient.storage.from("chat-images")
-                    val fileName = "${message.localId}.jpg"
+                    if (fileBytes != null) {
+                        val storageBucket = supabaseClient.storage.from("chat-images")
+                        val fileName = "${java.util.UUID.randomUUID()}.jpg" // Tên ảnh độc nhất
 
-                    storageBucket.upload(path = fileName, data = fileBytes) {
-                        upsert = true
+                        // Ép luồng phải đợi upload xong hoàn toàn
+                        storageBucket.upload(path = fileName, data = fileBytes) {
+                            upsert = true
+                        }
+
+                        // Lấy link public url thật từ server dội về
+                        finalImageUrl = storageBucket.publicUrl(fileName)
+                        println("Supabase Storage: Upload thành công link thật: $finalImageUrl")
                     }
-                    finalImageUrl = storageBucket.publicUrl(fileName)
+                } catch (storageErr: Exception) {
+                    println("Lỗi upload ảnh lên Storage: ${storageErr.localizedMessage}")
                 }
             }
 
+            // 🔥 BƯỚC 2: ĐÓNG GÓI DTO VỚI LINK ẢNH XỊN (Tuyệt đối không để null nếu là tin nhắn ảnh)
             val messageDto = SupabaseMessageDto(
                 conversationId = message.conversationId,
-                senderId = message.senderId,
+                senderId = currentUserId,
                 body = message.body,
-                imageUrl = finalImageUrl,
+                imageUrl = finalImageUrl, // Đã fix: Giá trị link https thật, không còn bị null
                 isSystem = message.isSystem
             )
 
+            // Đẩy lên bảng message trên Supabase
             val response = supabaseClient.from("message").insert(listOf(messageDto)) { select() }
             val insertedDto = response.decodeSingle<SupabaseMessageDto>()
 
+            // 🔥 BƯỚC 3: CẬP NHẬT LINK XỊN XUỐNG ROOM LOCAL ĐỂ KHÔNG BỊ MẤT KHI THOÁT APP
             val successMessage = message.copy(
                 syncStatus = MessageSyncStatus.SENT,
                 serverId = insertedDto.id,
-                imageUrl = finalImageUrl,
+                imageUrl = finalImageUrl, // Lưu link https vào Room cục bộ luôn
+                senderId = currentUserId,
                 createdAt = parseServerTimeToLong(insertedDto.createdAt)
             )
             chatDAO.updateMessage(successMessage)
 
         } catch (e: Exception) {
+            e.printStackTrace()
             println("Gửi tin thất bại, chuyển trạng thái FAILED: ${e.localizedMessage}")
             val failedMessage = message.copy(syncStatus = MessageSyncStatus.FAILED)
             chatDAO.updateMessage(failedMessage)

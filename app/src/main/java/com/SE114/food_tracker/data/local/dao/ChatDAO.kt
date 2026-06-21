@@ -36,4 +36,6 @@ interface ChatDAO {
     fun getAllConversations(): Flow<List<Conversation>>
     @Query("SELECT * FROM conversations WHERE id = :conversationId")
     fun getConversationById(conversationId: String): Flow<Conversation?>
+    @Query("SELECT * FROM messages WHERE id = :serverId LIMIT 1")
+    suspend fun getMessageByServerId(serverId: String): Message?
 }

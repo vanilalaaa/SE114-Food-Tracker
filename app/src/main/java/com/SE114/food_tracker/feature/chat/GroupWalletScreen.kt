@@ -125,7 +125,7 @@ fun GroupWalletScreenContent(
             TopAppBar(
                 title = {
                     Text(
-                        "Quỹ Nhóm Tài Chính",
+                        "Quỹ Nhóm",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )

@@ -14,7 +14,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.* import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,9 +42,8 @@ fun ChatScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Lấy dữ liệu Realtime từ Room DB local lên UI để lấy mã wallet_id
-    val conversationState by viewModel.getConversationState(conversationId)
-        .collectAsState(initial = null)
+    // Lấy dữ liệu Realtime sống từ Room DB cục bộ
+    val conversationState by viewModel.getConversationState(conversationId).collectAsState(initial = null)
     val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
     val currentUserId = viewModel.currentUserId
 
@@ -51,7 +51,13 @@ fun ChatScreen(
     val hasWallet = conversationState?.walletId != null &&
             conversationState?.walletId != "wallet_default" &&
             conversationState?.walletId?.isNotBlank() == true
+    // 🔥 ĐÃ FIX: Chỉ gọi tải danh sách thành viên đúng 1 lần duy nhất khi conversationId thay đổi, chặn đứng lỗi chớp màn hình!
+    LaunchedEffect(conversationId) {
+        viewModel.loadGroupMembers(conversationId)
+    }
 
+    // Hứng dữ liệu an toàn từ StateFlow tập trung của ViewModel
+    val memberList by viewModel.groupMembers.collectAsState()
     // Kiểm tra bất đồng bộ quyền Admin thật từ server
     var isAdmin by remember { mutableStateOf(false) }
     LaunchedEffect(conversationId, conversationState) {
@@ -75,7 +81,7 @@ fun ChatScreen(
             text = {
                 Column {
                     Text(
-                        "Nhập tên cho ví quỹ công vụ gắn liền với phòng chat này:",
+                        "Nhập tên cho ví gắn liền với phòng chat này:",
                         fontSize = 13.sp,
                         color = TextSecondary
                     )
@@ -131,16 +137,17 @@ fun ChatScreen(
 
     ChatScreenContent(
         conversationId = conversationId,
-        conversationName = conversationName,
+        conversationName = conversationState?.name ?: conversationName,
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,
         hasWallet = hasWallet,
         isAdmin = isAdmin,
+        memberList = memberList,
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {
-            walletNameInput = "Quỹ của $conversationName"
+            walletNameInput = "Quỹ của ${conversationState?.name ?: conversationName}"
             showCreateWalletDialog = true
         },
         onSendMessage = { text ->
@@ -151,9 +158,11 @@ fun ChatScreen(
         },
         onRenameGroup = { convId, newName ->
             viewModel.renameGroup(convId, newName)
+            Toast.makeText(context, "Cập nhật tên nhóm mới thành công!", Toast.LENGTH_SHORT).show()
         },
         onKickMember = { convId, userId, name ->
             viewModel.kickGroupMember(convId, userId, name)
+            Toast.makeText(context, "Đã mời $name rời khỏi nhóm!", Toast.LENGTH_SHORT).show()
         },
         onRetryMessage = { messageEntity ->
             viewModel.retryFailedMessage(messageEntity)
@@ -171,6 +180,7 @@ fun ChatScreenContent(
     isGroup: Boolean,
     hasWallet: Boolean,
     isAdmin: Boolean,
+    memberList: List<Pair<String, String>>,
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit,
     onCreateWalletClick: () -> Unit,
@@ -193,9 +203,11 @@ fun ChatScreenContent(
     if (showSettingsDialog) {
         GroupSettingsDialog(
             conversationName = conversationName,
+            memberList = memberList,
             onDismissRequest = { showSettingsDialog = false },
             onRenameGroup = { newName ->
                 onRenameGroup(conversationId, newName)
+                showSettingsDialog = false
             },
             onKickMember = { userId, name ->
                 onKickMember(conversationId, userId, name)
@@ -222,7 +234,6 @@ fun ChatScreenContent(
                     }
                 },
                 actions = {
-                    // Quản lý động nút Tạo quỹ / Xem quỹ
                     if (isGroup) {
                         if (hasWallet) {
                             IconButton(onClick = onWalletClick) {
@@ -275,7 +286,9 @@ fun ChatScreenContent(
 
                     MessageBubble(
                         message = message,
-                        isMine = message.senderId == myId,
+                        isMine = message.senderId == myId ||
+                                message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
+                                message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED,
                         onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
                     )
 
@@ -365,6 +378,7 @@ fun ChatScreenPreview() {
             isGroup = true,
             hasWallet = true,
             isAdmin = true,
+            memberList = listOf(Pair("azun_id", "Azun"), Pair("vy_id", "Vy")),
             messageList = listOf(
                 MessageUiModel(
                     senderId = "azun_id",

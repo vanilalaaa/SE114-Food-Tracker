@@ -1,4 +1,4 @@
-package com.SE114.food_tracker.feature.chat.components
+package com.SE114.food_tracker.core.designsystem.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*

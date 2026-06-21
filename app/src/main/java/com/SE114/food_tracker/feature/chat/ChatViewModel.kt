@@ -31,65 +31,20 @@ class ChatViewModel @Inject constructor(
     val currentUserId: String
         get() = chatRepository.getAuthenticatedUserId()
 
-    // ── STATE QUẢN LÝ DỮ LIỆU QUỸ NHÓM THẬT CHO UI QUAN SÁT ──
-    var walletBalance by mutableStateOf(mockBalance)
+    // ── STATE QUẢN LÝ DỮ LIỆU QUỸ NHÓM ──
+    var walletBalance by mutableStateOf(0.0)
         private set
 
+    private val _walletTransactions =
+        MutableStateFlow<List<Map<String, kotlinx.serialization.json.JsonElement>>>(emptyList())
     val walletTransactions: StateFlow<List<Map<String, kotlinx.serialization.json.JsonElement>>> =
-        _mockWalletTransactions.asStateFlow()
+        _walletTransactions.asStateFlow()
 
     var isTransactionSuccess by mutableStateOf<Boolean?>(null)
         private set
 
-    var isAlreadyReported by mutableStateOf(false)
-        private set
-
-    // KHỐI BỘ NHỚ TĨNH (COMPANION OBJECT) BẢO VỆ DỮ LIỆU KHÔNG BỊ RESET KHI THOÁT RA VÀO LẠI
-    companion object {
-        private var mockBalance by mutableStateOf(680000.0)
-        private val _mockWalletTransactions =
-            MutableStateFlow<List<Map<String, kotlinx.serialization.json.JsonElement>>>(
-                listOf(
-                    mapOf(
-                        "id" to kotlinx.serialization.json.JsonPrimitive("tx_mồi_01"),
-                        "type" to kotlinx.serialization.json.JsonPrimitive("deposit"),
-                        "amount" to kotlinx.serialization.json.JsonPrimitive(200000.0),
-                        "note" to kotlinx.serialization.json.JsonPrimitive("Nộp tiền quỹ cơm trưa tuần này"),
-                        "created_at" to kotlinx.serialization.json.JsonPrimitive("10:15 - Hôm nay")
-                    ),
-                    mapOf(
-                        "id" to kotlinx.serialization.json.JsonPrimitive("tx_mồi_02"),
-                        "type" to kotlinx.serialization.json.JsonPrimitive("withdrawal"),
-                        "amount" to kotlinx.serialization.json.JsonPrimitive(-120000.0),
-                        "note" to kotlinx.serialization.json.JsonPrimitive("Mua cơm gà phi lê nhóm"),
-                        "created_at" to kotlinx.serialization.json.JsonPrimitive("12:30 - Hôm qua")
-                    )
-                )
-            )
-    }
-
     init {
-        // 1. Duy trì lệnh đồng bộ từ server như bình thường
         fetchConversationsFromServer()
-
-        // 2. MỒI DATA VÀO ROOM LOCAL ĐỂ KIỂM TRA MÀN HÌNH
-        viewModelScope.launch {
-            try {
-                val testRoom = Conversation(
-                    id = "phong_test_114",
-                    name = "Nhóm Quỹ Thực Tế 🥑",
-                    isGroup = true,
-                    walletId = "wallet_xyz123"
-                )
-                chatDAO.insertConversation(testRoom)
-                println("ChatViewModel: Đã mồi thành công phòng chat test xuống Room local!")
-
-                // Đồng bộ biến UI khớp trực tiếp với bộ nhớ tĩnh Companion Object hiện thời
-                walletBalance = mockBalance
-            } catch (e: Exception) {
-                println("Lỗi mồi dữ liệu local: ${e.localizedMessage}")
-            }
-        }
     }
 
     fun fetchConversationsFromServer() {
@@ -102,6 +57,18 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    // 🔥 ĐÃ FIX: Biến StateFlow quản lý tập trung danh sách thành viên nhóm
+    private val _groupMembers = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val groupMembers: StateFlow<List<Pair<String, String>>> = _groupMembers.asStateFlow()
+
+    // Hàm gọi bốc dữ liệu một lần duy nhất khi vào phòng chat
+    fun loadGroupMembers(conversationId: String) {
+        viewModelScope.launch {
+            chatRepository.syncMessagesFromServer(conversationId)
+            val actualMembers = chatRepository.fetchGroupMembersFromServer(conversationId)
+            _groupMembers.value = actualMembers
+        }
+    }
     // KÍCH HOẠT LẮNG NGHE REALTIME ĐỘNG
     fun connectToConversation(conversationId: String) {
         viewModelScope.launch {
@@ -125,7 +92,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
     }
 
-    // Lấy luồng thông tin một phòng chat cụ thể từ Room DB để lấy Tên và ID ví sống
+    // Lấy luồng thông tin một phòng chat cụ thể từ Room DB để lấy Tên và ID ví
     fun getConversationState(conversationId: String): Flow<Conversation?> {
         return chatRepository.getLocalConversation(conversationId)
     }
@@ -177,19 +144,14 @@ class ChatViewModel @Inject constructor(
 
     // Hàm gọi bốc số dư và lịch sử giao dịch thật từ Server về máy
     fun loadWalletData(conversationId: String) {
-        if (conversationId == "phong_test_114") {
-            walletBalance = mockBalance
-            return
-        }
-
         viewModelScope.launch {
             walletBalance = chatRepository.getWalletBalance(conversationId)
-            _mockWalletTransactions.value =
+            _walletTransactions.value =
                 chatRepository.fetchWalletTransactionsFromServer(conversationId)
         }
     }
 
-    // Hàm xử lý kích hoạt giao dịch từ Giao diện gửi lên
+    // Hàm xử lý kích hoạt giao dịch từ Giao diện gửi lên thẳng RPC server thật
     fun executeWalletTransaction(
         conversationId: String,
         amount: Double,
@@ -197,36 +159,20 @@ class ChatViewModel @Inject constructor(
         note: String
     ) {
         viewModelScope.launch {
-            if (conversationId == "phong_test_114") {
-                val finalAmount = if (isDeposit) amount else -amount
-                mockBalance += finalAmount
-                walletBalance = mockBalance
+            val transactionType = if (isDeposit) "deposit" else "withdrawal"
 
-                val newMockTx = mapOf(
-                    "id" to kotlinx.serialization.json.JsonPrimitive(UUID.randomUUID().toString()),
-                    "type" to kotlinx.serialization.json.JsonPrimitive(if (isDeposit) "deposit" else "withdrawal"),
-                    "amount" to kotlinx.serialization.json.JsonPrimitive(finalAmount),
-                    "note" to kotlinx.serialization.json.JsonPrimitive(note),
-                    "created_at" to kotlinx.serialization.json.JsonPrimitive("Vừa xong")
-                )
-                _mockWalletTransactions.value = listOf(newMockTx) + _mockWalletTransactions.value
-                isTransactionSuccess = true
-            } else {
-                val transactionType = if (isDeposit) "deposit" else "withdrawal"
+            val success = chatRepository.executeWalletTransaction(
+                conversationId = conversationId,
+                amount = amount,
+                txType = transactionType,
+                note = note,
+                itemId = null
+            )
 
-                val success = chatRepository.executeWalletTransaction(
-                    conversationId = conversationId,
-                    amount = amount,
-                    txType = transactionType,
-                    note = note,
-                    itemId = null
-                )
-
-                if (success) {
-                    loadWalletData(conversationId)
-                }
-                isTransactionSuccess = success
+            if (success) {
+                loadWalletData(conversationId)
             }
+            isTransactionSuccess = success
         }
     }
 
@@ -238,7 +184,6 @@ class ChatViewModel @Inject constructor(
 
     // Kiểm tra bất đồng bộ quyền Admin thật của người dùng trong phòng chat dựa trên Repository
     suspend fun isCurrentUserAdmin(conversationId: String): Boolean {
-        if (conversationId == "phong_test_114") return true // Giữ quyền để test phòng mồi local
         return try {
             chatRepository.isCurrentUserAdminOf(conversationId)
         } catch (e: Exception) {
@@ -251,11 +196,10 @@ class ChatViewModel @Inject constructor(
     fun createGroupWallet(conversationId: String, walletName: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                // Tạm thời bốc toàn bộ list thành viên nhóm trống hoặc lấy danh sách động sau này tùy cấu trúc bài đăng
                 val success = chatRepository.createGroupWalletForExistingChat(
                     conversationId = conversationId,
                     walletName = walletName,
-                    memberUserIds = emptyList() // Các thành viên phòng chat sẽ tự đồng bộ qua bảng membership phía Backend
+                    memberUserIds = emptyList()
                 )
                 if (success) {
                     fetchConversationsFromServer() // Refresh dữ liệu local Room DB để cập nhật wallet_id mới
@@ -265,23 +209,6 @@ class ChatViewModel @Inject constructor(
                 println("Lỗi luồng xử lý đúc ví trên server: ${e.localizedMessage}")
                 onResult(false)
             }
-        }
-    }
-
-    // ── BÁO CÁO (REPORT) ──
-
-    // Kiểm tra xem reporter hiện tại đã từng gửi báo cáo cho mục tiêu này chưa để gài cảnh báo lên UI
-    fun checkReportStatus(targetId: String) {
-        viewModelScope.launch {
-            isAlreadyReported = chatRepository.checkIfAlreadyReported(targetId)
-        }
-    }
-
-    // Gửi báo cáo thật lên Supabase và nhận kết quả thông qua callback lambda để Toast
-    fun sendReport(targetId: String, reason: String, note: String, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            val success = chatRepository.submitReport(targetId, reason, note.ifBlank { null })
-            onResult(success)
         }
     }
 
