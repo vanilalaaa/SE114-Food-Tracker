@@ -6,6 +6,7 @@ data class FeedPostDto(
     val ownerName: String,
     val itemId: String?,
     val itemName: String?,
+    val categoryIconUrl: String?,
     val imageUrl: String,
     val caption: String,
     val visibility: String,
@@ -28,6 +29,7 @@ data class FeedSourceItemDto(
     val itemId: String,
     val name: String,
     val imageUrl: String?,
+    val categoryIconUrl: String?,
     val price: Double,
     val entryDate: Long
 )

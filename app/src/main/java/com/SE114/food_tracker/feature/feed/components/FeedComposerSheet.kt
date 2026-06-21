@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -81,20 +80,20 @@ fun FeedComposerSheet(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Tao bai viet",
+                        text = "Tạo bài viết",
                         color = TextPrimary,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Chon anh hoac mon trong nhat ky",
+                        text = "Chọn ảnh hoặc món trong nhật ký",
                         color = TextLabelGray,
                         fontSize = 13.sp
                     )
                 }
 
                 TextButton(onClick = onCancel) {
-                    Text("Huy", color = TextLabelGray, fontWeight = FontWeight.Bold)
+                    Text("Hủy", color = TextLabelGray, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -112,7 +111,7 @@ fun FeedComposerSheet(
                 value = uiState.draftCaption,
                 onValueChange = onCaptionChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Caption") },
+                label = { Text("Chú thích") },
                 minLines = 2,
                 maxLines = 4,
                 shape = RoundedCornerShape(16.dp)
@@ -132,7 +131,7 @@ fun FeedComposerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Tu nhat ky",
+                    text = "Từ nhật ký",
                     color = TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
@@ -140,7 +139,7 @@ fun FeedComposerSheet(
                 )
                 AssistChip(
                     onClick = onPickImage,
-                    label = { Text("Chon anh") },
+                    label = { Text("Chọn ảnh") },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Outlined.PhotoLibrary,
@@ -155,7 +154,7 @@ fun FeedComposerSheet(
         if (uiState.sourceItems.isEmpty()) {
             item {
                 Text(
-                    text = "Chua co mon nao trong nhat ky de dang.",
+                    text = "Chưa có món nào trong nhật ký để đăng.",
                     color = TextLabelGray,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -193,7 +192,7 @@ fun FeedComposerSheet(
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(onClick = onClearError) {
-                        Text("An")
+                        Text("Ẩn")
                     }
                 }
             }
@@ -218,7 +217,7 @@ fun FeedComposerSheet(
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(
-                    text = "Dang bai",
+                    text = "Đăng bài",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -234,7 +233,7 @@ private fun FeedPickedSourcePreview(
     onPickImage: () -> Unit
 ) {
     val previewModel = pickedImageUri ?: selectedSourceItem?.imageUrl
-    val previewTitle = selectedSourceItem?.name ?: "Anh tu do"
+    val previewTitle = selectedSourceItem?.name ?: "Ảnh tự do"
 
     Row(
         modifier = Modifier
@@ -257,6 +256,11 @@ private fun FeedPickedSourcePreview(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+            } else if (selectedSourceItem != null) {
+                Text(
+                    text = selectedSourceItem?.categoryIconUrl?.takeIf { it.isNotBlank() } ?: "🍱",
+                    fontSize = 28.sp
+                )
             } else {
                 Icon(
                     imageVector = Icons.Outlined.Image,
@@ -278,14 +282,14 @@ private fun FeedPickedSourcePreview(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = if (selectedSourceItem != null) "Tu nhat ky" else "Chua chon nguon",
+                text = if (selectedSourceItem != null) "Từ nhật ký" else "Chưa chọn nguồn",
                 color = TextLabelGray,
                 fontSize = 12.sp
             )
         }
 
         TextButton(onClick = onPickImage) {
-            Text("Anh", color = OrangeMain, fontWeight = FontWeight.Bold)
+            Text("Ảnh", color = OrangeMain, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -297,7 +301,7 @@ private fun FeedVisibilityPicker(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = "Quyen rieng tu",
+            text = "Quyền riêng tư",
             color = TextPrimary,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
@@ -344,11 +348,9 @@ private fun FeedSourceItemRow(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Icon(
-                    imageVector = Icons.Outlined.Restaurant,
-                    contentDescription = null,
-                    tint = OrangeMain,
-                    modifier = Modifier.size(24.dp)
+                Text(
+                    text = item.categoryIconUrl?.takeIf { it.isNotBlank() } ?: "🍱",
+                    fontSize = 24.sp
                 )
             }
         }
@@ -364,7 +366,7 @@ private fun FeedSourceItemRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${item.price.toInt()} d",
+                text = "${item.price.toInt()} đ",
                 color = TextLabelGray,
                 fontSize = 12.sp
             )
@@ -372,7 +374,7 @@ private fun FeedSourceItemRow(
 
         if (selected) {
             Text(
-                text = "Da chon",
+                text = "Đã chọn",
                 color = OrangeMain,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold

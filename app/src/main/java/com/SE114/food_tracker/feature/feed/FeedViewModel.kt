@@ -5,6 +5,7 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
@@ -193,6 +194,7 @@ class FeedViewModel @Inject constructor(
                 if (_error.value == null) {
                     closeCreateSheet()
                     refresh()
+                    SyncScheduler.triggerImmediateSync(context)
                 }
             } catch (throwable: Throwable) {
                 Timber.e(throwable, "[FeedVM] Create post failed")
@@ -206,6 +208,7 @@ class FeedViewModel @Inject constructor(
     fun toggleLike(postId: String) {
         viewModelScope.launch {
             runCatching { feedRepository.toggleLike(postId) }
+                .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Toggle like failed")
                     _error.value = throwable.message ?: "Không cập nhật được lượt thích"
@@ -217,6 +220,7 @@ class FeedViewModel @Inject constructor(
         if (body.isBlank()) return
         viewModelScope.launch {
             runCatching { feedRepository.addComment(postId, body) }
+                .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Add comment failed")
                     _error.value = throwable.message ?: "Không gửi được bình luận"

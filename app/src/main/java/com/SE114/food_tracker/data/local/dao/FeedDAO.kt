@@ -22,6 +22,7 @@ interface FeedDAO {
             p.owner_name AS ownerName,
             p.item_id AS itemId,
             i.name AS itemName,
+            c.icon_url AS categoryIconUrl,
             p.image_url AS imageUrl,
             p.caption AS caption,
             p.visibility AS visibility,
@@ -45,6 +46,7 @@ interface FeedDAO {
             p.created_at AS createdAt
         FROM feed_post p
         LEFT JOIN item i ON i.item_id = p.item_id
+        LEFT JOIN category c ON c.category_id = i.category_id
         WHERE p.is_deleted = 0
         ORDER BY p.created_at DESC
         LIMIT :limit OFFSET :offset
@@ -74,10 +76,17 @@ interface FeedDAO {
 
     @Query(
         """
-        SELECT item_id AS itemId, name, image_url AS imageUrl, price, entry_date AS entryDate
-        FROM item
-        WHERE is_deleted = 0
-        ORDER BY created_at DESC
+        SELECT
+            i.item_id AS itemId,
+            i.name AS name,
+            i.image_url AS imageUrl,
+            c.icon_url AS categoryIconUrl,
+            i.price AS price,
+            i.entry_date AS entryDate
+        FROM item i
+        LEFT JOIN category c ON c.category_id = i.category_id
+        WHERE i.is_deleted = 0
+        ORDER BY i.created_at DESC
         LIMIT :limit
         """
     )
@@ -87,13 +96,52 @@ interface FeedDAO {
     suspend fun insertPost(post: FeedPost)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPosts(posts: List<FeedPost>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComment(comment: FeedComment)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertComments(comments: List<FeedComment>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLikes(likes: List<FeedLike>)
 
     @Upsert
     suspend fun upsertLike(like: FeedLike)
 
+    @Query("SELECT * FROM feed_post WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
+    suspend fun getPendingPosts(): List<FeedPost>
+
+    @Query("SELECT * FROM feed_like WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
+    suspend fun getPendingLikes(): List<FeedLike>
+
+    @Query("SELECT * FROM feed_comment WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
+    suspend fun getPendingComments(): List<FeedComment>
+
     @Query("SELECT * FROM feed_like WHERE post_id = :postId AND user_id = :userId LIMIT 1")
     suspend fun getLike(postId: String, userId: String): FeedLike?
+
+    @Query("UPDATE feed_post SET image_url = :imageUrl, updated_at = :updatedAt WHERE post_id = :postId")
+    suspend fun updatePostImageUrl(postId: String, imageUrl: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE feed_post SET sync_status = 'SYNCED' WHERE post_id = :postId")
+    suspend fun markPostSynced(postId: String)
+
+    @Query("UPDATE feed_post SET sync_status = 'FAILED' WHERE post_id = :postId")
+    suspend fun markPostFailed(postId: String)
+
+    @Query("UPDATE feed_like SET sync_status = 'SYNCED' WHERE like_id = :likeId")
+    suspend fun markLikeSynced(likeId: String)
+
+    @Query("UPDATE feed_like SET sync_status = 'FAILED' WHERE like_id = :likeId")
+    suspend fun markLikeFailed(likeId: String)
+
+    @Query("UPDATE feed_comment SET sync_status = 'SYNCED' WHERE comment_id = :commentId")
+    suspend fun markCommentSynced(commentId: String)
+
+    @Query("UPDATE feed_comment SET sync_status = 'FAILED' WHERE comment_id = :commentId")
+    suspend fun markCommentFailed(commentId: String)
 
     @Query(
         """

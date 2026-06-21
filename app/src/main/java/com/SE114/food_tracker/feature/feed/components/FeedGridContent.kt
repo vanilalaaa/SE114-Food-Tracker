@@ -57,6 +57,8 @@ import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
 import com.SE114.food_tracker.core.designsystem.theme.TextPrimary
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.feature.feed.FeedUiState
+import com.SE114.food_tracker.feature.feed.feedFallbackIcon
+import com.SE114.food_tracker.feature.feed.feedImageModelOrNull
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
@@ -130,7 +132,7 @@ private fun FeedHeader(
                 fontSize = 24.sp
             )
             Text(
-                text = "$postCount bai viet",
+                text = "$postCount bài viết",
                 color = TextLabelGray,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold
@@ -140,7 +142,7 @@ private fun FeedHeader(
         IconButton(onClick = onNavigateToFriend) {
             Icon(
                 imageVector = Icons.Outlined.People,
-                contentDescription = "Ban be",
+                contentDescription = "Bạn bè",
                 tint = TextPrimary
             )
         }
@@ -186,16 +188,18 @@ private fun FeedPostTile(
             .background(LightPeach)
             .clickable(onClick = onClick)
     ) {
-        if (post.imageUrl.isNotBlank()) {
+        val imageModel = post.imageUrl.feedImageModelOrNull()
+        if (imageModel != null) {
             AsyncImage(
-                model = post.imageUrl,
-                contentDescription = post.caption.ifBlank { post.itemName ?: "Feed post" },
+                model = imageModel,
+                contentDescription = post.caption.ifBlank { post.itemName ?: "Bài viết" },
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
             FeedTilePlaceholder(
-                title = post.itemName ?: post.caption.ifBlank { "Food post" }
+                title = post.itemName ?: post.caption.ifBlank { "Bài viết món ăn" },
+                fallbackIcon = feedFallbackIcon(post.categoryIconUrl, post.imageUrl)
             )
         }
 
@@ -224,7 +228,10 @@ private fun FeedPostTile(
 }
 
 @Composable
-private fun FeedTilePlaceholder(title: String) {
+private fun FeedTilePlaceholder(
+    title: String,
+    fallbackIcon: String
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -238,11 +245,9 @@ private fun FeedTilePlaceholder(title: String) {
                 .background(CardWhite.copy(alpha = 0.75f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Image,
-                contentDescription = null,
-                tint = OrangeMain,
-                modifier = Modifier.size(20.dp)
+            Text(
+                text = fallbackIcon,
+                fontSize = 20.sp
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -341,7 +346,7 @@ private fun FeedLoadingState() {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Dang tai newsfeed...",
+            text = "Đang tải bảng tin...",
             color = TextLabelGray,
             fontSize = 14.sp
         )
@@ -372,12 +377,12 @@ private fun FeedEmptyState(error: String?) {
         }
         Spacer(Modifier.height(14.dp))
         Text(
-            text = error ?: "Chua co bai viet nao",
+            text = error ?: "Chưa có bài viết nào",
             color = if (error == null) TextPrimary else MaterialTheme.colorScheme.error,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "Dang cho bai viet dau tien tu nhat ky hoac anh cua ban.",
+            text = "Đăng bài viết đầu tiên từ nhật ký hoặc ảnh của bạn.",
             color = HintGray,
             fontSize = 13.sp
         )

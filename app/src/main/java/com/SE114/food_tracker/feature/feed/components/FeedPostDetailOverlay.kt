@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,6 +63,8 @@ import com.SE114.food_tracker.core.designsystem.theme.TextPrimary
 import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.feature.feed.FeedUiState
+import com.SE114.food_tracker.feature.feed.feedFallbackIcon
+import com.SE114.food_tracker.feature.feed.feedImageModelOrNull
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -142,7 +143,7 @@ fun FeedPostDetailOverlay(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Dong",
+                        contentDescription = "Đóng",
                         tint = Color.White
                     )
                 }
@@ -195,10 +196,11 @@ private fun FeedDetailImage(
         modifier = modifier.background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        if (post.imageUrl.isNotBlank()) {
+        val imageModel = post.imageUrl.feedImageModelOrNull()
+        if (imageModel != null) {
             AsyncImage(
-                model = post.imageUrl,
-                contentDescription = post.caption.ifBlank { post.itemName ?: "Feed post" },
+                model = imageModel,
+                contentDescription = post.caption.ifBlank { post.itemName ?: "Bài viết" },
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
@@ -213,16 +215,14 @@ private fun FeedDetailImage(
                         .background(LightPeach, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Image,
-                        contentDescription = null,
-                        tint = OrangeMain,
-                        modifier = Modifier.size(42.dp)
+                    Text(
+                        text = feedFallbackIcon(post.categoryIconUrl, post.imageUrl),
+                        fontSize = 36.sp
                     )
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = post.itemName ?: post.caption.ifBlank { "Food post" },
+                    text = post.itemName ?: post.caption.ifBlank { "Bài viết món ăn" },
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
@@ -335,7 +335,7 @@ private fun FeedActionButton(
         IconButton(onClick = onClick) {
             Icon(
                 imageVector = if (selected) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
-                contentDescription = "Thich",
+                contentDescription = "Thích",
                 tint = if (selected) OrangeMain else TextLabelGray,
                 modifier = Modifier.size(26.dp)
             )
@@ -361,7 +361,7 @@ private fun FeedCommentsList(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Chua co binh luan nao",
+                text = "Chưa có bình luận nào",
                 color = TextLabelGray,
                 fontSize = 13.sp
             )
@@ -413,7 +413,7 @@ private fun FeedCommentInput(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.weight(1f),
-            placeholder = { Text("Viet binh luan...") },
+            placeholder = { Text("Viết bình luận...") },
             singleLine = true,
             shape = RoundedCornerShape(16.dp)
         )
@@ -426,7 +426,7 @@ private fun FeedCommentInput(
         ) {
             Icon(
                 imageVector = Icons.Default.Send,
-                contentDescription = "Gui",
+                contentDescription = "Gửi",
                 tint = Color.White
             )
         }

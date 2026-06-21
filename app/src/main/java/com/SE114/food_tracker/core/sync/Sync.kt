@@ -12,6 +12,7 @@ import com.SE114.food_tracker.data.remote.dto.CategoryDTO
 import com.SE114.food_tracker.data.remote.mapper.DataMapper
 import com.SE114.food_tracker.data.repository.BudgetRepository
 import com.SE114.food_tracker.data.repository.CategoryRepository
+import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.ItemRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -29,7 +30,8 @@ class Sync @AssistedInject constructor(
     private val categoryRepository: CategoryRepository,
     private val supabaseItemService: SupabaseItemService,
     private val supabaseClient: SupabaseClient,
-    private val budgetRepository: BudgetRepository
+    private val budgetRepository: BudgetRepository,
+    private val feedRepository: FeedRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -186,6 +188,15 @@ class Sync @AssistedInject constructor(
             anyError = true
         }
 
+        // ── STEP 1.4: push pending feed posts / likes / comments ─────────────
+        try {
+            val success = feedRepository.pushPendingToSupabase(ownerId)
+            if (!success) anyError = true
+        } catch (e: Exception) {
+            Timber.e(e, "[Sync] fatal error in feed push block")
+            anyError = true
+        }
+
         // ── STEP 2.1: pull categories from server ────────────────────────────
         try {
             val remote = supabaseClient.postgrest.from("category")
@@ -246,6 +257,15 @@ class Sync @AssistedInject constructor(
             }
         } catch (e: Exception) {
             Timber.e(e, "[Sync] fatal error in budget pull block")
+            anyError = true
+        }
+
+        // ── STEP 2.4: pull visible feed posts / likes / comments ─────────────
+        try {
+            val success = feedRepository.pullVisibleFromSupabase(ownerId)
+            if (!success) anyError = true
+        } catch (e: Exception) {
+            Timber.e(e, "[Sync] fatal error in feed pull block")
             anyError = true
         }
 

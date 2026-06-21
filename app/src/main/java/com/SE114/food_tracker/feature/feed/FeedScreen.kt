@@ -119,7 +119,7 @@ fun FeedScreenContent(
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Tao bai viet"
+                contentDescription = "Tạo bài viết"
             )
         }
 
@@ -207,11 +207,12 @@ private fun previewFeedPosts(): List<FeedPostDto> =
         FeedPostDto(
             postId = "preview-1",
             ownerId = "user-1",
-            ownerName = "Thao Uyen",
+            ownerName = "Thảo Uyên",
             itemId = "item-1",
             itemName = "Matcha latte",
+            categoryIconUrl = "🥤",
             imageUrl = "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500",
-            caption = "Di hoc ma van phai co matcha",
+            caption = "Đi học mà vẫn phải có matcha",
             visibility = FeedVisibility.FRIENDS.value,
             likeCount = 18,
             commentCount = 4,
@@ -221,11 +222,12 @@ private fun previewFeedPosts(): List<FeedPostDto> =
         FeedPostDto(
             postId = "preview-2",
             ownerId = "user-2",
-            ownerName = "Bao Anh",
+            ownerName = "Bảo Anh",
             itemId = "item-2",
-            itemName = "Com tam",
+            itemName = "Cơm tấm",
+            categoryIconUrl = "🍚",
             imageUrl = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=500",
-            caption = "Trua nay an ngon",
+            caption = "Trưa nay ăn ngon",
             visibility = FeedVisibility.FRIENDS.value,
             likeCount = 9,
             commentCount = 2,
@@ -238,8 +240,9 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             ownerName = "Minh Quan",
             itemId = null,
             itemName = null,
+            categoryIconUrl = null,
             imageUrl = "",
-            caption = "Post tu do khong co anh",
+            caption = "Post tự do không có ảnh",
             visibility = FeedVisibility.PUBLIC.value,
             likeCount = 5,
             commentCount = 1,
@@ -249,11 +252,12 @@ private fun previewFeedPosts(): List<FeedPostDto> =
         FeedPostDto(
             postId = "preview-4",
             ownerId = "user-4",
-            ownerName = "Ngoc Han",
+            ownerName = "Ngọc Hân",
             itemId = "item-4",
-            itemName = "Banh mi",
+            itemName = "Bánh mì",
+            categoryIconUrl = "🥖",
             imageUrl = "https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=500",
-            caption = "Bua sang nhanh gon",
+            caption = "Bữa sáng nhanh gọn",
             visibility = FeedVisibility.FRIENDS.value,
             likeCount = 21,
             commentCount = 6,

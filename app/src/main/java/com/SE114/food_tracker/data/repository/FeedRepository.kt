@@ -1,14 +1,30 @@
 package com.SE114.food_tracker.data.repository
 
+import android.content.Context
+import android.net.Uri
+import com.SE114.food_tracker.core.sync.SyncStatus
 import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedDAO
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.data.local.entities.FeedComment
+import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
+import com.SE114.food_tracker.data.remote.dto.FeedCommentRemoteDTO
+import com.SE114.food_tracker.data.remote.dto.FeedLikeRemoteDTO
+import com.SE114.food_tracker.data.remote.dto.FeedPostRemoteDTO
+import com.SE114.food_tracker.data.remote.dto.ProfileDTO
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import kotlinx.datetime.Instant
+import timber.log.Timber
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,7 +32,8 @@ import javax.inject.Singleton
 @Singleton
 class FeedRepository @Inject constructor(
     private val feedDao: FeedDAO,
-    private val supabaseClient: SupabaseClient
+    private val supabaseClient: SupabaseClient,
+    @ApplicationContext private val context: Context
 ) {
     fun currentUserId(): String =
         supabaseClient.auth.currentUserOrNull()?.id ?: LOCAL_USER_ID
@@ -44,7 +61,9 @@ class FeedRepository @Inject constructor(
     ) {
         createPost(
             itemId = item.itemId,
-            imageUrl = item.imageUrl.orEmpty(),
+            imageUrl = item.imageUrl?.takeIf { it.isNotBlank() }
+                ?: item.categoryIconUrl?.takeIf { it.isNotBlank() }?.let { "$EMOJI_IMAGE_PREFIX$it" }
+                .orEmpty(),
             caption = caption.ifBlank { item.name },
             visibility = visibility
         )
@@ -81,6 +100,92 @@ class FeedRepository @Inject constructor(
         )
     }
 
+    suspend fun pushPendingToSupabase(ownerId: String): Boolean {
+        var anyError = false
+
+        for (post in feedDao.getPendingPosts()) {
+            runCatching { pushPost(post, ownerId) }
+                .onSuccess { feedDao.markPostSynced(post.postId) }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedSync] post failed id=${post.postId}")
+                    feedDao.markPostFailed(post.postId)
+                    anyError = true
+                }
+        }
+
+        for (like in feedDao.getPendingLikes()) {
+            runCatching { pushLike(like, ownerId) }
+                .onSuccess { feedDao.markLikeSynced(like.likeId) }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedSync] like failed post=${like.postId}")
+                    feedDao.markLikeFailed(like.likeId)
+                    anyError = true
+                }
+        }
+
+        for (comment in feedDao.getPendingComments()) {
+            runCatching { pushComment(comment, ownerId) }
+                .onSuccess { feedDao.markCommentSynced(comment.commentId) }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedSync] comment failed id=${comment.commentId}")
+                    feedDao.markCommentFailed(comment.commentId)
+                    anyError = true
+                }
+        }
+
+        return !anyError
+    }
+
+    suspend fun pullVisibleFromSupabase(ownerId: String): Boolean =
+        runCatching {
+            val profiles = supabaseClient.postgrest.from("profile")
+                .select()
+                .decodeList<ProfileDTO>()
+                .associateBy { it.id }
+
+            val remotePosts = supabaseClient.postgrest.from("post")
+                .select()
+                .decodeList<FeedPostRemoteDTO>()
+
+            val postEntities = remotePosts.map { dto ->
+                dto.toEntity(
+                    ownerName = profiles[dto.authorId].displayNameOrFallback(dto.authorId)
+                )
+            }
+            if (postEntities.isNotEmpty()) {
+                feedDao.insertPosts(postEntities)
+            }
+
+            val remoteLikes = supabaseClient.postgrest.from("post_like")
+                .select()
+                .decodeList<FeedLikeRemoteDTO>()
+
+            val likeEntities = remoteLikes.map { it.toEntity() }
+            if (likeEntities.isNotEmpty()) {
+                feedDao.insertLikes(likeEntities)
+            }
+
+            val remoteComments = supabaseClient.postgrest.from("post_comment")
+                .select()
+                .decodeList<FeedCommentRemoteDTO>()
+
+            val commentEntities = remoteComments.map { dto ->
+                dto.toEntity(
+                    displayName = profiles[dto.authorId].displayNameOrFallback(dto.authorId)
+                )
+            }
+            if (commentEntities.isNotEmpty()) {
+                feedDao.insertComments(commentEntities)
+            }
+
+            Timber.d(
+                "[FeedSync] pulled posts=${postEntities.size}, " +
+                    "likes=${likeEntities.size}, comments=${commentEntities.size}, me=$ownerId"
+            )
+        }
+            .onFailure { Timber.e(it, "[FeedSync] pull failed") }
+            .isSuccess
+
     private suspend fun createPost(
         itemId: String?,
         imageUrl: String,
@@ -103,8 +208,176 @@ class FeedRepository @Inject constructor(
         )
     }
 
+    private suspend fun pushPost(post: FeedPost, ownerId: String) {
+        if (post.ownerId != ownerId) {
+            error("post ownerId ${post.ownerId} does not match auth user $ownerId")
+        }
+
+        if (post.isDeleted) {
+            supabaseClient.postgrest.from("post").delete {
+                filter {
+                    eq("id", post.postId)
+                    eq("author_id", ownerId)
+                }
+            }
+            return
+        }
+
+        val remoteImageUrl = uploadPostImageIfNeeded(post, ownerId)
+        val dto = post.toRemoteDTO(ownerId, remoteImageUrl)
+        supabaseClient.postgrest.from("post").upsert(dto)
+    }
+
+    private suspend fun pushLike(like: FeedLike, ownerId: String) {
+        if (like.userId != ownerId) {
+            error("like userId ${like.userId} does not match auth user $ownerId")
+        }
+
+        if (like.isDeleted) {
+            supabaseClient.postgrest.from("post_like").delete {
+                filter {
+                    eq("post_id", like.postId)
+                    eq("user_id", ownerId)
+                }
+            }
+        } else {
+            supabaseClient.postgrest.from("post_like").upsert(like.toRemoteDTO(ownerId))
+        }
+    }
+
+    private suspend fun pushComment(comment: FeedComment, ownerId: String) {
+        if (comment.userId != ownerId) {
+            error("comment userId ${comment.userId} does not match auth user $ownerId")
+        }
+
+        if (comment.isDeleted) {
+            supabaseClient.postgrest.from("post_comment").delete {
+                filter {
+                    eq("id", comment.commentId)
+                    eq("author_id", ownerId)
+                }
+            }
+        } else {
+            supabaseClient.postgrest.from("post_comment").upsert(comment.toRemoteDTO(ownerId))
+        }
+    }
+
+    private suspend fun uploadPostImageIfNeeded(post: FeedPost, ownerId: String): String {
+        if (
+            post.imageUrl.isBlank() ||
+            post.imageUrl.startsWith("http", ignoreCase = true) ||
+            post.imageUrl.startsWith(EMOJI_IMAGE_PREFIX)
+        ) {
+            return post.imageUrl
+        }
+
+        val bytes = withContext(Dispatchers.IO) {
+            val uri = Uri.parse(post.imageUrl)
+            if (uri.scheme == "file") {
+                val path = uri.path ?: error("cannot read local post image: ${post.imageUrl}")
+                File(path).readBytes()
+            } else {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: error("cannot read local post image: ${post.imageUrl}")
+            }
+        }
+
+        val path = "$ownerId/${post.postId}.jpg"
+        runCatching {
+            supabaseClient.storage.from("posts").upload(path, bytes) {
+                upsert = false
+            }
+        }.onFailure { throwable ->
+            val message = throwable.message.orEmpty()
+            val duplicate = message.contains("409") ||
+                message.contains("already exists", ignoreCase = true) ||
+                message.contains("duplicate", ignoreCase = true)
+
+            if (!duplicate) throw throwable
+        }
+
+        val publicUrl = supabaseClient.storage.from("posts").publicUrl(path)
+        feedDao.updatePostImageUrl(post.postId, publicUrl)
+        return publicUrl
+    }
+
+    private fun FeedPost.toRemoteDTO(ownerId: String, remoteImageUrl: String): FeedPostRemoteDTO =
+        FeedPostRemoteDTO(
+            id = postId,
+            authorId = ownerId,
+            itemId = itemId,
+            caption = caption.ifBlank { null },
+            imageUrl = remoteImageUrl.ifBlank { null },
+            visibility = visibility,
+            createdAt = Instant.fromEpochMilliseconds(createdAt).toString()
+        )
+
+    private fun FeedLike.toRemoteDTO(ownerId: String): FeedLikeRemoteDTO =
+        FeedLikeRemoteDTO(
+            postId = postId,
+            userId = ownerId,
+            createdAt = Instant.fromEpochMilliseconds(createdAt).toString()
+        )
+
+    private fun FeedComment.toRemoteDTO(ownerId: String): FeedCommentRemoteDTO =
+        FeedCommentRemoteDTO(
+            id = commentId,
+            postId = postId,
+            authorId = ownerId,
+            body = body,
+            createdAt = Instant.fromEpochMilliseconds(createdAt).toString()
+        )
+
+    private fun FeedPostRemoteDTO.toEntity(ownerName: String): FeedPost =
+        FeedPost(
+            postId = id,
+            ownerId = authorId,
+            ownerName = ownerName,
+            itemId = itemId,
+            imageUrl = imageUrl.orEmpty(),
+            caption = caption.orEmpty(),
+            visibility = visibility,
+            syncStatus = SyncStatus.SYNCED.name,
+            isDeleted = false,
+            createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
+            updatedAt = Instant.parse(createdAt).toEpochMilliseconds()
+        )
+
+    private fun FeedLikeRemoteDTO.toEntity(): FeedLike =
+        FeedLike(
+            likeId = stableLikeId(postId, userId),
+            postId = postId,
+            userId = userId,
+            syncStatus = SyncStatus.SYNCED.name,
+            isDeleted = false,
+            createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
+            updatedAt = Instant.parse(createdAt).toEpochMilliseconds()
+        )
+
+    private fun FeedCommentRemoteDTO.toEntity(displayName: String): FeedComment =
+        FeedComment(
+            commentId = id,
+            postId = postId,
+            userId = authorId,
+            displayName = displayName,
+            body = body,
+            syncStatus = SyncStatus.SYNCED.name,
+            isDeleted = false,
+            createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
+            updatedAt = Instant.parse(createdAt).toEpochMilliseconds()
+        )
+
+    private fun ProfileDTO?.displayNameOrFallback(profileId: String): String =
+        this?.displayName?.takeIf { it.isNotBlank() }
+            ?: this?.userId?.takeIf { it.isNotBlank() }
+            ?: profileId.take(8)
+
+    private fun stableLikeId(postId: String, userId: String): String =
+        UUID.nameUUIDFromBytes("$postId:$userId".toByteArray()).toString()
+
     companion object {
         const val PAGE_SIZE = 30
+        private const val EMOJI_IMAGE_PREFIX = "emoji:"
         private const val LOCAL_USER_ID = "local_user"
     }
 }
