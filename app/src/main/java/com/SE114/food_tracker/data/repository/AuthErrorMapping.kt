@@ -53,6 +53,10 @@ internal fun Throwable.toProfileError(): AuthError {
         Timber.tag("Auth").e(this, "user_id unique violation")
         return AuthError.UserIdTaken
     }
+    if ("user_id_cooldown_active" in body) {
+        Timber.tag("Auth").e(this, "user_id change cooldown active")
+        return AuthError.UserIdChangeCooldown
+    }
     return toAuthError()
 }
 

@@ -14,6 +14,7 @@ fun AuthError.asMessage(): String = when (this) {
     AuthError.InvalidEmail -> stringResource(R.string.auth_err_invalid_email)
     AuthError.RateLimited -> stringResource(R.string.auth_err_rate_limited)
     AuthError.UserIdTaken -> stringResource(R.string.auth_err_user_id_taken)
+    AuthError.UserIdChangeCooldown -> stringResource(R.string.auth_err_user_id_cooldown)
     AuthError.NoNetwork -> stringResource(R.string.auth_err_no_network)
     is AuthError.Unknown -> stringResource(R.string.auth_err_unknown)
 }

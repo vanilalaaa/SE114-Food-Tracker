@@ -121,6 +121,58 @@ class SupabaseProfileRepository @Inject constructor(
         )
     }
 
+    override suspend fun updateProfile(
+        displayName: String,
+        userId: String?,
+        avatarUrl: String?
+    ): AuthOutcome<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val uid = requireUid()
+            db.from("profile").update(
+                {
+                    set("display_name", displayName.trim())
+                    userId?.let { set("user_id", it.trim()) }
+                    avatarUrl?.let { set("avatar_url", it) }
+                }
+            ) { filter { eq("id", uid) } }
+            Unit
+        }.fold(
+            onSuccess = {
+                refreshMyProfile()
+                AuthOutcome.Success(Unit)
+            },
+            onFailure = { AuthOutcome.Failure(it.toProfileError()) }
+        )
+    }
+
+    override suspend fun userIdCooldownRemaining(): AuthOutcome<Int> = withContext(Dispatchers.IO) {
+        runCatching {
+            val raw = db.rpc("user_id_cooldown_remaining").decodeAsOrNull<String>()
+            parseCooldownDays(raw)
+        }.fold(
+            onSuccess = { AuthOutcome.Success(it) },
+            onFailure = { AuthOutcome.Failure(it.toAuthError()) }
+        )
+    }
+
+    // The RPC returns a Postgres interval string ("D days HH:MM:SS", or "00:00:00"
+    // when elapsed, or null when user_id was never set). Round any remainder up to
+    // whole days; 0 means the cooldown is over (or never started).
+    private fun parseCooldownDays(raw: String?): Int {
+        if (raw.isNullOrBlank()) return 0
+        var totalSeconds = 0L
+        Regex("""(\d+)\s+day""").find(raw)?.let {
+            totalSeconds += it.groupValues[1].toLong() * 86_400L
+        }
+        Regex("""(\d{1,2}):(\d{2}):(\d{2})""").find(raw)?.let { m ->
+            totalSeconds += m.groupValues[1].toLong() * 3_600L +
+                m.groupValues[2].toLong() * 60L +
+                m.groupValues[3].toLong()
+        }
+        if (totalSeconds <= 0L) return 0
+        return ((totalSeconds + 86_399L) / 86_400L).toInt()
+    }
+
     private fun requireUid(): String =
         auth.currentUserOrNull()?.id ?: error("No authenticated session")
 }

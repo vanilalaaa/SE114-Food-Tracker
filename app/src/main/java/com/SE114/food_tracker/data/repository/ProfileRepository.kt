@@ -30,4 +30,10 @@ interface ProfileRepository {
 
     /** UX-only availability hint; the DB unique index is the final authority. */
     suspend fun isUserIdAvailable(userId: String): AuthOutcome<Boolean>
+
+    /** Own-row UPDATE; [userId]/[avatarUrl] are written only when non-null. */
+    suspend fun updateProfile(displayName: String, userId: String?, avatarUrl: String?): AuthOutcome<Unit>
+
+    /** Remaining whole days before user_id can change again; 0 = changeable now. */
+    suspend fun userIdCooldownRemaining(): AuthOutcome<Int>
 }

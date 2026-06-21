@@ -41,6 +41,7 @@
     <string name="auth_err_invalid_email">Email không hợp lệ</string>
     <string name="auth_err_rate_limited">Bạn thao tác quá nhanh. Vui lòng thử lại sau giây lát.</string>
     <string name="auth_err_user_id_taken">User ID đã tồn tại</string>
+    <string name="auth_err_user_id_cooldown">Bạn vừa đổi User ID gần đây. Vui lòng thử lại sau.</string>
     <string name="auth_err_no_network">Không có kết nối mạng. Vui lòng kiểm tra Internet và thử lại.</string>
     <string name="auth_err_unknown">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
     <string name="auth_err_password_mismatch">Mật khẩu nhập lại không khớp</string>
@@ -78,4 +79,21 @@
     <string name="settings_logout_confirm_body">Bạn sẽ cần đăng nhập lại để tiếp tục.</string>
     <string name="settings_logout_confirm_yes">Đăng xuất</string>
     <string name="settings_logout_confirm_cancel">Huỷ</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Hồ sơ của tôi</string>
+    <string name="profile_back">Quay lại</string>
+    <string name="profile_avatar_desc">Ảnh đại diện</string>
+    <string name="profile_change_avatar">Đổi ảnh đại diện</string>
+    <string name="profile_display_name">Tên hiển thị</string>
+    <string name="profile_display_name_required">Tên hiển thị không được để trống</string>
+    <string name="profile_user_id">User ID</string>
+    <string name="profile_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
+    <string name="profile_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
+    <string name="profile_user_id_checking">Đang kiểm tra…</string>
+    <string name="profile_user_id_available">User ID khả dụng</string>
+    <string name="profile_user_id_taken">User ID đã được sử dụng</string>
+    <string name="profile_user_id_check_error">Không kiểm tra được, vui lòng thử lại</string>
+    <string name="profile_user_id_cooldown">Có thể đổi sau %1$d ngày</string>
+    <string name="profile_save">Lưu</string>
 </resources>

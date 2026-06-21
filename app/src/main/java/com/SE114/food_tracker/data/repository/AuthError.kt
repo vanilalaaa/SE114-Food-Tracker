@@ -12,6 +12,7 @@ sealed interface AuthError {
     data object InvalidEmail : AuthError
     data object RateLimited : AuthError
     data object UserIdTaken : AuthError
+    data object UserIdChangeCooldown : AuthError
     data object NoNetwork : AuthError
     data class Unknown(val raw: String?) : AuthError
 }
