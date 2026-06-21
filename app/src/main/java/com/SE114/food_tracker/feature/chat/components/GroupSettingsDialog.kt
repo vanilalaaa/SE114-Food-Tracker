@@ -17,13 +17,13 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 @Composable
 fun GroupSettingsDialog(
     conversationName: String,
+    memberList: List<Pair<String, String>>,
     onDismissRequest: () -> Unit,
     onRenameGroup: (String) -> Unit,
     onKickMember: (userId: String, name: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var groupNameInput by remember { mutableStateOf(conversationName) }
-    val mockMembers = listOf(Pair("azun_id", "Azun (Data)"), Pair("member_test_id", "Vy"))
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -64,7 +64,7 @@ fun GroupSettingsDialog(
                             onRenameGroup(groupNameInput)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark), // Hồng trầm đồng bộ nút Send
+                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark),
                     shape = RoundedCornerShape(24.dp),
                     modifier = Modifier.align(Alignment.End)
                 ) {
@@ -85,45 +85,58 @@ fun GroupSettingsDialog(
                     color = TextSecondary
                 )
 
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    mockMembers.forEach { member ->
-                        Surface(
-                            color = CardWhite,
-                            shape = RoundedCornerShape(16.dp),
-                            shadowElevation = 1.dp,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                // Kiểm tra nếu danh sách trống từ server
+                if (memberList.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Chưa tải được danh sách thành viên", color = HintGray, fontSize = 13.sp)
+                    }
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        memberList.forEach { member ->
+                            Surface(
+                                color = CardWhite,
+                                shape = RoundedCornerShape(16.dp),
+                                shadowElevation = 1.dp,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = member.second,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = TextPrimary
-                                )
-
-                                // Nút "Mời ra" dùng tone hồng pastel nhạt điểm chữ đỏ StatRed dịu mắt
-                                Surface(
-                                    color = StatPinkLight,
-                                    shape = RoundedCornerShape(12.dp),
+                                Row(
                                     modifier = Modifier
-                                        .clickable { onKickMember(member.first, member.second) }
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Mời ra ❌",
-                                        color = StatRed,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(
-                                            horizontal = 12.dp,
-                                            vertical = 6.dp
-                                        )
+                                        text = member.second,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = TextPrimary
                                     )
+
+                                    // Chỉ cho phép click gọi hàm Kick Member với đúng thông tin thực tế
+                                    Surface(
+                                        color = StatPinkLight,
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .clickable { onKickMember(member.first, member.second) }
+                                    ) {
+                                        Text(
+                                            text = "Mời ra ❌",
+                                            color = StatRed,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(
+                                                horizontal = 12.dp,
+                                                vertical = 6.dp
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -148,9 +161,14 @@ fun GroupSettingsDialog(
 @Preview(showBackground = true)
 @Composable
 fun GroupSettingsDialogPreview() {
+    val previewMembers = listOf(
+        Pair("azun_id", "Azun (Data) 🥑"),
+        Pair("vy_id", "Vy Nguyễn (BA) 🥰")
+    )
     FoodTrackerTheme {
         GroupSettingsDialog(
             conversationName = "Team SE114 - Food Tracker 🥑",
+            memberList = previewMembers,
             onDismissRequest = {},
             onRenameGroup = {},
             onKickMember = { _, _ -> }
