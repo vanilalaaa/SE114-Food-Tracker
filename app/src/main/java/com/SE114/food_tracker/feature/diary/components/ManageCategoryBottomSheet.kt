@@ -39,7 +39,7 @@ fun ManageCategoryBottomSheet(
     onDismiss: () -> Unit,
     onToggleVisibility: (DiaryCategory) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
-    onEditCategory: (DiaryCategory) -> Unit,
+    onEditCategory: (DiaryCategory, name: String, emoji: String) -> Unit,
     onCreateNew: (name: String, emoji: String) -> Unit,
     deleteError: String? = null,
     onClearDeleteError: () -> Unit = {}
@@ -47,6 +47,7 @@ fun ManageCategoryBottomSheet(
     val systemCategories = categories.filter { it.isSystem }
     val customCategories = categories.filter { !it.isSystem }
     var showCreateSheet by remember { mutableStateOf(false) }
+    var editingCategory by remember { mutableStateOf<DiaryCategory?>(null) }
 
     // Category pending confirmation before delete is committed
     var pendingDeleteCategory by remember { mutableStateOf<DiaryCategory?>(null) }
@@ -175,7 +176,7 @@ fun ManageCategoryBottomSheet(
                         CategoryItemRow(
                             category = category,
                             showEditActions = true,
-                            onEdit = { onEditCategory(category) },
+                            onEdit = { editingCategory = category },
                             // Request confirmation first; ViewModel runs RESTRICT check on confirm
                             onDelete = { pendingDeleteCategory = category },
                             onToggleVisibility = { onToggleVisibility(category) }
@@ -209,6 +210,17 @@ fun ManageCategoryBottomSheet(
             onCreate  = { name, emoji ->
                 onCreateNew(name, emoji)
                 showCreateSheet = false
+            }
+        )
+    }
+
+    editingCategory?.let { category ->
+        EditCategoryBottomSheet(
+            category = category,
+            onDismiss = { editingCategory = null },
+            onSave = { name, emoji ->
+                onEditCategory(category, name, emoji)
+                editingCategory = null
             }
         )
     }
@@ -315,6 +327,127 @@ fun CreateCategoryBottomSheet(
             ) {
                 Text(
                     "Tạo loại",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (categoryName.isNotBlank()) Color.White else Color.Gray
+                )
+            }
+        }
+    }
+
+    if (showEmojiPicker) {
+        EmojiPickerBottomSheet(
+            onDismiss = { showEmojiPicker = false },
+            onEmojiSelected = {
+                selectedEmoji = it
+                showEmojiPicker = false
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditCategoryBottomSheet(
+    category: DiaryCategory,
+    onDismiss: () -> Unit,
+    onSave: (name: String, emoji: String) -> Unit
+) {
+    var categoryName by remember(category.categoryId) { mutableStateOf(category.name) }
+    var selectedEmoji by remember(category.categoryId) { mutableStateOf(category.iconUrl) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 40.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Sửa loại", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.background(Color(0xFFF5F5F5), CircleShape).size(32.dp)
+                ) {
+                    Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp))
+                            .clickable { showEmojiPicker = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(selectedEmoji, fontSize = 28.sp)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .background(Color.White, CircleShape)
+                            .padding(2.dp)
+                            .background(Color(0xFFE57373), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(10.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                BasicTextField(
+                    value = categoryName,
+                    onValueChange = { categoryName = it },
+                    textStyle = TextStyle(fontSize = 16.sp, color = Color.Black),
+                    decorationBox = { innerTextField ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp))
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            if (categoryName.isEmpty()) {
+                                Text("Tên loại", color = Color.LightGray, fontSize = 16.sp)
+                            }
+                            innerTextField()
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = { onSave(categoryName, selectedEmoji) },
+                enabled = categoryName.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFE89A7A),
+                    disabledContainerColor = Color(0xFFE0E0E0)
+                )
+            ) {
+                Text(
+                    "Lưu thay đổi",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (categoryName.isNotBlank()) Color.White else Color.Gray
@@ -453,7 +586,7 @@ fun Preview_ManageCategoryBottomSheet() {
                 onDismiss = {},
                 onToggleVisibility = {},
                 onDeleteCategory = {},
-                onEditCategory = {},
+                onEditCategory = { _, _, _ -> },
                 onCreateNew = { _, _ -> }
             )
         }
