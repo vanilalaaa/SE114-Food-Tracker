@@ -17,6 +17,20 @@ interface FriendDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUserCache(userProfile: UserProfileCacheEntity)
 
+    @Query("SELECT * FROM friendship WHERE friendship_id = :friendshipId LIMIT 1")
+    suspend fun getFriendshipById(friendshipId: String): FriendshipEntity?
+
+    @Query("""
+        SELECT * FROM friendship
+        WHERE is_deleted = 0
+        AND (
+            (sender_id = :firstUserId AND receiver_id = :secondUserId)
+            OR (sender_id = :secondUserId AND receiver_id = :firstUserId)
+        )
+        LIMIT 1
+    """)
+    suspend fun getFriendshipBetween(firstUserId: String, secondUserId: String): FriendshipEntity?
+
     @Query("""
         SELECT f.friendship_id AS friendshipId, 
                c.user_id AS userId, 
@@ -59,9 +73,18 @@ interface FriendDAO {
     """)
     fun getOutgoingRequests(myUserId: String): Flow<List<FriendItemDto>>
 
-    @Query("UPDATE friendship SET status = :newStatus, sync_status = 'PENDING', updated_at = :updatedAt WHERE friendship_id = :friendshipId")
-    suspend fun updateFriendshipStatus(friendshipId: String, newStatus: String, updatedAt: Long = System.currentTimeMillis())
+    @Query("UPDATE friendship SET status = :newStatus, sync_status = :syncStatus, updated_at = :updatedAt WHERE friendship_id = :friendshipId")
+    suspend fun updateFriendshipStatus(
+        friendshipId: String,
+        newStatus: String,
+        syncStatus: String = "PENDING",
+        updatedAt: Long = System.currentTimeMillis()
+    )
 
-    @Query("UPDATE friendship SET is_deleted = 1, sync_status = 'PENDING', updated_at = :updatedAt WHERE friendship_id = :friendshipId")
-    suspend fun softDeleteFriendship(friendshipId: String, updatedAt: Long = System.currentTimeMillis())
+    @Query("UPDATE friendship SET is_deleted = 1, sync_status = :syncStatus, updated_at = :updatedAt WHERE friendship_id = :friendshipId")
+    suspend fun softDeleteFriendship(
+        friendshipId: String,
+        syncStatus: String = "PENDING",
+        updatedAt: Long = System.currentTimeMillis()
+    )
 }

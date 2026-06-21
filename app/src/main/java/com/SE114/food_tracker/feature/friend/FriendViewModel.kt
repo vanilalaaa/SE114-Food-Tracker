@@ -4,18 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.data.repository.FriendRepository
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
+import com.SE114.food_tracker.feature.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class FriendViewModel @Inject constructor(
-    private val repository: FriendRepository
+    private val repository: FriendRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     val acceptedFriends = repository.getAcceptedFriends()
@@ -27,6 +31,8 @@ class FriendViewModel @Inject constructor(
     val outgoingRequests = repository.getOutgoingRequests()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val currentProfile = repository.currentProfile
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
@@ -35,6 +41,34 @@ class FriendViewModel @Inject constructor(
 
     private val _isLoadingSearch = MutableStateFlow(false)
     val isLoadingSearch = _isLoadingSearch.asStateFlow()
+
+    private val _profileLoadError = MutableStateFlow<String?>(null)
+    val profileLoadError = _profileLoadError.asStateFlow()
+
+    init {
+        loadFriendData()
+
+        viewModelScope.launch {
+            authRepository.currentSessionFlow()
+                .filterIsInstance<SessionStatus.Authenticated>()
+                .collect {
+                    loadFriendData()
+                }
+        }
+    }
+
+    private fun loadFriendData() {
+        viewModelScope.launch {
+            repository.refreshCurrentProfile()
+                .onSuccess {
+                    _profileLoadError.value = null
+                    repository.refreshFriendships()
+                }
+                .onFailure {
+                    _profileLoadError.value = "Không lấy được ID"
+                }
+        }
+    }
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
@@ -57,8 +91,10 @@ class FriendViewModel @Inject constructor(
     fun sendFriendRequest(targetProfileId: String) {
         viewModelScope.launch {
             repository.sendFriendRequest(targetProfileId)
-            _searchResult.value = null
-            _searchQuery.value = ""
+                .onSuccess {
+                    _searchResult.value = null
+                    _searchQuery.value = ""
+                }
         }
     }
 
@@ -77,6 +113,12 @@ class FriendViewModel @Inject constructor(
     fun unfriend(friendshipId: String) {
         viewModelScope.launch {
             repository.unfriend(friendshipId)
+        }
+    }
+
+    fun cancelOutgoingRequest(friendshipId: String) {
+        viewModelScope.launch {
+            repository.cancelOutgoingRequest(friendshipId)
         }
     }
 }
