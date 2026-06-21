@@ -27,8 +27,8 @@ class FeedRepository @Inject constructor(
     fun observePosts(pageSize: Int, page: Int): Flow<List<FeedPostDto>> =
         feedDao.observePosts(
             currentUserId = currentUserId(),
-            limit = pageSize,
-            offset = (page - 1).coerceAtLeast(0) * pageSize
+            limit = pageSize * page.coerceAtLeast(1),
+            offset = 0
         )
 
     fun observeComments(postId: String): Flow<List<FeedCommentDto>> =
