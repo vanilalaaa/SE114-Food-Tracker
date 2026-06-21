@@ -121,6 +121,15 @@ interface FeedDAO {
     @Query("SELECT * FROM feed_post WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingPosts(): List<FeedPost>
 
+    @Query(
+        """
+        SELECT post_id
+        FROM feed_post
+        WHERE is_deleted = 1 AND (sync_status = 'PENDING' OR sync_status = 'FAILED')
+        """
+    )
+    suspend fun getPendingDeletedPostIds(): List<String>
+
     @Query("SELECT * FROM feed_like WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingLikes(): List<FeedLike>
 

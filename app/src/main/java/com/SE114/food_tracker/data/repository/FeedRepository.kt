@@ -160,13 +160,15 @@ class FeedRepository @Inject constructor(
                     }
                 }
                 .decodeList<FeedPostRemoteDTO>()
+            val pendingDeletedPostIds = feedDao.getPendingDeletedPostIds().toSet()
+            val visibleRemotePosts = remotePosts.filterNot { it.id in pendingDeletedPostIds }
 
-            val postEntities = remotePosts.map { dto ->
+            val postEntities = visibleRemotePosts.map { dto ->
                 dto.toEntity(
                     ownerName = profiles[dto.authorId].displayNameOrFallback(dto.authorId)
                 )
             }
-            val remotePostIds = remotePosts.map { it.id }
+            val remotePostIds = visibleRemotePosts.map { it.id }
             if (remotePostIds.isEmpty()) {
                 feedDao.deleteAllSyncedPosts()
             } else {
