@@ -79,7 +79,11 @@ class SupabaseProfileRepository @Inject constructor(
         )
     }
 
-    override suspend fun completeOnboarding(userId: String): AuthOutcome<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun completeOnboarding(
+        displayName: String,
+        userId: String,
+        avatarUrl: String?
+    ): AuthOutcome<Unit> = withContext(Dispatchers.IO) {
         val normalized = userId.trim()
         runCatching {
             val uid = requireUid()
@@ -94,14 +98,19 @@ class SupabaseProfileRepository @Inject constructor(
             if (!alreadyDone) {
                 db.from("profile").update(
                     {
+                        set("display_name", displayName.trim())
                         set("user_id", normalized)
                         set("onboarding_completed", true)
+                        avatarUrl?.let { set("avatar_url", it) }
                     }
                 ) { filter { eq("id", uid) } }
             }
             Unit
         }.fold(
-            onSuccess = { AuthOutcome.Success(Unit) },
+            onSuccess = {
+                refreshMyProfile()
+                AuthOutcome.Success(Unit)
+            },
             onFailure = { AuthOutcome.Failure(it.toProfileError()) }
         )
     }

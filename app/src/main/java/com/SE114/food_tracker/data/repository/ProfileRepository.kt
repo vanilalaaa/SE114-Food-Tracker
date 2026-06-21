@@ -25,8 +25,11 @@ interface ProfileRepository {
     /** Onboarding is complete when `onboarding_completed = true AND user_id IS NOT NULL`. */
     suspend fun getProfileStatus(): AuthOutcome<ProfileStatus>
 
-    /** UPDATEs the current user's row; idempotent for the same normalized [userId]. */
-    suspend fun completeOnboarding(userId: String): AuthOutcome<Unit>
+    /**
+     * UPDATEs display_name + user_id (+ avatar when non-null) and sets
+     * onboarding_completed; idempotent for the same already-onboarded [userId].
+     */
+    suspend fun completeOnboarding(displayName: String, userId: String, avatarUrl: String?): AuthOutcome<Unit>
 
     /** UX-only availability hint; the DB unique index is the final authority. */
     suspend fun isUserIdAvailable(userId: String): AuthOutcome<Boolean>

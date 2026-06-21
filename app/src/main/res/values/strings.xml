@@ -52,6 +52,10 @@
     <!-- Complete profile -->
     <string name="auth_complete_title">Hoàn tất hồ sơ</string>
     <string name="auth_complete_subtitle">Chọn một User ID để bạn bè có thể tìm thấy bạn.</string>
+    <string name="auth_complete_display_name">Tên hiển thị</string>
+    <string name="auth_complete_display_name_required">Tên hiển thị không được để trống</string>
+    <string name="auth_complete_avatar_desc">Ảnh đại diện</string>
+    <string name="auth_complete_change_avatar">Đổi ảnh đại diện</string>
     <string name="auth_complete_user_id">User ID</string>
     <string name="auth_complete_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
     <string name="auth_complete_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
