@@ -39,8 +39,6 @@ fun ManageCategoryBottomSheet(
     onDismiss: () -> Unit,
     onToggleVisibility: (DiaryCategory) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
-    // Signature changed: now delivers (category, newName, newIconUrl) so the
-    // caller (ViewModel) receives the updated values without needing its own state.
     onEditCategory: (category: DiaryCategory, newName: String, newIconUrl: String) -> Unit,
     onCreateNew: (name: String, emoji: String) -> Unit,
     deleteError: String? = null,
@@ -202,6 +200,7 @@ fun ManageCategoryBottomSheet(
                             category          = category,
                             showEditActions   = true,
                             onEdit            = { pendingEditCategory = category },
+                            // Confirmation first; ViewModel runs the RESTRICT check on confirm.
                             onDelete          = { pendingDeleteCategory = category },
                             onToggleVisibility = { onToggleVisibility(category) }
                         )
@@ -419,7 +418,7 @@ fun EmojiPickerBottomSheet(
     }
 }
 
-// ── Category row (unchanged) ───────────────────────────────────────────────────
+// ── Category row ────────────────────────────────────────────────────────────
 @Composable
 private fun CategoryItemRow(
     category:          DiaryCategory,

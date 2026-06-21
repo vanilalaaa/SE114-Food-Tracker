@@ -36,6 +36,21 @@ class CategoryViewModel @Inject constructor(
                 initialValue = emptyList()
             )
 
+    // All categories (including hidden) — feeds the "manage categories" sheet so a
+    // hidden category can still be found and un-hidden there.
+    val allCategories: StateFlow<List<DiaryCategory>> =
+        categoryRepository.getAllCategories()
+            .map { categories -> categories.map { it.toDiaryCategory() } }
+            .catch { throwable ->
+                _error.value = throwable.message
+                emit(emptyList())
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+
     fun addCategory(name: String, iconUrl: String) {
         val userId = categoryRepository.getCurrentUserId()
         if (userId == null) {
@@ -90,14 +105,9 @@ class CategoryViewModel @Inject constructor(
     fun toggleVisibility(category: DiaryCategory) {
         viewModelScope.launch {
             runCatching {
-                val existing = categoryRepository.getCategoryByIdOneShot(category.categoryId)
-                    ?: error("Không tìm thấy danh mục để cập nhật")
-                categoryRepository.updateCategory(
-                    existing.copy(
-                        isHidden   = !existing.isHidden,
-                        syncStatus = SyncStatus.PENDING.name,
-                        updatedAt  = System.currentTimeMillis()
-                    )
+                categoryRepository.updateCategoryVisibility(
+                    categoryId = category.categoryId,
+                    isHidden = !category.isHidden
                 )
             }.onFailure { _error.value = it.message }
         }
@@ -124,15 +134,6 @@ class CategoryViewModel @Inject constructor(
 
     private fun Category.toDiaryCategory(): DiaryCategory =
         DiaryCategory(
-            categoryId = categoryId,
-            name       = name,
-            iconUrl    = iconUrl,
-            isHidden   = isHidden,
-            isSystem   = isSystem
-        )
-
-    private fun DiaryCategory.toEntity(): Category =
-        Category(
             categoryId = categoryId,
             name       = name,
             iconUrl    = iconUrl,

@@ -43,15 +43,18 @@ fun DiaryScreen(
     val categoryViewModel = hiltViewModel<CategoryViewModel>()
     val uiState           by diaryViewModel.uiState.collectAsStateWithLifecycle()
     val categoryState     by categoryViewModel.visibleCategories.collectAsStateWithLifecycle()
+    val allCategoryState  by categoryViewModel.allCategories.collectAsStateWithLifecycle()
     val pendingImageUri   by diaryViewModel.pendingImageUri.collectAsStateWithLifecycle()
     val categoryError     by categoryViewModel.error.collectAsStateWithLifecycle()
 
-    val categories = categoryState
+    val categories = categoryState.ifEmpty { uiState.categories }
+    val manageCategories = allCategoryState.ifEmpty { categories }
 
     DiaryScreenContent(
         uiState                    = uiState,
         pendingImageUri            = pendingImageUri,
         categories                 = categories,
+        manageCategories           = manageCategories,
         categoryDeleteError        = categoryError,
         triggerAdd                 = triggerAdd,
         onAddTriggered             = onAddTriggered,
@@ -76,6 +79,7 @@ fun DiaryScreenContent(
     uiState: DiaryUiState,
     pendingImageUri: Uri?,
     categories: List<DiaryCategory>,
+    manageCategories: List<DiaryCategory>,
     categoryDeleteError: String?,
     triggerAdd: Boolean,
     onAddTriggered: () -> Unit,
@@ -184,7 +188,7 @@ fun DiaryScreenContent(
                     showDetailSheet = true
                 }
             },
-            hasDataDates = uiState.datesWithData.toList(),
+            monthlyItems = filteredMonthlyItems,
             scale        = calendarScale
         )
 
@@ -255,6 +259,7 @@ fun DiaryScreenContent(
                     existingItem        = editingItem,
                     preSelectedCategory = preSelectedCategory,
                     categories          = categories,
+                    manageCategories    = manageCategories,
                     pendingImageUri     = pendingImageUri,
                     categoryDeleteError = categoryDeleteError,
                     onDismiss = {
@@ -305,6 +310,11 @@ fun DiaryScreenPreview() {
             categories             = listOf(
                 DiaryCategory("1", "Cơm",      "🍚", isSystem = true),
                 DiaryCategory("2", "Mì & Phở", "🍜", isSystem = true)
+            ),
+            manageCategories       = listOf(
+                DiaryCategory("1", "Rice", "🍚", isSystem = true),
+                DiaryCategory("2", "Noodles", "🍜", isSystem = true),
+                DiaryCategory("3", "Hidden", "👀", isHidden = true)
             ),
             categoryDeleteError        = null,
             triggerAdd                 = false,
