@@ -71,6 +71,7 @@ fun FoodEntryScreen(
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
     onCreateCategory: (String, String) -> Unit = { _, _ -> },
+    onUpdateCategory: (DiaryCategory, String, String) -> Unit = { _, _, _ -> },
     onClearCategoryError: () -> Unit = {}
 ) {
     var foodName by remember(existingItem?.itemId, preSelectedCategory) {
@@ -214,7 +215,7 @@ fun FoodEntryScreen(
             onDismiss           = { showManageCategoriesSheet = false },
             onToggleVisibility  = onToggleCategoryVisibility,
             onDeleteCategory    = onDeleteCategory,
-            onEditCategory      = { /* TODO Sprint 2 */ },
+            onEditCategory      = onUpdateCategory,
             onCreateNew         = { name, emoji ->
                 onCreateCategory(name, emoji)
                 showManageCategoriesSheet = false

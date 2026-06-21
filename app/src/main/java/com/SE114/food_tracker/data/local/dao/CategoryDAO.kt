@@ -12,6 +12,17 @@ interface CategoryDAO {
     @Update
     suspend fun update(category: Category)
 
+    @Query(
+        "UPDATE category SET name = :name, icon_url = :iconUrl, sync_status = 'PENDING', updated_at = :updatedAt " +
+            "WHERE category_id = :categoryId AND is_system = 0 AND is_deleted = 0"
+    )
+    suspend fun updateCustomCategoryDetails(
+        categoryId: String,
+        name: String,
+        iconUrl: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
     // Soft-delete: marks is_deleted = 1 and queues for sync. Only for custom (is_system = false).
     @Query("UPDATE category SET is_deleted = 1, sync_status = 'PENDING', updated_at = :updatedAt WHERE category_id = :categoryId AND is_system = 0")
     suspend fun softDeleteCategory(categoryId: String, updatedAt: Long = System.currentTimeMillis())

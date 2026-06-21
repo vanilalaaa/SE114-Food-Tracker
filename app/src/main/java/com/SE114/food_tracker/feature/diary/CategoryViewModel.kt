@@ -70,6 +70,29 @@ class CategoryViewModel @Inject constructor(
         }
     }
 
+    fun updateCategory(category: DiaryCategory, name: String, iconUrl: String) {
+        if (category.isSystem) {
+            _error.value = "Danh mục hệ thống không thể chỉnh sửa."
+            return
+        }
+
+        val trimmedName = name.trim()
+        if (trimmedName.isBlank()) {
+            _error.value = "Tên danh mục không được để trống."
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                categoryRepository.updateCustomCategoryDetails(
+                    categoryId = category.categoryId,
+                    name = trimmedName,
+                    iconUrl = iconUrl
+                )
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
     fun deleteCategory(category: DiaryCategory) {
         if (category.isSystem) {
             _error.value = "Danh mục hệ thống không thể xóa. Hãy ẩn nó thay thế."

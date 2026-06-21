@@ -65,6 +65,7 @@ fun DiaryScreen(
         onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
         onCreateCategory           = { name, emoji -> categoryViewModel.addCategory(name, emoji) },
+        onUpdateCategory           = { category, name, emoji -> categoryViewModel.updateCategory(category, name, emoji) },
         onSelectCategoryFilter     = { catId -> diaryViewModel.selectCategoryFilter(catId) }
     )
 }
@@ -88,6 +89,7 @@ fun DiaryScreenContent(
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
     onCreateCategory: (String, String) -> Unit,
+    onUpdateCategory: (DiaryCategory, String, String) -> Unit,
     onSelectCategoryFilter: (String?) -> Unit
 ) {
     var showDetailSheet     by remember { mutableStateOf(false) }
@@ -183,7 +185,7 @@ fun DiaryScreenContent(
                     showDetailSheet = true
                 }
             },
-            hasDataDates = uiState.datesWithData.toList(),
+            monthlyItems = filteredMonthlyItems,
             scale        = calendarScale
         )
 
@@ -281,6 +283,7 @@ fun DiaryScreenContent(
                     onToggleCategoryVisibility = onToggleCategoryVisibility,
                     onDeleteCategory           = onDeleteCategory,
                     onCreateCategory           = onCreateCategory,
+                    onUpdateCategory           = onUpdateCategory,
                     onClearCategoryError       = onClearCategoryError
                 )
             }
@@ -317,6 +320,7 @@ fun DiaryScreenPreview() {
             onDeleteCategory           = {},
             onToggleCategoryVisibility = {},
             onCreateCategory           = { _, _ -> },
+            onUpdateCategory           = { _, _, _ -> },
             onSelectCategoryFilter     = {}
         )
     }
