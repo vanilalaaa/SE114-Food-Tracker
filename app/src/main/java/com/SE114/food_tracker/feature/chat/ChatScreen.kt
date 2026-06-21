@@ -58,11 +58,7 @@ fun ChatScreen(
 
     // Hứng dữ liệu an toàn từ StateFlow tập trung của ViewModel
     val memberList by viewModel.groupMembers.collectAsState()
-    // Kiểm tra bất đồng bộ quyền Admin thật từ server
-    var isAdmin by remember { mutableStateOf(false) }
-    LaunchedEffect(conversationId, conversationState) {
-        isAdmin = viewModel.isCurrentUserAdmin(conversationId)
-    }
+    val isAdmin by viewModel.isCurrentAdmin.collectAsState()
 
     // State điều khiển Dialog nhập tên tạo Quỹ nhóm mới
     var showCreateWalletDialog by remember { mutableStateOf(false) }

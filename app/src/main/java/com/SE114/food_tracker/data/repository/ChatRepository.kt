@@ -66,6 +66,20 @@ class ChatRepository @Inject constructor(
         @SerialName("is_admin") val isAdmin: Boolean
     )
     @Serializable
+    data class SupabaseGroupWalletDto(
+        @SerialName("id") val id: String,
+        @SerialName("name") val name: String,
+        @SerialName("balance") val balance: Double,
+        @SerialName("created_by") val createdBy: String
+    )
+
+    @Serializable
+    data class SupabaseWalletMembershipDto(
+        @SerialName("wallet_id") val walletId: String,
+        @SerialName("user_id") val userId: String,
+        @SerialName("role") val role: String
+    )
+    @Serializable
     data class ProfileNameDto(
         @SerialName("display_name") val displayName: String? = null
     )
@@ -455,34 +469,42 @@ class ChatRepository @Inject constructor(
         memberUserIds: List<String>
     ): Boolean {
         return try {
-            // 🔥 ĐÃ FIX: Sinh UUID chuẩn 100% để Postgres chịu nhận kiểu dữ liệu uuid cho khóa chính
-            val walletUuid = UUID.randomUUID().toString()
-            val currentUserId = getAuthenticatedUserId()
+            val walletUuid = java.util.UUID.randomUUID().toString()
+            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: ""
 
-            supabaseClient.from("group_wallet").insert(
-                mapOf(
-                    "id" to walletUuid,
-                    "name" to walletName,
-                    "balance" to 0.0,
-                    "created_by" to currentUserId
-                )
+            if (currentUserId.isBlank()) {
+                println("Lỗi tạo ví: Không tìm thấy ID User hợp lệ")
+                return false
+            }
+
+            // 1. 🔥 ĐÃ FIX: Chèn ví mới dùng DTO Class có @Serializable chuẩn chỉnh
+            val walletDto = SupabaseGroupWalletDto(
+                id = walletUuid,
+                name = walletName,
+                balance = 0.0,
+                createdBy = currentUserId
             )
+            supabaseClient.from("group_wallet").insert(walletDto)
 
+            // 2. 🔥 ĐÃ FIX: Chèn liên kết thành viên dùng DTO Class chuẩn chỉnh
             val allMembers = (memberUserIds + currentUserId).distinct()
             val membershipRows = allMembers.map { userId ->
-                mapOf(
-                    "wallet_id" to walletUuid,
-                    "user_id" to userId,
-                    "role" to if (userId == currentUserId) "owner" else "member"
+                SupabaseWalletMembershipDto(
+                    walletId = walletUuid,
+                    userId = userId,
+                    role = if (userId == currentUserId) "owner" else "member"
                 )
             }
             supabaseClient.from("wallet_membership").insert(membershipRows)
 
-            supabaseClient.from("conversation").update(mapOf("wallet_id" to walletUuid)) {
+            // 3. Cập nhật wallet_id ngược lại bảng conversation trên server
+            // (Dùng cấu trúc mapOf cho update đơn giản hoặc DTO đều được, nhưng dùng map thô với chuỗi tường minh)
+            val updateData = mapOf("wallet_id" to walletUuid)
+            supabaseClient.from("conversation").update(updateData) {
                 filter { eq("id", conversationId) }
             }
 
-            // Cập nhật ID ví mới trực tiếp vào Room local để kích hoạt hiển thị nút Quỹ lập tức
+            // 4. Đồng bộ trực tiếp xuống Room DB local ngay lập tức
             val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
             currentConv?.let {
                 chatDAO.insertConversation(it.copy(walletId = walletUuid))
@@ -490,12 +512,12 @@ class ChatRepository @Inject constructor(
 
             sendSystemMessage(
                 conversationId,
-                "Quỹ nhóm '$walletName' đã được Admin thiết lập thành công."
+                "Quỹ nhóm '$walletName' đã được thiết lập thành công."
             )
             true
         } catch (e: Exception) {
             e.printStackTrace()
-            println("Lỗi luồng tạo ví quỹ nhóm: ${e.localizedMessage}")
+            println("Lỗi luồng tạo ví quỹ nhóm thực tế: ${e.localizedMessage}")
             false
         }
     }

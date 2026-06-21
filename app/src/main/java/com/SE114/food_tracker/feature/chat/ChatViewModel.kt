@@ -60,11 +60,15 @@ class ChatViewModel @Inject constructor(
     // 🔥 ĐÃ FIX: Biến StateFlow quản lý tập trung danh sách thành viên nhóm
     private val _groupMembers = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val groupMembers: StateFlow<List<Pair<String, String>>> = _groupMembers.asStateFlow()
+    private val _isCurrentAdmin = MutableStateFlow(false)
+    val isCurrentAdmin: StateFlow<Boolean> = _isCurrentAdmin.asStateFlow()
 
     // Hàm gọi bốc dữ liệu một lần duy nhất khi vào phòng chat
     fun loadGroupMembers(conversationId: String) {
         viewModelScope.launch {
             chatRepository.syncMessagesFromServer(conversationId)
+            val isAdmin = chatRepository.isCurrentUserAdminOf(conversationId)
+            _isCurrentAdmin.value = isAdmin
             val actualMembers = chatRepository.fetchGroupMembersFromServer(conversationId)
             _groupMembers.value = actualMembers
         }
