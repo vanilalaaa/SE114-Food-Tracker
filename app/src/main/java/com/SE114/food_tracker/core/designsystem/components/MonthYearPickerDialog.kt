@@ -1,4 +1,4 @@
-package com.SE114.food_tracker.feature.diary.components
+package com.SE114.food_tracker.core.designsystem.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

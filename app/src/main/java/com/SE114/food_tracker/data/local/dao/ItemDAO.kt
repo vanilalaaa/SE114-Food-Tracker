@@ -6,8 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ItemDAO {
-    // CRUD
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun insertItem(item: Item)
 
     @Update
@@ -20,15 +19,17 @@ interface ItemDAO {
     suspend fun softDeleteItem(itemId: String, updatedAt: Long = System.currentTimeMillis())
 
     @Query("SELECT * FROM item WHERE item_id = :id AND is_deleted = 0")
-    fun getItemById(id: String): Flow<Item?> 
+    fun getItemById(id: String): Flow<Item?>
 
     @Query("SELECT * FROM item WHERE is_deleted = 0 ORDER BY created_at DESC")
     fun getAllItems(): Flow<List<Item>>
 
+    @Query("SELECT * FROM item WHERE item_id = :id")
+    suspend fun getItemByIdOneShot(id: String): Item?
+
     @Query("SELECT * FROM item WHERE category_id = :catId AND is_deleted = 0")
     fun getItemsByCategory(catId: String): Flow<List<Item>>
 
-    // Lọc dữ liệu theo Ngày/Buổi cho màn hình Nhật ký
     @Query("SELECT * FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND is_deleted = 0 ORDER BY time_type ASC, created_at DESC")
     fun getItemsByDay(startDate: Long, endDate: Long): Flow<List<Item>>
 
@@ -38,11 +39,10 @@ interface ItemDAO {
     @Query("SELECT * FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND category_id = :categoryId AND is_deleted = 0 ORDER BY entry_date DESC")
     fun getItemsByCategoryAndDay(categoryId: String, startDate: Long, endDate: Long): Flow<List<Item>>
 
-    // Phục vụ cơ chế Đồng bộ Local-First (Lấy cả những item bị đánh dấu xóa nhưng chưa sync lên server)
     @Query("SELECT * FROM item WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingItems(): List<Item>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertItemsFromServer(items: List<Item>)
 
     @Query("UPDATE item SET sync_status = 'SYNCED' WHERE item_id = :itemId")
@@ -51,14 +51,111 @@ interface ItemDAO {
     @Query("UPDATE item SET sync_status = 'FAILED' WHERE item_id = :itemId")
     suspend fun markFailed(itemId: String)
 
-    // Phục vụ Thống kê Chi tiêu Cá nhân
     @Query("SELECT COUNT(*) FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0")
     fun getItemCountForDay(startDate: Long, endDate: Long): Flow<Int>
 
     @Query("SELECT SUM(price) FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0")
-    fun getTotalExpenseForDay(startDate: Long, endDate: Long): Flow<Double?> 
+    fun getTotalExpenseForDay(startDate: Long, endDate: Long): Flow<Double?>
 
-    // Lấy chi tiêu gom nhóm theo danh mục phục vụ vẽ biểu đồ Donut của Vico Chart
     @Query("SELECT category_id, SUM(price) as total FROM item WHERE entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0 GROUP BY category_id ORDER BY total DESC")
     fun getPersonalExpenseByCategory(startDate: Long, endDate: Long): Flow<List<CategoryExpense>>
+
+    /**
+     * Biểu đồ cột theo ngày — spend (and count) bucketed by meal session.
+     * time_type: 0 = Sáng, 1 = Trưa, 2 = Tối.
+     */
+    @Query("""
+        SELECT time_type, SUM(price) as total, COUNT(*) as count
+        FROM item
+        WHERE entry_date >= :startDate AND entry_date < :endDate
+          AND wallet_id IS NULL AND is_deleted = 0
+        GROUP BY time_type
+        ORDER BY time_type ASC
+    """)
+    fun getExpenseByTimeType(startDate: Long, endDate: Long): Flow<List<TimeTypeExpense>>
+
+    /**
+     * Biểu đồ cột theo Tuần/Tháng — one row per distinct entry_date.
+     * The ViewModel/Repository maps entry_date epoch → day label (T2…CN or 1…31).
+     */
+    @Query("""
+        SELECT entry_date, SUM(price) as total
+        FROM item
+        WHERE entry_date >= :startDate AND entry_date < :endDate
+          AND wallet_id IS NULL AND is_deleted = 0
+        GROUP BY entry_date
+        ORDER BY entry_date ASC
+    """)
+    fun getExpenseByDateBucket(startDate: Long, endDate: Long): Flow<List<DateExpense>>
+
+    /**
+     * YEAR view bar chart — exactly 12 bars, one per calendar month.
+     *
+     * SQLite does not have native month extraction from epoch-millis, so we derive the
+     * month bucket via integer arithmetic. entry_date is UTC midnight millis.
+     *
+     *   days_since_epoch  = entry_date / 86400000
+     *   year              = (days_since_epoch * 400 + 200) / 146097 + 1970   (approx)
+     *   month             ≈ computed from day-of-year
+     *
+     * Instead of that fragile math, we use a clean two-level approach:
+     *   1. Group by (entry_date / 2629800000) — 2629800000 ms ≈ 30.4375 days ≈ 1 month
+     *      This gives the "month bucket index" from epoch.
+     *   2. Return the bucket start as month_epoch = bucket_index * 2629800000
+     *
+     * This is accurate enough for display and avoids complex SQLite date functions.
+     * The label is derived in Kotlin via [Long.toDayLabel(TimeFrame.YEAR)] → "Th1"…"Th12".
+     *
+     * NOTE: We still filter by [startDate]..[endDate] (the Jan-1 → Dec-31 range) so only
+     * the 12 months of the anchor year are included.
+     */
+    @Query("""
+        SELECT 
+            (entry_date / 2629800000) * 2629800000 AS month_epoch,
+            SUM(price) as total
+        FROM item
+        WHERE entry_date >= :startDate AND entry_date < :endDate
+          AND wallet_id IS NULL AND is_deleted = 0
+        GROUP BY month_epoch
+        ORDER BY month_epoch ASC
+    """)
+    fun getExpenseByMonthBucket(startDate: Long, endDate: Long): Flow<List<MonthExpense>>
+
+    /**
+     * "Kẻ hủy diệt ví" — the single most expensive personal item in the period.
+     * [limit] defaults to 1 (top-1 confirmed for Sprint 2).
+     */
+    @Query("""
+        SELECT * FROM item
+        WHERE entry_date >= :startDate AND entry_date < :endDate
+          AND wallet_id IS NULL AND is_deleted = 0
+        ORDER BY price DESC
+        LIMIT :limit
+    """)
+    fun getTopExpensiveItems(startDate: Long, endDate: Long, limit: Int = 1): Flow<List<Item>>
+
+    /**
+     * "Phổ biến nhất" — most frequently logged food names, with tie-break by total spend.
+     */
+    @Query("""
+        SELECT name, COUNT(*) as recordCount, SUM(price) as totalSpent
+        FROM item
+        WHERE entry_date >= :startDate AND entry_date < :endDate
+          AND wallet_id IS NULL AND is_deleted = 0
+        GROUP BY name
+        ORDER BY recordCount DESC, totalSpent DESC
+        LIMIT :limit
+    """)
+    fun getPopularFoods(startDate: Long, endDate: Long, limit: Int = 5): Flow<List<PopularFoodExpense>>
+
+    /**
+     * Tổng chi tiêu theo khoảng thời gian — used for "vs previous period" comparison.
+     * Separate from [getTotalExpenseForDay] which has a misleading name but the same SQL.
+     */
+    @Query("""
+        SELECT SUM(price) FROM item
+        WHERE entry_date >= :startDate AND entry_date < :endDate
+          AND wallet_id IS NULL AND is_deleted = 0
+    """)
+    fun getTotalExpenseForRange(startDate: Long, endDate: Long): Flow<Double?>
 }

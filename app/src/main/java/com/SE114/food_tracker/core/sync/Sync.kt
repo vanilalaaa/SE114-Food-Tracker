@@ -7,8 +7,10 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.SE114.food_tracker.data.remote.SupabaseItemService
+import com.SE114.food_tracker.data.remote.dto.BudgetDTO
 import com.SE114.food_tracker.data.remote.dto.CategoryDTO
 import com.SE114.food_tracker.data.remote.mapper.DataMapper
+import com.SE114.food_tracker.data.repository.BudgetRepository
 import com.SE114.food_tracker.data.repository.CategoryRepository
 import com.SE114.food_tracker.data.repository.ItemRepository
 import dagger.assisted.Assisted
@@ -26,7 +28,8 @@ class Sync @AssistedInject constructor(
     private val itemRepository: ItemRepository,
     private val categoryRepository: CategoryRepository,
     private val supabaseItemService: SupabaseItemService,
-    private val supabaseClient: SupabaseClient
+    private val supabaseClient: SupabaseClient,
+    private val budgetRepository: BudgetRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -84,6 +87,23 @@ class Sync @AssistedInject constructor(
                     continue
                 }
 
+                // Soft-deleted custom category: push is_deleted=true to server, keep row locally
+                if (category.isDeleted) {
+                    val dto = with(DataMapper) { category.toDto() }
+                    Timber.d("[Sync] soft-deleting category '${category.name}' id=${category.categoryId} on server")
+                    runCatching {
+                        supabaseClient.postgrest.from("category").upsert(dto)
+                    }.onSuccess {
+                        categoryRepository.markSynced(category.categoryId)
+                        Timber.d("[Sync] ✓ category soft-deleted on server: ${category.name}")
+                    }.onFailure { err ->
+                        Timber.e(err, "[Sync] ✗ category soft-delete FAILED: ${category.name} — ${err.message}")
+                        categoryRepository.markFailed(category.categoryId)
+                        anyError = true
+                    }
+                    continue
+                }
+
                 val dto = with(DataMapper) { category.toDto() }
                 Timber.d("[Sync] upserting category '${category.name}' id=${category.categoryId}")
 
@@ -133,6 +153,39 @@ class Sync @AssistedInject constructor(
             anyError = true
         }
 
+        // ── STEP 1.3: push pending budget ────────────────────────────────────
+        try {
+            val pendingBudgets = budgetRepository.getPendingBudgets()
+            Timber.d("[Sync] budgets pending = ${pendingBudgets.size}")
+
+            for (budget in pendingBudgets) {
+                // ⚠️  RLS policy budget_owner_all: `auth.uid() = user_id`.
+                // A mismatch never throws — postgrest silently returns 0 rows.
+                // Detect it here and markFailed so the row doesn't loop as PENDING forever.
+                if (budget.userId != ownerId) {
+                    Timber.e("[Sync] SKIPPING budget — userId ${budget.userId} != auth uid $ownerId")
+                    budgetRepository.markFailed(budget.userId)
+                    anyError = true
+                    continue
+                }
+
+                val dto = with(DataMapper) { budget.toDto() }
+                runCatching {
+                    supabaseClient.postgrest.from("budget").upsert(dto)
+                }.onSuccess {
+                    budgetRepository.markSynced(budget.userId)
+                    Timber.d("[Sync] ✓ budget synced for userId=${budget.userId}")
+                }.onFailure { err ->
+                    Timber.e(err, "[Sync] ✗ budget FAILED — ${err.message}")
+                    budgetRepository.markFailed(budget.userId)
+                    anyError = true
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "[Sync] fatal error in budget push block")
+            anyError = true
+        }
+
         // ── STEP 2.1: pull categories from server ────────────────────────────
         try {
             val remote = supabaseClient.postgrest.from("category")
@@ -175,6 +228,24 @@ class Sync @AssistedInject constructor(
                 }
         } catch (e: Exception) {
             Timber.e(e, "[Sync] fatal error in item pull block")
+            anyError = true
+        }
+
+        // ── STEP 2.3: pull budget from server ────────────────────────────────
+        try {
+            val remoteBudgets = supabaseClient.postgrest.from("budget")
+                .select { filter { eq("user_id", ownerId) } }
+                .decodeList<BudgetDTO>()
+
+            Timber.d("[Sync] pulled ${remoteBudgets.size} budget row(s) from server")
+            remoteBudgets.firstOrNull()?.let { dto ->
+                val entity = with(DataMapper) { dto.toEntity() }
+                // upsertFromServer bypasses the merge logic — server wins unconditionally
+                budgetRepository.upsertFromServer(entity)
+                Timber.d("[Sync] ✓ budget pulled from server for userId=${entity.userId}")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "[Sync] fatal error in budget pull block")
             anyError = true
         }
 

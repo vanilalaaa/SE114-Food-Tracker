@@ -35,6 +35,9 @@ data class Category(
     @ColumnInfo(name = "is_system")
     var isSystem: Boolean = false,
 
+    @ColumnInfo(name = "is_deleted")
+    var isDeleted: Boolean = false,
+
     @ColumnInfo(name = "sync_status")
     var syncStatus: String = SyncStatus.PENDING.name,
 

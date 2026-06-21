@@ -24,6 +24,7 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "app_database")
+            .addMigrations(AppDatabase.MIGRATION_8_9)
             .fallbackToDestructiveMigration()
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
@@ -31,14 +32,14 @@ object DatabaseModule {
                     val now = System.currentTimeMillis()
 
                     db.execSQL("""
-                        INSERT INTO category (category_id, owner_id, name, icon_url, is_hidden, is_system, sync_status, created_at, updated_at)
-                        VALUES
-                        ('a1000000-0000-0000-0000-000000000001', null, 'Cơm',         '🍚', 0, 1, 'PENDING', $now, $now),
-                        ('a1000000-0000-0000-0000-000000000002', null, 'Mì & Phở',    '🍜', 0, 1, 'PENDING', $now, $now),
-                        ('a1000000-0000-0000-0000-000000000003', null, 'Bánh mì',     '🥖', 0, 1, 'PENDING', $now, $now),
-                        ('a1000000-0000-0000-0000-000000000004', null, 'Đồ uống',     '🥤', 0, 1, 'PENDING', $now, $now),
-                        ('a1000000-0000-0000-0000-000000000005', null, 'Tráng miệng', '🍰', 0, 1, 'PENDING', $now, $now),
-                        ('a1000000-0000-0000-0000-000000000006', null, 'Ăn vặt',      '🍡', 0, 1, 'PENDING', $now, $now);
+                    INSERT INTO category (category_id, owner_id, name, icon_url, is_hidden, is_system, is_deleted, sync_status, created_at, updated_at)
+                    VALUES
+                    ('a1000000-0000-0000-0000-000000000001', null, 'Cơm',         '🍚', 0, 1, 0, 'PENDING', $now, $now),
+                    ('a1000000-0000-0000-0000-000000000002', null, 'Mì & Phở',    '🍜', 0, 1, 0, 'PENDING', $now, $now),
+                    ('a1000000-0000-0000-0000-000000000003', null, 'Bánh mì',     '🥖', 0, 1, 0, 'PENDING', $now, $now),
+                    ('a1000000-0000-0000-0000-000000000004', null, 'Đồ uống',     '🥤', 0, 1, 0, 'PENDING', $now, $now),
+                    ('a1000000-0000-0000-0000-000000000005', null, 'Tráng miệng', '🍰', 0, 1, 0, 'PENDING', $now, $now),
+                    ('a1000000-0000-0000-0000-000000000006', null, 'Ăn vặt',      '🍡', 0, 1, 0, 'PENDING', $now, $now);
                     """.trimIndent())
                 }
             })
@@ -55,5 +56,7 @@ object DatabaseModule {
 
     @Provides @Singleton
     fun provideFriendDao(db: AppDatabase): FriendDAO = db.friendDao()
-    fun provideChatDao(db: AppDatabase): ChatDAO = db.chatDAO()
+
+    @Provides @Singleton
+    fun provideChatDao(db: AppDatabase): ChatDAO = db.chatDao()
 }

@@ -48,6 +48,14 @@ class SyncManager @Inject constructor(
         )
     }
 
+    fun enqueueBudgetSync() {
+        workManager.enqueueUniqueWork(
+            ITEM_SYNC_WORK,          // same unique name — Sync worker covers items + budget
+            ExistingWorkPolicy.KEEP,
+            buildRequest<Sync>()
+        )
+    }
+
     fun startInitialSync() {
         SyncScheduler.schedulePeriodicSync(context)
         enqueueProfileSync()

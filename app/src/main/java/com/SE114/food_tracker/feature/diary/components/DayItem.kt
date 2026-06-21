@@ -9,12 +9,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
+import com.SE114.food_tracker.core.util.*
 
 @Composable
 fun DayItem(
@@ -23,6 +27,7 @@ fun DayItem(
     price: Double,
     time: String,
     categoryIcon: String = "",
+    imageUrl: String? = null,
     onClick: () -> Unit
 ) {
     Surface(
@@ -43,10 +48,21 @@ fun DayItem(
                     .background(LightPeach, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = categoryIcon.ifEmpty { "🍱" },
-                    fontSize = 22.sp
-                )
+                if (!imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = "Ảnh món ăn",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = categoryIcon.ifEmpty { "🍱" },
+                        fontSize = 22.sp
+                    )
+                }
             }
 
             Spacer(Modifier.width(12.dp))
@@ -75,7 +91,7 @@ fun DayItem(
             }
 
             Text(
-                text = "${(price / 1000).toInt()}k đ",
+                text = price.formatVndExact(),
                 color = OrangeMain,
                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold)
             )

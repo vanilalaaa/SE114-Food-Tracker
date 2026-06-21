@@ -2,6 +2,8 @@ package com.SE114.food_tracker.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.SE114.food_tracker.data.local.dao.BudgetDAO
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.dao.ItemDAO
@@ -17,8 +19,17 @@ import com.SE114.food_tracker.data.local.dao.ChatDAO
 import com.SE114.food_tracker.data.local.dao.FriendDAO
 
 @Database(
-    entities = [Category::class, Item::class, Budget::class, Conversation::class, ConversationParticipant::class, Message::class, FriendshipEntity::class, UserProfileCacheEntity::class],
-    version = 8,
+    entities = [
+        Category::class,
+        Item::class,
+        Budget::class,
+        Conversation::class,
+        ConversationParticipant::class,
+        Message::class,
+        FriendshipEntity::class,
+        UserProfileCacheEntity::class
+    ],
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,4 +38,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDAO(): BudgetDAO
     abstract fun chatDao(): ChatDAO
     abstract fun friendDao(): FriendDAO
+
+    companion object {
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE category ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+    }
 }
