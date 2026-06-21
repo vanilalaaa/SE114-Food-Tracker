@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.diary
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.sync.SyncStatus
 import com.SE114.food_tracker.data.local.entities.Category
 import com.SE114.food_tracker.data.repository.CategoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -51,9 +52,35 @@ class CategoryViewModel @Inject constructor(
                         iconUrl    = iconUrl,
                         isHidden   = false,
                         isSystem   = false,
-                        syncStatus = "PENDING",
+                        syncStatus = SyncStatus.PENDING.name,
                         createdAt  = now,
                         updatedAt  = now
+                    )
+                )
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
+    fun editCategory(category: DiaryCategory, newName: String, newIconUrl: String) {
+        if (category.isSystem) {
+            _error.value = "Danh mục hệ thống không thể chỉnh sửa."
+            return
+        }
+        val trimmedName = newName.trim()
+        if (trimmedName.isBlank()) {
+            _error.value = "Tên danh mục không được để trống."
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                val existing = categoryRepository.getCategoryByIdOneShot(category.categoryId)
+                    ?: error("Không tìm thấy danh mục để cập nhật")
+                categoryRepository.updateCategory(
+                    existing.copy(
+                        name       = trimmedName,
+                        iconUrl    = newIconUrl,
+                        syncStatus = SyncStatus.PENDING.name,
+                        updatedAt  = System.currentTimeMillis()
                     )
                 )
             }.onFailure { _error.value = it.message }
@@ -63,8 +90,14 @@ class CategoryViewModel @Inject constructor(
     fun toggleVisibility(category: DiaryCategory) {
         viewModelScope.launch {
             runCatching {
+                val existing = categoryRepository.getCategoryByIdOneShot(category.categoryId)
+                    ?: error("Không tìm thấy danh mục để cập nhật")
                 categoryRepository.updateCategory(
-                    category.toEntity().copy(isHidden = !category.isHidden)
+                    existing.copy(
+                        isHidden   = !existing.isHidden,
+                        syncStatus = SyncStatus.PENDING.name,
+                        updatedAt  = System.currentTimeMillis()
+                    )
                 )
             }.onFailure { _error.value = it.message }
         }

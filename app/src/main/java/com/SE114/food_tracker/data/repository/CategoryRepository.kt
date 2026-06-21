@@ -27,6 +27,8 @@ class CategoryRepository @Inject constructor(
 
     suspend fun softDeleteCategory(categoryId: String) =
         categoryDAO.softDeleteCategory(categoryId)
+    suspend fun getCategoryByIdOneShot(id: String): Category? =
+        categoryDAO.getCategoryByIdOneShot(id)
 
     // ── SYNC ──
 

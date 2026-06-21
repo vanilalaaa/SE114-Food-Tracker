@@ -213,19 +213,19 @@ fun FoodEntryScreen(
     // ── Manage categories bottom sheet (TV3) ──────────────────────────────
     if (showManageCategoriesSheet) {
         ManageCategoryBottomSheet(
-            categories          = categories,
-            onDismiss           = { showManageCategoriesSheet = false },
-            onToggleVisibility  = onToggleCategoryVisibility,
-            onDeleteCategory    = onDeleteCategory,
+            categories         = categories,
+            onDismiss          = { showManageCategoriesSheet = false },
+            onToggleVisibility = onToggleCategoryVisibility,
+            onDeleteCategory   = onDeleteCategory,
             onEditCategory     = { category, newName, newIconUrl ->
                 onEditCategory(category, newName, newIconUrl)
             },
-            onCreateNew         = { name, emoji ->
+            onCreateNew        = { name, emoji ->
                 onCreateCategory(name, emoji)
                 showManageCategoriesSheet = false
             },
-            deleteError         = categoryDeleteError,
-            onClearDeleteError  = onClearCategoryError
+            deleteError        = categoryDeleteError,
+            onClearDeleteError = onClearCategoryError
         )
     }
 

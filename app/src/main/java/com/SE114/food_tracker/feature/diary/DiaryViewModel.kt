@@ -9,7 +9,6 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.core.sync.SyncScheduler
-import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.core.sync.SyncStatus
 import com.SE114.food_tracker.data.repository.ImageRepository
@@ -50,7 +49,6 @@ import kotlinx.coroutines.withContext
 class DiaryViewModel @Inject constructor(
     private val itemRepository: ItemRepository,
     private val imageRepository: ImageRepository,
-    private val categoryDAO: CategoryDAO,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -66,20 +64,6 @@ class DiaryViewModel @Inject constructor(
 
     private var _pendingImageBytes: ByteArray? = null
     private var _imageCompressionJob: Job? = null
-
-    private val categories: Flow<List<DiaryCategory>> =
-        categoryDAO.getVisibleCategories()
-            .map { list ->
-                list.map { category ->
-                    DiaryCategory(
-                        categoryId = category.categoryId,
-                        name       = category.name,
-                        iconUrl    = category.iconUrl,
-                        isHidden   = category.isHidden,
-                        isSystem   = category.isSystem
-                    )
-                }
-            }
 
     // TỐI ƯU: Loại bỏ mutationTrigger, để Room Flow tự động cập nhật bất cứ khi nào DB thay đổi
     private val selectedDayItems: Flow<List<DiaryItem>> =
@@ -124,16 +108,15 @@ class DiaryViewModel @Inject constructor(
             _selectedDate,
             _selectedCategoryId,
             selectedDayItems,
-            selectedMonthItems,
-            categories
-        ) { selectedDate, selectedCategoryId, items, monthlyItems, categories ->
+            selectedMonthItems
+        ) { selectedDate, selectedCategoryId, items, monthlyItems ->
             DiaryContent(
                 selectedDate       = selectedDate,
                 selectedCategoryId = selectedCategoryId,
                 items              = items,
                 monthlyItems       = monthlyItems,
-                categories         = categories,
-                datesWithData      = emptySet() // filled in the next combine
+                categories         = emptyList(),
+                datesWithData      = emptySet()
             )
         }.combine(datesWithData) { content, datesWithData ->
             content.copy(datesWithData = datesWithData)

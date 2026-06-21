@@ -46,7 +46,7 @@ fun DiaryScreen(
     val pendingImageUri   by diaryViewModel.pendingImageUri.collectAsStateWithLifecycle()
     val categoryError     by categoryViewModel.error.collectAsStateWithLifecycle()
 
-    val categories = categoryState.ifEmpty { uiState.categories }
+    val categories = categoryState
 
     DiaryScreenContent(
         uiState                    = uiState,
@@ -64,6 +64,7 @@ fun DiaryScreen(
         onDeleteItem               = { diaryViewModel.deleteItem(it) },
         onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
+        onEditCategory             = { category, newName, newIconUrl -> categoryViewModel.editCategory(category, newName, newIconUrl) },
         onCreateCategory           = { name, emoji -> categoryViewModel.addCategory(name, emoji) },
         onSelectCategoryFilter     = { catId -> diaryViewModel.selectCategoryFilter(catId) }
     )
@@ -87,6 +88,7 @@ fun DiaryScreenContent(
     onDeleteItem: (String) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
+    onEditCategory: (DiaryCategory, String, String) -> Unit,
     onCreateCategory: (String, String) -> Unit,
     onSelectCategoryFilter: (String?) -> Unit
 ) {
@@ -279,6 +281,7 @@ fun DiaryScreenContent(
                     },
                     onToggleCategoryVisibility = onToggleCategoryVisibility,
                     onDeleteCategory           = onDeleteCategory,
+                    onEditCategory             = onEditCategory,
                     onCreateCategory           = onCreateCategory,
                     onClearCategoryError       = onClearCategoryError
                 )
@@ -315,6 +318,7 @@ fun DiaryScreenPreview() {
             onDeleteItem               = {},
             onDeleteCategory           = {},
             onToggleCategoryVisibility = {},
+            onEditCategory             = { _, _, _ -> },
             onCreateCategory           = { _, _ -> },
             onSelectCategoryFilter     = {}
         )
