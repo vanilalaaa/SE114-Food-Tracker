@@ -43,15 +43,18 @@ fun DiaryScreen(
     val categoryViewModel = hiltViewModel<CategoryViewModel>()
     val uiState           by diaryViewModel.uiState.collectAsStateWithLifecycle()
     val categoryState     by categoryViewModel.visibleCategories.collectAsStateWithLifecycle()
+    val allCategoryState  by categoryViewModel.allCategories.collectAsStateWithLifecycle()
     val pendingImageUri   by diaryViewModel.pendingImageUri.collectAsStateWithLifecycle()
     val categoryError     by categoryViewModel.error.collectAsStateWithLifecycle()
 
     val categories = categoryState.ifEmpty { uiState.categories }
+    val manageCategories = allCategoryState.ifEmpty { categories }
 
     DiaryScreenContent(
         uiState                    = uiState,
         pendingImageUri            = pendingImageUri,
         categories                 = categories,
+        manageCategories           = manageCategories,
         categoryDeleteError        = categoryError,
         triggerAdd                 = triggerAdd,
         onAddTriggered             = onAddTriggered,
@@ -65,6 +68,7 @@ fun DiaryScreen(
         onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
         onCreateCategory           = { name, emoji -> categoryViewModel.addCategory(name, emoji) },
+        onUpdateCategory           = { category, name, emoji -> categoryViewModel.updateCategory(category, name, emoji) },
         onSelectCategoryFilter     = { catId -> diaryViewModel.selectCategoryFilter(catId) }
     )
 }
@@ -75,6 +79,7 @@ fun DiaryScreenContent(
     uiState: DiaryUiState,
     pendingImageUri: Uri?,
     categories: List<DiaryCategory>,
+    manageCategories: List<DiaryCategory>,
     categoryDeleteError: String?,
     triggerAdd: Boolean,
     onAddTriggered: () -> Unit,
@@ -88,6 +93,7 @@ fun DiaryScreenContent(
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
     onCreateCategory: (String, String) -> Unit,
+    onUpdateCategory: (DiaryCategory, String, String) -> Unit,
     onSelectCategoryFilter: (String?) -> Unit
 ) {
     var showDetailSheet     by remember { mutableStateOf(false) }
@@ -183,7 +189,7 @@ fun DiaryScreenContent(
                     showDetailSheet = true
                 }
             },
-            hasDataDates = uiState.datesWithData.toList(),
+            monthlyItems = filteredMonthlyItems,
             scale        = calendarScale
         )
 
@@ -254,6 +260,7 @@ fun DiaryScreenContent(
                     existingItem        = editingItem,
                     preSelectedCategory = preSelectedCategory,
                     categories          = categories,
+                    manageCategories    = manageCategories,
                     pendingImageUri     = pendingImageUri,
                     categoryDeleteError = categoryDeleteError,
                     onDismiss = {
@@ -281,6 +288,7 @@ fun DiaryScreenContent(
                     onToggleCategoryVisibility = onToggleCategoryVisibility,
                     onDeleteCategory           = onDeleteCategory,
                     onCreateCategory           = onCreateCategory,
+                    onUpdateCategory           = onUpdateCategory,
                     onClearCategoryError       = onClearCategoryError
                 )
             }
@@ -304,6 +312,11 @@ fun DiaryScreenPreview() {
                 DiaryCategory("1", "Cơm",      "🍚", isSystem = true),
                 DiaryCategory("2", "Mì & Phở", "🍜", isSystem = true)
             ),
+            manageCategories       = listOf(
+                DiaryCategory("1", "Rice", "🍚", isSystem = true),
+                DiaryCategory("2", "Noodles", "🍜", isSystem = true),
+                DiaryCategory("3", "Hidden", "👀", isHidden = true)
+            ),
             categoryDeleteError        = null,
             triggerAdd                 = false,
             onClearPendingImage        = {},
@@ -317,6 +330,7 @@ fun DiaryScreenPreview() {
             onDeleteCategory           = {},
             onToggleCategoryVisibility = {},
             onCreateCategory           = { _, _ -> },
+            onUpdateCategory           = { _, _, _ -> },
             onSelectCategoryFilter     = {}
         )
     }

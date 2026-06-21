@@ -99,7 +99,7 @@ fun NutritionCard(
                                 DropdownMenuItem(
                                     text = { Text("Lọc loại", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.Black) },
                                     leadingIcon = { Icon(Icons.Outlined.Tune, null, tint = Color.Black) },
-                                    trailingIcon = { Icon(Icons.Default.KeyboardArrowRight, null, tint = Color.Black) },
+                                    trailingIcon = { Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.Black) },
                                     onClick = { menuState = MenuState.FILTER },
                                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                                 )
@@ -107,6 +107,7 @@ fun NutritionCard(
                                 DropdownMenuItem(
                                     text = { Text("Kích thước", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.Black) },
                                     leadingIcon = { Icon(Icons.Outlined.AspectRatio, null, tint = Color.Black) },
+                                    trailingIcon = { Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.Black) },
                                     onClick = { menuState = MenuState.SIZE },
                                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                                 )
@@ -115,7 +116,7 @@ fun NutritionCard(
                                 DropdownMenuItem(
                                     text = { Text("Lọc loại", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black) },
                                     leadingIcon = { Icon(Icons.Outlined.Tune, null, tint = Color.Black) },
-                                    trailingIcon = { Icon(Icons.Default.KeyboardArrowRight, null, tint = Color.Black) },
+                                    trailingIcon = { Icon(Icons.Default.KeyboardArrowUp, null, tint = Color.Black) },
                                     onClick = { menuState = MenuState.MAIN },
                                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                                 )
@@ -154,6 +155,7 @@ fun NutritionCard(
                                 DropdownMenuItem(
                                     text = { Text("Kích thước", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black) },
                                     leadingIcon = { Icon(Icons.Outlined.AspectRatio, null, tint = Color.Black) },
+                                    trailingIcon = { Icon(Icons.Default.KeyboardArrowUp, null, tint = Color.Black) },
                                     onClick = { menuState = MenuState.MAIN },
                                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                                 )

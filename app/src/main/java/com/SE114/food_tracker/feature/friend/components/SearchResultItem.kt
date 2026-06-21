@@ -17,6 +17,11 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
 fun SearchResultItem(profile: ProfileDTO, onSendRequest: (String) -> Unit) {
+    val displayName = profile.displayName?.takeIf { it.isNotBlank() }
+        ?: profile.userId?.takeIf { it.isNotBlank() }
+        ?: "Người dùng"
+    val userTag = profile.userId?.takeIf { it.isNotBlank() } ?: profile.id
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).background(CardWhite, RoundedCornerShape(12.dp)).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -24,8 +29,8 @@ fun SearchResultItem(profile: ProfileDTO, onSendRequest: (String) -> Unit) {
         ProfileAvatar(avatarUrl = profile.avatarUrl, hasStory = false)
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(profile.displayName, color = TextPrimary, fontWeight = FontWeight.Bold)
-            Text("@${profile.userId}", color = TextLabelGray, fontSize = 12.sp)
+            Text(displayName, color = TextPrimary, fontWeight = FontWeight.Bold)
+            Text("@$userTag", color = TextLabelGray, fontSize = 12.sp)
         }
         Button(
             onClick = { onSendRequest(profile.id) },

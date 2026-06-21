@@ -29,21 +29,26 @@ fun FriendScreen(
     val isLoadingSearch by viewModel.isLoadingSearch.collectAsStateWithLifecycle()
     val acceptedFriends by viewModel.acceptedFriends.collectAsStateWithLifecycle()
     val incomingRequests by viewModel.incomingRequests.collectAsStateWithLifecycle()
-
-    val myUserId = "Uyen#3822"
+    val outgoingRequests by viewModel.outgoingRequests.collectAsStateWithLifecycle()
+    val currentProfile by viewModel.currentProfile.collectAsStateWithLifecycle()
+    val profileLoadError by viewModel.profileLoadError.collectAsStateWithLifecycle()
 
     FriendScreenContent(
-        myUserId = myUserId,
+        myUserId = currentProfile?.userId?.takeIf { it.isNotBlank() }
+            ?: profileLoadError
+            ?: "Đang tải...",
         searchQuery = searchQuery,
         searchResult = searchResult,
         isLoadingSearch = isLoadingSearch,
         acceptedFriends = acceptedFriends,
         incomingRequests = incomingRequests,
+        outgoingRequests = outgoingRequests,
         onUpdateSearchQuery = viewModel::updateSearchQuery,
         onSearchUser = viewModel::searchUser,
         onSendFriendRequest = viewModel::sendFriendRequest,
         onAcceptRequest = viewModel::acceptRequest,
         onDeclineRequest = viewModel::declineRequest,
+        onCancelOutgoingRequest = viewModel::cancelOutgoingRequest,
         onUnfriend = viewModel::unfriend,
         onNavigateBack = onNavigateBack
     )
@@ -57,11 +62,13 @@ fun FriendScreenContent(
     isLoadingSearch: Boolean,
     acceptedFriends: List<FriendItemDto>,
     incomingRequests: List<FriendItemDto>,
+    outgoingRequests: List<FriendItemDto>,
     onUpdateSearchQuery: (String) -> Unit,
     onSearchUser: () -> Unit,
     onSendFriendRequest: (String) -> Unit,
     onAcceptRequest: (String) -> Unit,
     onDeclineRequest: (String) -> Unit,
+    onCancelOutgoingRequest: (String) -> Unit,
     onUnfriend: (String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
@@ -135,6 +142,20 @@ fun FriendScreenContent(
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
 
+        if (outgoingRequests.isNotEmpty()) {
+            item {
+                SectionHeader(title = "Lời mời đã gửi", count = outgoingRequests.size)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            items(outgoingRequests) { request ->
+                OutgoingRequestItem(
+                    request = request,
+                    onCancel = onCancelOutgoingRequest
+                )
+            }
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+        }
+
         item {
             SectionHeader(title = "Bạn bè", count = acceptedFriends.size, maxCount = 10)
             Spacer(modifier = Modifier.height(16.dp))
@@ -162,11 +183,15 @@ fun Preview_EmptyFriendScreen() {
             isLoadingSearch = false,
             acceptedFriends = emptyList(),
             incomingRequests = emptyList(),
+            outgoingRequests = listOf(
+                FriendItemDto("5", "waiting", "Pending Friend", null, "pending")
+            ),
             onUpdateSearchQuery = {},
             onSearchUser = {},
             onSendFriendRequest = {},
             onAcceptRequest = {},
             onDeclineRequest = {},
+            onCancelOutgoingRequest = {},
             onUnfriend = {},
             onNavigateBack = {}
         )
@@ -190,11 +215,15 @@ fun Preview_FilledFriendScreen() {
             incomingRequests = listOf(
                 FriendItemDto("4", "stranger", "Người Lạ", null, "pending")
             ),
+            outgoingRequests = listOf(
+                FriendItemDto("5", "waiting", "Pending Friend", null, "pending")
+            ),
             onUpdateSearchQuery = {},
             onSearchUser = {},
             onSendFriendRequest = {},
             onAcceptRequest = {},
             onDeclineRequest = {},
+            onCancelOutgoingRequest = {},
             onUnfriend = {},
             onNavigateBack = {}
         )
