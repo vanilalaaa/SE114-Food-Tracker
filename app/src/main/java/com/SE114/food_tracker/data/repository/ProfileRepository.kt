@@ -1,11 +1,27 @@
 package com.SE114.food_tracker.data.repository
 
+import kotlinx.coroutines.flow.Flow
+
+/** Own-profile fields readable under the `authenticated` column grant. */
+data class Profile(
+    val id: String,
+    val displayName: String?,
+    val userId: String?,
+    val avatarUrl: String?
+)
+
 sealed interface ProfileStatus {
     data object Complete : ProfileStatus
     data object Incomplete : ProfileStatus
 }
 
 interface ProfileRepository {
+    /** Cached current-user profile; refreshed by [refreshMyProfile]. */
+    fun observeMyProfile(): Flow<Profile?>
+
+    /** Re-fetches the current user's row into the [observeMyProfile] cache. */
+    suspend fun refreshMyProfile(): AuthOutcome<Unit>
+
     /** Onboarding is complete when `onboarding_completed = true AND user_id IS NOT NULL`. */
     suspend fun getProfileStatus(): AuthOutcome<ProfileStatus>
 

@@ -1,7 +1,6 @@
 package com.SE114.food_tracker.core.navigation
 
 import android.net.Uri
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -15,6 +14,7 @@ import com.SE114.food_tracker.feature.auth.PostAuthDestination
 import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
+import com.SE114.food_tracker.feature.settings.SettingsScreen
 import com.SE114.food_tracker.feature.stats.StatisticsScreen
 import com.SE114.food_tracker.feature.feed.FeedScreen
 import com.SE114.food_tracker.feature.friend.FriendScreen
@@ -132,7 +132,11 @@ fun AppNavGraph(
                 )
             }
 
-            composable(AppDestinations.Settings.route) { Text("TODO: Settings (TV5)") }
+            composable(AppDestinations.Settings.route) {
+                SettingsScreen(
+                    onNavigateToProfile = { navController.navigate(AppDestinations.Profile.route) }
+                )
+            }
         }
     }
 }

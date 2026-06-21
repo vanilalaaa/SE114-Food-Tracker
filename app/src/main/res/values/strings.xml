@@ -66,4 +66,16 @@
     <string name="auth_google_signin">Tiếp tục với Google</string>
 
     <string name="auth_retry">Thử lại</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Cài đặt</string>
+    <string name="settings_default_name">Người dùng</string>
+    <string name="settings_no_user_id">Chưa đặt User ID</string>
+    <string name="settings_open_profile">Mở hồ sơ</string>
+    <string name="settings_avatar_desc">Ảnh đại diện</string>
+    <string name="settings_logout">Đăng xuất</string>
+    <string name="settings_logout_confirm_title">Đăng xuất khỏi tài khoản?</string>
+    <string name="settings_logout_confirm_body">Bạn sẽ cần đăng nhập lại để tiếp tục.</string>
+    <string name="settings_logout_confirm_yes">Đăng xuất</string>
+    <string name="settings_logout_confirm_cancel">Huỷ</string>
 </resources>

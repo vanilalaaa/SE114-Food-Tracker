@@ -5,6 +5,9 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -19,6 +22,8 @@ class SupabaseProfileRepository @Inject constructor(
     private val auth get() = client.auth
     private val db get() = client.postgrest
 
+    private val myProfile = MutableStateFlow<Profile?>(null)
+
     @Serializable
     private data class ProfileStatusRow(
         @SerialName("user_id") val userId: String? = null,
@@ -27,6 +32,35 @@ class SupabaseProfileRepository @Inject constructor(
 
     @Serializable
     private data class UserIdRow(@SerialName("user_id") val userId: String? = null)
+
+    @Serializable
+    private data class MyProfileRow(
+        @SerialName("id") val id: String,
+        @SerialName("display_name") val displayName: String? = null,
+        @SerialName("user_id") val userId: String? = null,
+        @SerialName("avatar_url") val avatarUrl: String? = null
+    )
+
+    override fun observeMyProfile(): Flow<Profile?> = myProfile.asStateFlow()
+
+    override suspend fun refreshMyProfile(): AuthOutcome<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val uid = requireUid()
+            val row = db.from("profile")
+                .select(Columns.list("id", "display_name", "user_id", "avatar_url")) {
+                    filter { eq("id", uid) }
+                }
+                .decodeList<MyProfileRow>()
+                .firstOrNull()
+            myProfile.value = row?.let {
+                Profile(id = it.id, displayName = it.displayName, userId = it.userId, avatarUrl = it.avatarUrl)
+            }
+            Unit
+        }.fold(
+            onSuccess = { AuthOutcome.Success(Unit) },
+            onFailure = { AuthOutcome.Failure(it.toAuthError()) }
+        )
+    }
 
     override suspend fun getProfileStatus(): AuthOutcome<ProfileStatus> = withContext(Dispatchers.IO) {
         runCatching {
