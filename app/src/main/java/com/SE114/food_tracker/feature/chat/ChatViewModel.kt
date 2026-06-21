@@ -189,7 +189,8 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // Hàm kích hoạt thực hiện giao dịch nộp hoặc rút quỹ thật
+
+    // Hàm xử lý kích hoạt giao dịch từ Giao diện gửi lên
     fun executeWalletTransaction(
         conversationId: String,
         amount: Double,
@@ -197,10 +198,9 @@ class ChatViewModel @Inject constructor(
         note: String
     ) {
         viewModelScope.launch {
-            // NẾU LÀ PHÒNG TEST MOCK DATA: Cập nhật thẳng vào vùng nhớ tĩnh Companion để không bị bay màu
+            // NẾU LÀ PHÒNG TEST MOCK DATA: Giữ nguyên logic cũ cho phòng mồi để kiểm thử UI
             if (conversationId == "phong_test_114") {
                 val finalAmount = if (isDeposit) amount else -amount
-
                 mockBalance += finalAmount
                 walletBalance = mockBalance
 
@@ -214,11 +214,19 @@ class ChatViewModel @Inject constructor(
                 _mockWalletTransactions.value = listOf(newMockTx) + _mockWalletTransactions.value
                 isTransactionSuccess = true
             } else {
-                // Luồng chạy dữ liệu thật liên thông Supabase khi tháo mock data
-                val success =
-                    chatRepository.executeWalletTransaction(conversationId, amount, isDeposit, note)
+                val transactionType = if (isDeposit) "deposit" else "withdrawal"
+
+                // Gọi sang hàm RPC thật bảo mật chống tranh chấp trên Supabase
+                val success = chatRepository.executeWalletTransaction(
+                    conversationId = conversationId,
+                    amount = amount,
+                    txType = transactionType,
+                    note = note,
+                    itemId = null // Giao dịch nộp/rút trực tiếp từ màn hình Ví không gắn với món ăn cụ thể
+                )
+
                 if (success) {
-                    loadWalletData(conversationId)
+                    loadWalletData(conversationId) // Tải lại số dư và lịch sử giao dịch thật mới nhất từ server
                 }
                 isTransactionSuccess = success
             }

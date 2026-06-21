@@ -16,6 +16,7 @@ import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.decodeRecord
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.storage.storage
+import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -26,6 +27,8 @@ import kotlinx.serialization.Serializable
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import io.github.jan.supabase.postgrest.rpc
+import io.github.jan.supabase.postgrest.postgrest
 
 @Singleton
 class ChatRepository @Inject constructor(
@@ -54,18 +57,20 @@ class ChatRepository @Inject constructor(
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
 
-    // 🔥 FIX LỖI RÒ RỈ KÊNH: Quản lý danh sách các phòng chat đang kết nối realtime bằng Map thay vì biến đơn
+    // Quản lý danh sách các phòng chat đang kết nối realtime bằng Map thay vì biến đơn
     private val activeChannels = mutableMapOf<String, RealtimeChannel>()
 
     private fun parseServerTimeToLong(serverTimeStr: String?): Long {
         if (serverTimeStr.isNullOrBlank()) return System.currentTimeMillis()
         return try {
-            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", java.util.Locale.US)
+            val sdf =
+                java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", java.util.Locale.US)
             val date = sdf.parse(serverTimeStr)
             date?.time ?: System.currentTimeMillis()
         } catch (e: Exception) {
             try {
-                val sdfBackup = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+                val sdfBackup =
+                    java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
                 val date = sdfBackup.parse(serverTimeStr)
                 date?.time ?: System.currentTimeMillis()
             } catch (e2: Exception) {
@@ -95,7 +100,8 @@ class ChatRepository @Inject constructor(
                 }.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
 
             myParticipations.forEach { part ->
-                val convId = part["conversation_id"]?.toString()?.replace("\"", "") ?: return@forEach
+                val convId =
+                    part["conversation_id"]?.toString()?.replace("\"", "") ?: return@forEach
                 try {
                     val response = supabaseClient.from("conversation")
                         .select {
@@ -126,18 +132,18 @@ class ChatRepository @Inject constructor(
         }
     }
 
-    // ── 🔥 FIX TOÀN DIỆN CHỨC NĂNG REALTIME CHANNEL (SUBSCRIBE + RECONNECT CHUẨN BA) ──
+    // ── CHỨC NĂNG REALTIME CHANNEL (SUBSCRIBE + RECONNECT) ──
 
     fun subscribeToChatRealtime(conversationId: String) {
         repositoryScope.launch {
-            // Nếu phòng chat này đã có kênh kết nối đang chạy rồi thì bỏ qua, không tạo đè lên nữa
             if (activeChannels.containsKey(conversationId)) return@launch
 
             try {
                 val channel = supabaseClient.channel("chat_channel_$conversationId")
-                val changeFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-                    table = "message"
-                }
+                val changeFlow =
+                    channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                        table = "message"
+                    }
 
                 repositoryScope.launch {
                     changeFlow.collect { action ->
@@ -146,29 +152,6 @@ class ChatRepository @Inject constructor(
 
                         // Kiểm tra tin nhắn có thuộc về phòng chat này hay không
                         if (dto.conversationId == conversationId && dto.senderId != currentUserId) {
-                            val incomingMessage = Message(
-                                localId = dto.id ?: UUID.randomUUID().toString(),
-                                serverId = dto.id,
-                                conversationId = dto.conversationId,
-                                senderId = dto.senderId,
-                                body = dto.body,
-                                imageUrl = dto.imageUrl,
-                                isSystem = dto.isSystem,
-                                syncStatus = MessageSyncStatus.SENT,
-                                createdAt = parseServerTimeToLong(dto.createdAt)
-                            )
-                            chatDAO.insertMessage(incomingMessage)
-                        }
-                    }
-                }
-
-                repositoryScope.launch {
-                    changeFlow.collect { action ->
-                        val dto = action.decodeRecord<SupabaseMessageDto>()
-                        val currentUserId = getAuthenticatedUserId()
-
-                        // Chỉ nhận tin nhắn của người khác gửi đến, không tự nạp tin nhắn của chính mình
-                        if (dto.senderId != currentUserId) {
                             val incomingMessage = Message(
                                 localId = dto.id ?: UUID.randomUUID().toString(),
                                 serverId = dto.id,
@@ -202,13 +185,13 @@ class ChatRepository @Inject constructor(
         while (!isConnected) {
             delay(retryDelay)
             try {
-                val channel = activeChannels[conversationId] ?: supabaseClient.channel("chat_channel_$conversationId")
+                val channel = activeChannels[conversationId]
+                    ?: supabaseClient.channel("chat_channel_$conversationId")
                 channel.subscribe()
                 activeChannels[conversationId] = channel
                 isConnected = true
                 println("Supabase Realtime: Reconnect thành công phòng $conversationId!")
             } catch (e: Exception) {
-                // Tự động nhân đôi thời gian chờ (Exponential Backoff) lên tối đa 1 phút để tránh nghẽn Thread
                 retryDelay = (retryDelay * 2).coerceAtMost(60000L)
             }
         }
@@ -274,11 +257,20 @@ class ChatRepository @Inject constructor(
             if (existingConversationId != null) return existingConversationId
 
             val newChatUuid = UUID.randomUUID().toString()
-            supabaseClient.from("conversation").insert(mapOf("id" to newChatUuid, "is_group" to false, "name" to null))
+            supabaseClient.from("conversation")
+                .insert(mapOf("id" to newChatUuid, "is_group" to false, "name" to null))
 
             val participantRows = listOf(
-                mapOf("conversation_id" to newChatUuid, "user_id" to currentUserId, "is_admin" to false),
-                mapOf("conversation_id" to newChatUuid, "user_id" to friendUserId, "is_admin" to false)
+                mapOf(
+                    "conversation_id" to newChatUuid,
+                    "user_id" to currentUserId,
+                    "is_admin" to false
+                ),
+                mapOf(
+                    "conversation_id" to newChatUuid,
+                    "user_id" to friendUserId,
+                    "is_admin" to false
+                )
             )
             supabaseClient.from("conversation_participant").insert(participantRows)
             newChatUuid
@@ -291,12 +283,13 @@ class ChatRepository @Inject constructor(
     suspend fun createGroupChat(groupName: String, memberUserIds: List<String>): String? {
         return try {
             val groupUuid = UUID.randomUUID().toString()
-            // Đã tích hợp gán mã wallet_id cho phòng chat nhóm để đồng bộ phân hệ Ví Quỹ
+
+            // Tạo phòng nhóm ban đầu (Chưa kích hoạt Ví Quỹ theo đúng kịch bản nút bấm riêng biệt)
             val conversationMap = mapOf(
                 "id" to groupUuid,
                 "is_group" to true,
                 "name" to groupName,
-                "wallet_id" to "wallet_${UUID.randomUUID().toString().take(8)}"
+                "wallet_id" to null
             )
             supabaseClient.from("conversation").insert(conversationMap)
 
@@ -311,7 +304,7 @@ class ChatRepository @Inject constructor(
             }
             supabaseClient.from("conversation_participant").insert(participantRows)
 
-            sendSystemMessage(groupUuid, "Hệ thống: Nhóm '$groupName' đã được tạo thành công.")
+            sendSystemMessage(groupUuid, "Hệ thống: Nhóm '$groupName' đã được khởi tạo thành công.")
             groupUuid
         } catch (e: Exception) {
             println("Lỗi tạo nhóm: ${e.localizedMessage}")
@@ -370,51 +363,170 @@ class ChatRepository @Inject constructor(
         )
     }
 
-    // ── CHỨC NĂNG QUY TRÌNH VÍ QUỸ ──
-    suspend fun getWalletBalance(conversationId: String): Double {
+    suspend fun createGroupWalletForExistingChat(
+        conversationId: String,
+        walletName: String,
+        memberUserIds: List<String>
+    ): Boolean {
         return try {
-            val response = supabaseClient.from("conversation")
-                .select { filter { eq("id", conversationId) } }
-                .decodeSingle<Map<String, kotlinx.serialization.json.JsonElement>>()
-            response["balance"]?.toString()?.toDoubleOrNull() ?: 0.0
-        } catch (e: Exception) { 0.0 }
-    }
-
-    suspend fun executeWalletTransaction(conversationId: String, amount: Double, isDeposit: Boolean, note: String): Boolean {
-        return try {
+            val walletUuid = "wallet_${UUID.randomUUID().toString().take(8)}"
             val currentUserId = getAuthenticatedUserId()
-            val finalAmount = if (isDeposit) amount else -amount
-            val txRow = mapOf(
-                "id" to UUID.randomUUID().toString(),
-                "conversation_id" to conversationId,
-                "user_id" to currentUserId,
-                "type" to if (isDeposit) "deposit" else "withdrawal",
-                "amount" to finalAmount,
-                "note" to note,
-                "created_at" to java.text.SimpleDateFormat("HH:mm - 'Hôm nay'", java.util.Locale.getDefault()).format(java.util.Date())
-            )
-            supabaseClient.from("wallet_transaction").insert(txRow)
 
-            val currentBalance = getWalletBalance(conversationId)
-            supabaseClient.from("conversation").update(mapOf("balance" to currentBalance + finalAmount)) {
+            // 1. Tạo bản ghi ví mới trong group_wallet (balance ban đầu = 0)
+            supabaseClient.from("group_wallet").insert(
+                mapOf(
+                    "id" to walletUuid,
+                    "name" to walletName,
+                    "balance" to 0.0,
+                    "created_by" to currentUserId
+                )
+            )
+
+            // 2. Thiết lập wallet_membership cho tất cả thành viên (role='owner' cho Admin, 'member' cho còn lại)
+            val allMembers = (memberUserIds + currentUserId).distinct()
+            val membershipRows = allMembers.map { userId ->
+                mapOf(
+                    "wallet_id" to walletUuid,
+                    "user_id" to userId,
+                    "role" to if (userId == currentUserId) "owner" else "member"
+                )
+            }
+            supabaseClient.from("wallet_membership").insert(membershipRows)
+
+            // 3. Cập nhật liên kết khóa ngoại conversation.wallet_id = id của quỹ vừa tạo
+            supabaseClient.from("conversation").update(mapOf("wallet_id" to walletUuid)) {
                 filter { eq("id", conversationId) }
             }
 
-            val systemNotification = if (isDeposit) {
-                "Hệ thống: Thành viên đã nộp ${String.format("%,.0f", amount)}đ vào quỹ nhóm. Nội dung: $note"
-            } else {
-                "Hệ thống: Admin đã chi ${String.format("%,.0f", amount)}đ từ quỹ nhóm. Nội dung: $note"
-            }
-            sendSystemMessage(conversationId, systemNotification)
+            sendSystemMessage(
+                conversationId,
+                "Hệ thống: Quỹ nhóm '$walletName' đã được Admin thiết lập thành công."
+            )
             true
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun getWalletBalance(conversationId: String): Double {
+        return try {
+            val convResponse = supabaseClient.from("conversation")
+                .select { filter { eq("id", conversationId) } }
+                .decodeSingle<SupabaseConversationDto>()
+
+            val walletId = convResponse.walletId ?: return 0.0
+
+            val walletResponse = supabaseClient.from("group_wallet")
+                .select { filter { eq("id", walletId) } }
+                .decodeSingle<Map<String, kotlinx.serialization.json.JsonElement>>()
+
+            walletResponse["balance"]?.toString()?.toDoubleOrNull() ?: 0.0
+        } catch (e: Exception) {
+            println("Lỗi bốc số dư ví thật từ server: ${e.localizedMessage}")
+            0.0
+        }
+    }
+
+    suspend fun executeWalletTransaction(
+        conversationId: String,
+        amount: Double,
+        txType: String, // Nhận diện rõ ràng: "deposit", "withdrawal", "purchase"
+        note: String,
+        itemId: String? = null
+    ): Boolean {
+        return try {
+            val convResponse = supabaseClient.from("conversation")
+                .select { filter { eq("id", conversationId) } }
+                .decodeSingle<SupabaseConversationDto>()
+            val walletId = convResponse.walletId ?: return false
+
+            when (txType) {
+                "deposit" -> {
+                    supabaseClient.postgrest.rpc(
+                        function = "rpc_wallet_deposit",
+                        parameters = mapOf(
+                            "p_wallet_id" to walletId,
+                            "p_amount" to amount,
+                            "p_note" to note
+                        )
+                    )
+                    sendSystemMessage(
+                        conversationId,
+                        "Hệ thống: Thành viên đã nộp ${
+                            String.format(
+                                "%,.0f",
+                                amount
+                            )
+                        }đ vào quỹ nhóm. Nội dung: $note"
+                    )
+                }
+
+                "withdrawal" -> {
+                    supabaseClient.postgrest.rpc(
+                        function = "rpc_wallet_withdraw",
+                        parameters = mapOf(
+                            "p_wallet_id" to walletId,
+                            "p_amount" to amount,
+                            "p_note" to note
+                        )
+                    )
+                    sendSystemMessage(
+                        conversationId,
+                        "Hệ thống: Admin đã rút ${
+                            String.format(
+                                "%,.0f",
+                                amount
+                            )
+                        }đ từ quỹ nhóm. Nội dung: $note"
+                    )
+                }
+
+                "purchase" -> {
+                    supabaseClient.postgrest.rpc(
+                        function = "rpc_wallet_purchase",
+                        parameters = mapOf(
+                            "p_wallet_id" to walletId,
+                            "p_amount" to amount,
+                            "p_note" to note,
+                            "p_item_id" to (itemId ?: "")
+                        )
+                    )
+                    sendSystemMessage(
+                        conversationId,
+                        "Hệ thống: Quỹ nhóm đã chi tiêu ${
+                            String.format(
+                                "%,.0f",
+                                amount
+                            )
+                        }đ để mua món công vụ. Nội dung: $note"
+                    )
+                }
+            }
+            true
+        } catch (e: Exception) {
+            println("Lỗi xử lý luồng giao dịch RPC: ${e.localizedMessage}")
+            false
+        }
     }
 
     suspend fun fetchWalletTransactionsFromServer(conversationId: String): List<Map<String, kotlinx.serialization.json.JsonElement>> {
         return try {
+            val convResponse = supabaseClient.from("conversation")
+                .select { filter { eq("id", conversationId) } }
+                .decodeSingle<SupabaseConversationDto>()
+            val walletId = convResponse.walletId ?: return emptyList()
+
+            // Thực hiện query sắp xếp DESC theo thời gian tạo như BA quy định
             supabaseClient.from("wallet_transaction")
-                .select { filter { eq("conversation_id", conversationId) } }.decodeList()
-        } catch (e: Exception) { emptyList() }
+                .select {
+                    filter { eq("wallet_id", walletId) }
+                    order(column = "created_at", order = Order.DESCENDING)
+                }.decodeList()
+        } catch (e: Exception) {
+            println("Lỗi lấy lịch sử giao dịch từ server: ${e.localizedMessage}")
+            emptyList()
+        }
     }
 
     // ── CHỨC NĂNG GỬI MẠNG LƯỚI & RETRY TIN NHẮN LỖI ──
@@ -423,7 +535,6 @@ class ChatRepository @Inject constructor(
         try {
             var finalImageUrl = message.imageUrl
 
-            // Nếu tin nhắn có chứa ảnh cục bộ (đường dẫn content:// từ thiết bị) thì thực hiện upload trước
             if (message.imageUrl != null && message.imageUrl.startsWith("content://")) {
                 val uri = Uri.parse(message.imageUrl)
                 val inputStream = context.contentResolver.openInputStream(uri)

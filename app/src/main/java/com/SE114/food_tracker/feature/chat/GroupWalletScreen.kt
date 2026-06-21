@@ -62,7 +62,7 @@ fun GroupWalletScreen(
         hasWallet = hasWallet,
         realTransactions = realTransactions,
         onBackClick = onBackClick,
-        onConfirmTransaction = { amount, isDeposit, note ->
+        onConfirmTransaction = { amount: Double, isDeposit: Boolean, note: String ->
             viewModel.executeWalletTransaction(
                 conversationId = conversationId,
                 amount = amount,
@@ -171,7 +171,6 @@ fun GroupWalletScreenContent(
                 }
             }
         } else {
-            // 🔥 FIX XOAY NGANG: Thay thế Column cha bằng LazyColumn cho toàn bộ màn hình
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
