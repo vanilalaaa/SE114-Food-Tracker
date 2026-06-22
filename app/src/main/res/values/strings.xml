@@ -48,7 +48,7 @@
     <string name="auth_err_invalid_credentials">Email hoặc mật khẩu không đúng</string>
     <string name="auth_err_email_not_confirmed">Email chưa được xác nhận. Vui lòng kiểm tra hộp thư của bạn.</string>
     <string name="auth_err_email_registered">Email đã được đăng ký</string>
-    <string name="auth_err_weak_password">Mật khẩu quá yếu — cần ít nhất 6 ký tự</string>
+    <string name="auth_err_weak_password">Mật khẩu chưa đạt yêu cầu: tối thiểu 6 ký tự, gồm chữ thường, chữ hoa và số</string>
     <string name="auth_err_invalid_email">Email không hợp lệ</string>
     <string name="auth_err_rate_limited">Bạn thao tác quá nhanh. Vui lòng thử lại sau giây lát.</string>
     <string name="auth_err_user_id_taken">User ID đã tồn tại</string>
@@ -60,6 +60,9 @@
 
     <!-- Register confirm password -->
     <string name="auth_register_confirm_password">Nhập lại mật khẩu</string>
+
+    <!-- Password requirement hint (shown on focus); matches Supabase password policy -->
+    <string name="auth_password_hint">Tối thiểu 6 ký tự, gồm chữ thường, chữ hoa và số</string>
 
     <!-- Complete profile -->
     <string name="auth_complete_title">Hoàn tất hồ sơ</string>

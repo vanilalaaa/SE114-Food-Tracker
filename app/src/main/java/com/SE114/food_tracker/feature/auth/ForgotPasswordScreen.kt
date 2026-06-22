@@ -193,7 +193,8 @@ private fun NewPasswordStep(
         label = stringResource(R.string.auth_reset_new_password_label),
         leadingIcon = Icons.Outlined.Lock,
         isPassword = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        supportingText = stringResource(R.string.auth_password_hint)
     )
     AppTextField(
         value = state.confirmPassword,

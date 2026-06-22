@@ -130,7 +130,8 @@ private fun RegisterContent(
                 label = stringResource(R.string.auth_register_password),
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                supportingText = stringResource(R.string.auth_password_hint)
             )
 
             AppTextField(
