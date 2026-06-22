@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.data.repository.AuthError
 import com.SE114.food_tracker.data.repository.AuthOutcome
+import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.ImageRepository
 import com.SE114.food_tracker.data.repository.Profile
 import com.SE114.food_tracker.data.repository.ProfileRepository
@@ -43,7 +44,8 @@ data class CompleteProfileUiState(
 @HiltViewModel
 class CompleteProfileViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
-    private val imageRepository: ImageRepository
+    private val imageRepository: ImageRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CompleteProfileUiState())
@@ -129,6 +131,17 @@ class CompleteProfileViewModel @Inject constructor(
                 is AuthOutcome.Failure -> _state.update { it.copy(isSubmitting = false, error = outcome.error) }
             }
         }
+    }
+
+    /**
+     * Abandon Google onboarding: sign out so the incomplete (onboarding_completed = false)
+     * profile never enters the app. The MainScaffold session guard then routes to Login and
+     * clears the back stack. The auth user/profile row is intentionally NOT deleted (that needs
+     * a service-role key, which must never ship in the app); it's harmless and finished on a
+     * later sign-in. See docs/app-flow.md.
+     */
+    fun cancel() {
+        viewModelScope.launch { authRepository.signOut() }
     }
 
     private fun applyPrefill(p: Profile) {

@@ -16,11 +16,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -68,6 +70,7 @@ fun CompleteProfileScreen(
 
     CompleteProfileContent(
         state = state,
+        onCancel = viewModel::cancel,
         onDisplayNameChange = viewModel::onDisplayNameChange,
         onUserIdChange = viewModel::onUserIdChange,
         onPickAvatar = {
@@ -80,6 +83,7 @@ fun CompleteProfileScreen(
 @Composable
 private fun CompleteProfileContent(
     state: CompleteProfileUiState,
+    onCancel: () -> Unit,
     onDisplayNameChange: (String) -> Unit,
     onUserIdChange: (String) -> Unit,
     onPickAvatar: () -> Unit,
@@ -98,6 +102,13 @@ private fun CompleteProfileContent(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            IconButton(onClick = onCancel) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.auth_complete_back)
+                )
+            }
+
             Text(
                 text = stringResource(R.string.auth_complete_title),
                 style = MaterialTheme.typography.titleLarge,
@@ -213,6 +224,7 @@ private fun CompleteProfileContentPreview() {
                 userId = "an.nguyen",
                 userIdStatus = UserIdStatus.Available
             ),
+            onCancel = {},
             onDisplayNameChange = {},
             onUserIdChange = {},
             onPickAvatar = {},

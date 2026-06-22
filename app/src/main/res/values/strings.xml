@@ -78,6 +78,7 @@
     <string name="auth_complete_user_id_available_desc">Khả dụng</string>
     <string name="auth_complete_user_id_taken_desc">Đã được dùng</string>
     <string name="auth_complete_submit">Hoàn tất</string>
+    <string name="auth_complete_back">Quay lại</string>
 
     <!-- Verify email (signup OTP activation) -->
     <string name="auth_verify_email_title">Xác nhận email</string>
