@@ -63,6 +63,23 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND (
+            p.owner_id = :currentUserId
+            OR p.visibility = 'public'
+            OR (
+                p.visibility = 'friends'
+                AND EXISTS(
+                    SELECT 1
+                    FROM friendship f
+                    WHERE f.status = 'accepted'
+                        AND f.is_deleted = 0
+                        AND (
+                            (f.sender_id = :currentUserId AND f.receiver_id = p.owner_id)
+                            OR (f.receiver_id = :currentUserId AND f.sender_id = p.owner_id)
+                        )
+                )
+            )
+        )
         ORDER BY p.created_at DESC
         LIMIT :limit OFFSET :offset
         """

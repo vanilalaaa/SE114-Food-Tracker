@@ -10,6 +10,7 @@ import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.data.repository.FeedRepository
+import com.SE114.food_tracker.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,7 @@ import javax.inject.Inject
 @HiltViewModel
 class FeedViewModel @Inject constructor(
     private val feedRepository: FeedRepository,
+    private val friendRepository: FriendRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -112,6 +114,29 @@ class FeedViewModel @Inject constructor(
     }
 
     fun refresh() {
+        if (_isLoading.value) return
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            _page.value = 1
+            _error.value = null
+
+            runCatching {
+                friendRepository.refreshCurrentProfile().getOrThrow()
+                friendRepository.refreshFriendships().getOrThrow()
+                if (!feedRepository.refreshVisibleFromSupabase()) {
+                    error("Không làm mới được bảng tin")
+                }
+            }.onFailure { throwable ->
+                Timber.e(throwable, "[FeedVM] Refresh failed")
+                _error.value = throwable.message ?: "Không làm mới được bảng tin"
+            }
+
+            _isLoading.value = false
+        }
+    }
+
+    private fun resetPage() {
         _page.value = 1
         _error.value = null
     }
@@ -212,7 +237,7 @@ class FeedViewModel @Inject constructor(
 
                 if (_error.value == null) {
                     closeCreateSheet()
-                    refresh()
+                    resetPage()
                     SyncScheduler.triggerImmediateSync(context)
                 }
             } catch (throwable: Throwable) {

@@ -59,6 +59,11 @@ class FeedRepository @Inject constructor(
     fun observeSourceItems(): Flow<List<FeedSourceItemDto>> =
         feedDao.observeSourceItems(limit = PAGE_SIZE)
 
+    suspend fun refreshVisibleFromSupabase(): Boolean {
+        val ownerId = currentAuthenticatedUserId()
+        return pullVisibleFromSupabase(ownerId)
+    }
+
     suspend fun createPostFromItem(
         item: FeedSourceItemDto,
         caption: String,

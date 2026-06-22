@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import com.SE114.food_tracker.data.repository.AuthRepository
+import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class FriendViewModel @Inject constructor(
     private val repository: FriendRepository,
+    private val feedRepository: FeedRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -130,7 +132,9 @@ class FriendViewModel @Inject constructor(
 
     private fun runFriendAction(action: suspend () -> Result<Unit>) {
         viewModelScope.launch {
-            action().onFailure { reportActionError(it) }
+            action()
+                .onSuccess { runCatching { feedRepository.refreshVisibleFromSupabase() } }
+                .onFailure { reportActionError(it) }
         }
     }
 
