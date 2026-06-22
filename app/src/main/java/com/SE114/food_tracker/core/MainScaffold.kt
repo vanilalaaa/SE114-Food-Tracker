@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,7 +18,10 @@ import androidx.navigation.compose.rememberNavController
 import com.SE114.food_tracker.core.designsystem.components.BottomBar
 import com.SE114.food_tracker.core.navigation.AppDestinations
 import com.SE114.food_tracker.core.navigation.AppNavGraph
+import com.SE114.food_tracker.core.util.CurrencyDisplay
+import com.SE114.food_tracker.core.util.LocalCurrencyDisplay
 import com.SE114.food_tracker.feature.diary.components.AddActionButton
+import com.SE114.food_tracker.feature.settings.CurrencyViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
 
 private val BAR_ROUTES = listOf(
@@ -56,6 +60,14 @@ fun MainScaffold() {
     val mainViewModel: MainViewModel = hiltViewModel()
     val session by mainViewModel.sessionStatus.collectAsStateWithLifecycle()
 
+    // App-wide display-currency context: every price formats through this, so switching
+    // the currency in Settings re-renders all amounts without mutating any stored value.
+    val currencyViewModel: CurrencyViewModel = hiltViewModel()
+    val currencyState by currencyViewModel.uiState.collectAsStateWithLifecycle()
+    val currencyDisplay = remember(currencyState.displayCurrency, currencyState.rates) {
+        CurrencyDisplay(currencyState.displayCurrency, currencyState.rates)
+    }
+
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
 
@@ -75,6 +87,7 @@ fun MainScaffold() {
         }
     }
 
+    CompositionLocalProvider(LocalCurrencyDisplay provides currencyDisplay) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
@@ -118,5 +131,6 @@ fun MainScaffold() {
             triggerDiaryAdd = triggerDiaryAdd,
             onDiaryAddHandled = { triggerDiaryAdd = false }
         )
+    }
     }
 }

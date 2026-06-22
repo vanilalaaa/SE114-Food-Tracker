@@ -16,7 +16,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.SE114.food_tracker.core.util.formatVndExact
+import com.SE114.food_tracker.core.util.LocalCurrencyDisplay
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.stats.WalletDestroyerItem
 
@@ -100,7 +100,7 @@ fun WalletDestroyerCard(
                     )
 
                     Text(
-                        text = "${item.recordCount} lần · Tổng ${(item.price * item.recordCount).formatVndExact()}",
+                        text = "${item.recordCount} lần · Tổng ${LocalCurrencyDisplay.current.format(item.price * item.recordCount)}",
                         style = StatLabelStyle,
                         color = TextLabelGray,
                         fontSize = 13.sp
