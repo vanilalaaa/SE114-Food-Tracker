@@ -94,6 +94,34 @@
     <string name="settings_currency_title">Đơn vị tiền</string>
     <string name="settings_currency_note">Giá đã nhập được giữ nguyên; chỉ thay đổi cách hiển thị.</string>
     <string name="settings_logout">Đăng xuất</string>
+
+    <!-- Category management -->
+    <string name="settings_category_manage">Quản lý loại</string>
+    <string name="settings_category_title">Quản lý loại</string>
+    <string name="settings_category_back">Quay lại</string>
+    <string name="settings_category_system_group">Mặc định (hệ thống)</string>
+    <string name="settings_category_my_group">Của tôi</string>
+    <string name="settings_category_empty_mine">Bạn chưa tạo loại nào</string>
+    <string name="settings_category_create">Tạo loại mới</string>
+    <string name="settings_category_create_title">Tạo loại mới</string>
+    <string name="settings_category_edit_title">Chỉnh sửa loại</string>
+    <string name="settings_category_name_label">Tên loại</string>
+    <string name="settings_category_icon_label">Biểu tượng</string>
+    <string name="settings_category_save">Lưu</string>
+    <string name="settings_category_cancel">Huỷ</string>
+    <string name="settings_category_delete_title">Xóa loại?</string>
+    <string name="settings_category_delete_body">Loại \"%1$s\" sẽ bị xóa.</string>
+    <string name="settings_category_delete_confirm">Xóa</string>
+    <string name="settings_category_in_use">Loại đang được sử dụng, không thể xóa</string>
+    <string name="settings_category_name_required">Tên loại không được để trống</string>
+    <string name="settings_category_unauthenticated">Bạn cần đăng nhập để thực hiện</string>
+    <string name="settings_category_error_title">Không thể thực hiện</string>
+    <string name="settings_category_error_generic">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
+    <string name="settings_category_error_ok">Đã hiểu</string>
+    <string name="settings_category_show">Hiện</string>
+    <string name="settings_category_hide">Ẩn</string>
+    <string name="settings_category_edit">Sửa</string>
+    <string name="settings_category_delete">Xóa</string>
     <string name="settings_logout_confirm_title">Đăng xuất khỏi tài khoản?</string>
     <string name="settings_logout_confirm_body">Bạn sẽ cần đăng nhập lại để tiếp tục.</string>
     <string name="settings_logout_confirm_yes">Đăng xuất</string>

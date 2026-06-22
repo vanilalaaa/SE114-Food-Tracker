@@ -15,6 +15,7 @@ import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
 import com.SE114.food_tracker.feature.profile.MyProfileScreen
+import com.SE114.food_tracker.feature.settings.CategoryManagementScreen
 import com.SE114.food_tracker.feature.settings.SettingsScreen
 import com.SE114.food_tracker.feature.stats.StatisticsScreen
 import com.SE114.food_tracker.feature.feed.FeedScreen
@@ -153,6 +154,10 @@ fun AppNavGraph(
 
             composable(AppDestinations.MyProfile.route) {
                 MyProfileScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(AppDestinations.CategoryManagement.route) {
+                CategoryManagementScreen(onBack = { navController.popBackStack() })
             }
         }
     }

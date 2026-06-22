@@ -18,4 +18,5 @@ sealed class AppDestinations(val route: String) {
     data object Chat : AppDestinations("chat")
     data object Settings : AppDestinations("settings")
     data object MyProfile : AppDestinations("my_profile")
+    data object CategoryManagement : AppDestinations("category_management")
 }
