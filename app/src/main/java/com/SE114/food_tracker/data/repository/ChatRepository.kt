@@ -113,7 +113,7 @@ class ChatRepository @Inject constructor(
         } catch (e: Exception) {
             try {
                 val sdfBackup =
-                    java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+                    java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:ssXXX", java.util.Locale.US)
                 val date = sdfBackup.parse(serverTimeStr)
                 date?.time ?: System.currentTimeMillis()
             } catch (e2: Exception) {
@@ -172,8 +172,6 @@ class ChatRepository @Inject constructor(
             println("Lỗi hệ thống luồng fetchAndSaveConversationsToLocal: ${e.localizedMessage}")
         }
     }
-
-    // ── CHỨC NĂNG REALTIME CHANNEL ──
 
     fun subscribeToChatRealtime(conversationId: String) {
         repositoryScope.launch {
@@ -261,8 +259,6 @@ class ChatRepository @Inject constructor(
             }
         }
     }
-
-    // ── CHỨC NĂNG CHAT NHÓM & QUẢN TRỊ VIÊN ──
 
     suspend fun sendMessage(
         conversationId: String,
@@ -418,12 +414,12 @@ class ChatRepository @Inject constructor(
                 val displayName = try {
                     if (profileElement != null) {
                         profileElement.jsonObject["display_name"]?.jsonPrimitive?.content
-                            ?: "Thành viên nhóm"
+                            ?: "Thành viên"
                     } else {
-                        "Thành viên nhóm"
+                        "Thành viên"
                     }
                 } catch (e: Exception) {
-                    "Thành viên nhóm"
+                    "Thành viên"
                 }
 
                 Pair(userId, displayName)
@@ -455,6 +451,10 @@ class ChatRepository @Inject constructor(
 
     suspend fun kickMember(conversationId: String, userIdToKick: String, memberName: String) {
         try {
+            val currentAdminId = getAuthenticatedUserId()
+            val actualGroupMembers = fetchGroupMembersFromServer(conversationId)
+            val adminName = actualGroupMembers.find { it.first == currentAdminId }?.second ?: "Admin"
+
             supabaseClient.from("conversation_participant").delete {
                 filter {
                     eq("conversation_id", conversationId)
@@ -464,7 +464,8 @@ class ChatRepository @Inject constructor(
 
             fetchAndSaveConversationsToLocal()
 
-            sendSystemMessage(conversationId, "Admin đã mời $memberName rời khỏi nhóm.")
+            sendSystemMessage(conversationId, "$adminName đã mời $memberName rời khỏi nhóm.")
+
         } catch (e: Exception) {
             println("Lỗi kích thành viên: ${e.localizedMessage}")
         }
@@ -561,6 +562,7 @@ class ChatRepository @Inject constructor(
         itemId: String? = null
     ): Boolean {
         return try {
+            val currentUserId = getAuthenticatedUserId()
             val conversation = chatDAO.getConversationById(conversationId).first()
             val walletId = conversation?.walletId ?: ""
 
@@ -568,15 +570,20 @@ class ChatRepository @Inject constructor(
                 println("Lỗi Repository: Không tìm thấy Wallet ID hợp lệ")
                 return false
             }
+
+            val actualGroupMembers = fetchGroupMembersFromServer(conversationId)
+            val currentUserName = actualGroupMembers.find { it.first == currentUserId }?.second ?: "Thành viên"
+
             val rpcArgs = WalletRpcArgs(
                 walletId = walletId,
                 amount = amount,
                 note = note
             )
+
             val messageText = if (txType == "deposit") {
-                "Hệ thống: Thành viên đã nộp ${String.format("%,.0f", amount)} VND vào quỹ nhóm. Nội dung: $note"
+                "Hệ thống: ${currentUserName} đã nộp ${String.format("%,.0f", amount)} VND vào quỹ nhóm. Nội dung: $note"
             } else {
-                "Hệ thống: Admin đã rút ${String.format("%,.0f", amount)} VND từ quỹ nhóm. Nội dung: $note"
+                "Hệ thống: ${currentUserName} đã rút ${String.format("%,.0f", amount)} VND từ quỹ nhóm. Nội dung: $note"
             }
 
             when (txType) {
@@ -674,8 +681,6 @@ class ChatRepository @Inject constructor(
             println("Lỗi luồng đồng bộ: ${e.localizedMessage}")
         }
     }
-
-    // ── CHỨC NĂNG GỬI MẠNG LƯỚI & RETRY TIN NHẮN LỖI ──
 
     private suspend fun performNetworkSend(message: Message) {
         try {

@@ -25,7 +25,6 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.MessageSyncStatus
 import java.util.UUID
 
-// Data class đại diện cho trạng thái hiển thị của một tin nhắn trên UI
 data class MessageUiModel(
     val localId: String = UUID.randomUUID().toString(),
     val senderId: String,
@@ -44,7 +43,7 @@ fun MessageBubble(
     isMine: Boolean,
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier,
-    senderName: String = "Thành viên nhóm" // 🔥 ĐÃ BỔ SUNG: Tham số nhận tên để sinh Avatar động
+    senderName: String = "Thành viên"
 ) {
     // 1. Trường hợp đặc biệt: Tin nhắn hệ thống (System Message)
     if (message.isSystem) {
@@ -77,19 +76,17 @@ fun MessageBubble(
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMine) {
-            // 🔥 ĐÃ NÂNG CẤP: Kiểm tra xem có Link ảnh Url hay không để đổi thành Avatar thật
-            // (Nếu sau này Vy có thêm trường avatarUrl trong MessageUiModel thì truyền vào đây, hiện tại lấy tạm hình mặc định sinh theo Tên)
             val avatarChar = senderName.trim().take(1).uppercase()
 
             Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(LightGreenStat), // Màu nền xanh dương nhạt chuẩn Messenger
+                    .background(LightGreenStat),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = avatarChar, // 🔥 ĐÃ ĐỒNG BỘ: Chữ cái đầu lấy theo đúng tên thật (H cho Thảo Uyên, A cho AnhZun)
+                    text = avatarChar,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
                     color = Color.Black
@@ -98,7 +95,6 @@ fun MessageBubble(
             Spacer(modifier = Modifier.width(6.dp))
         }
 
-        // Khối nội dung bong bóng chat chính
         Column(
             horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
         ) {
@@ -115,7 +111,6 @@ fun MessageBubble(
                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     if (message.imageUrl != null) {
                         Column {
-                            // Dùng AsyncImage của thư viện Coil để hiển thị ảnh từ Supabase Storage
                             AsyncImage(
                                 model = message.imageUrl,
                                 contentDescription = "Hình ảnh gửi kèm",
@@ -123,14 +118,12 @@ fun MessageBubble(
                                     .size(150.dp)
                                     .clip(RoundedCornerShape(8.dp))
                             )
-                            // Nếu có text caption kèm theo ảnh thì vẽ thêm ở dưới cách 4dp
                             if (!message.body.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(text = message.body, fontSize = 14.sp)
                             }
                         }
                     } else {
-                        // Tin nhắn chỉ chứa ký tự chữ thuần túy
                         if (message.body != null) {
                             Text(text = message.body, fontSize = 14.sp)
                         }
@@ -143,12 +136,11 @@ fun MessageBubble(
             ) {
                 Text(text = message.timeLabel, fontSize = 10.sp, color = TextLabelGray)
 
-                // Cờ trạng thái đồng bộ hàng đợi offline (Chỉ hiển thị cho chính mình gửi)
                 if (isMine) {
                     Spacer(modifier = Modifier.width(4.dp))
                     when (message.syncStatus) {
                         MessageSyncStatus.PENDING -> {
-                            Text(text = "🕒", fontSize = 10.sp) // Đồng hồ chờ gửi
+                            Text(text = "🕒", fontSize = 10.sp)
                         }
 
                         MessageSyncStatus.SENT -> {

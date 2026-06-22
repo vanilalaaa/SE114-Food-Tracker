@@ -58,7 +58,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // 🔥 ĐÃ FIX: Biến StateFlow quản lý tập trung danh sách thành viên nhóm
+    // Biến StateFlow quản lý tập trung danh sách thành viên nhóm
     private val _groupMembers = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val groupMembers: StateFlow<List<Pair<String, String>>> = _groupMembers.asStateFlow()
     private val _isCurrentAdmin = MutableStateFlow(false)
@@ -74,6 +74,29 @@ class ChatViewModel @Inject constructor(
             _groupMembers.value = actualMembers
         }
     }
+
+    // 🔥 ĐÃ THÊM: Hàm chuyên dụng phục vụ cho tính năng Kéo xuống để reload (Pull-to-Refresh)
+    fun refreshChatData(conversationId: String, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                // Đồng bộ và tải tin nhắn mới nhất từ server về Room cục bộ
+                chatRepository.syncMessagesFromServer(conversationId)
+
+                // Tải lại danh sách thành viên mới nhất
+                val actualMembers = chatRepository.fetchGroupMembersFromServer(conversationId)
+                _groupMembers.value = actualMembers
+
+                // Cập nhật lại trạng thái quyền Admin
+                val isAdmin = chatRepository.isCurrentUserAdminOf(conversationId)
+                _isCurrentAdmin.value = isAdmin
+            } catch (e: Exception) {
+                println("Lỗi khi kéo reload phòng chat: ${e.localizedMessage}")
+            } finally {
+                onComplete() // Báo cho UI tắt hiệu ứng vòng xoay nhe Vy!
+            }
+        }
+    }
+
     // KÍCH HOẠT LẮNG NGHE REALTIME ĐỘNG
     fun connectToConversation(conversationId: String) {
         viewModelScope.launch {
@@ -147,7 +170,7 @@ class ChatViewModel @Inject constructor(
         return chatDAO.getAllConversations()
     }
 
-    // 1. 🔥 ĐÃ FIX: Chuyển số dư về StateFlow để UI lắng nghe live biến động 100%
+    // Chuyển số dư về StateFlow để UI lắng nghe live biến động 100%
     private val _walletBalanceFlow = MutableStateFlow(0.0)
     val walletBalanceFlow: StateFlow<Double> = _walletBalanceFlow.asStateFlow()
 
@@ -165,7 +188,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // 2. 🔥 ĐÃ FIX: Lấy đúng walletId từ Conversation local trước khi gọi hàm RPC giao dịch!
+    // Lấy đúng walletId từ Conversation local trước khi gọi hàm RPC giao dịch!
     fun executeWalletTransaction(
         conversationId: String,
         amount: Double,
