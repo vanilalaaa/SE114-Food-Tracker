@@ -6,7 +6,8 @@
 
     <!-- Login -->
     <string name="auth_login_title">Đăng nhập</string>
-    <string name="auth_login_email">Email</string>
+    <string name="auth_login_identifier">Email hoặc User ID</string>
+    <string name="auth_login_identifier_helper">Bạn có thể đăng nhập bằng email hoặc User ID</string>
     <string name="auth_login_password">Mật khẩu</string>
     <string name="auth_login_submit">Đăng nhập</string>
     <string name="auth_login_forgot">Quên mật khẩu?</string>

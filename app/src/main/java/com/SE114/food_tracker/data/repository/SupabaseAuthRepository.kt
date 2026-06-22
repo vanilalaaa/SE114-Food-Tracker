@@ -30,13 +30,22 @@ class SupabaseAuthRepository @Inject constructor(
         }
     }
 
-    override suspend fun signUp(email: String, password: String, displayName: String): AuthOutcome<Unit> =
+    override suspend fun signUp(
+        email: String,
+        password: String,
+        displayName: String,
+        userId: String
+    ): AuthOutcome<Unit> =
         runAuth {
             auth.signUpWith(Email) {
                 this.email = email
                 this.password = password
-                // The on_auth_user_created trigger reads full_name from user metadata.
-                data = buildJsonObject { put("full_name", displayName) }
+                // The on_auth_user_created trigger reads full_name; user_id is carried too
+                // but the chosen handle is committed by the immediate completeOnboarding call.
+                data = buildJsonObject {
+                    put("full_name", displayName)
+                    put("user_id", userId)
+                }
             }
             Unit
         }

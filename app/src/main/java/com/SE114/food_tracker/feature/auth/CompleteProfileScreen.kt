@@ -16,8 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Person
@@ -87,21 +85,9 @@ private fun CompleteProfileContent(
     onPickAvatar: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    val isUserIdError = state.userIdStatus == UserIdStatus.Invalid ||
-        state.userIdStatus == UserIdStatus.Taken ||
-        state.userIdStatus == UserIdStatus.Error
-    val helper = when (state.userIdStatus) {
-        UserIdStatus.Idle -> stringResource(R.string.auth_complete_user_id_helper)
-        UserIdStatus.Checking -> stringResource(R.string.auth_complete_user_id_checking)
-        UserIdStatus.Available -> stringResource(R.string.auth_complete_user_id_available)
-        else -> null
-    }
-    val userIdErrorText = when (state.userIdStatus) {
-        UserIdStatus.Invalid -> stringResource(R.string.auth_complete_user_id_invalid)
-        UserIdStatus.Taken -> stringResource(R.string.auth_complete_user_id_taken)
-        UserIdStatus.Error -> stringResource(R.string.auth_complete_user_id_error)
-        else -> null
-    }
+    val isUserIdError = state.userIdStatus.isError()
+    val helper = userIdSupportingText(state.userIdStatus)
+    val userIdError = userIdErrorText(state.userIdStatus)
 
     AppScaffold { innerPadding ->
         Column(
@@ -145,7 +131,7 @@ private fun CompleteProfileContent(
                 label = stringResource(R.string.auth_complete_user_id),
                 leadingIcon = Icons.Outlined.AlternateEmail,
                 isError = isUserIdError,
-                errorText = userIdErrorText,
+                errorText = userIdError,
                 supportingText = helper,
                 trailing = { UserIdStatusIcon(state.userIdStatus) }
             )
@@ -214,27 +200,6 @@ private fun EditableAvatar(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun UserIdStatusIcon(status: UserIdStatus) {
-    when (status) {
-        UserIdStatus.Checking -> CircularProgressIndicator(
-            modifier = Modifier.size(18.dp),
-            strokeWidth = 2.dp
-        )
-        UserIdStatus.Available -> Icon(
-            imageVector = Icons.Filled.Check,
-            contentDescription = stringResource(R.string.auth_complete_user_id_available_desc),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        UserIdStatus.Taken, UserIdStatus.Invalid, UserIdStatus.Error -> Icon(
-            imageVector = Icons.Filled.Close,
-            contentDescription = stringResource(R.string.auth_complete_user_id_taken_desc),
-            tint = MaterialTheme.colorScheme.error
-        )
-        UserIdStatus.Idle -> Unit
     }
 }
 

@@ -31,8 +31,19 @@ interface ProfileRepository {
      */
     suspend fun completeOnboarding(displayName: String, userId: String, avatarUrl: String?): AuthOutcome<Unit>
 
-    /** UX-only availability hint; the DB unique index is the final authority. */
+    /**
+     * UX-only availability hint via the `user_id_available` security-definer RPC, so it
+     * works before authentication (register) as well as after (onboarding). The DB unique
+     * index is the final authority.
+     */
     suspend fun isUserIdAvailable(userId: String): AuthOutcome<Boolean>
+
+    /**
+     * Resolves the email registered for [userId] (case-insensitive) via the
+     * `email_for_user_id` security-definer RPC so a user can log in by handle.
+     * Returns null when no profile matches; callers map that to InvalidCredentials.
+     */
+    suspend fun getEmailByUserId(userId: String): AuthOutcome<String?>
 
     /** Own-row UPDATE; [userId]/[avatarUrl] are written only when non-null. */
     suspend fun updateProfile(displayName: String, userId: String?, avatarUrl: String?): AuthOutcome<Unit>
