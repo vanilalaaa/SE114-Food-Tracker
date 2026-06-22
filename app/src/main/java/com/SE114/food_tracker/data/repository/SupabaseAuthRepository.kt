@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.data.repository
 
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -60,6 +61,15 @@ class SupabaseAuthRepository @Inject constructor(
 
     override suspend fun sendPasswordReset(email: String): AuthOutcome<Unit> = runAuth {
         auth.resetPasswordForEmail(email)
+    }
+
+    override suspend fun verifyRecoveryOtp(email: String, token: String): AuthOutcome<Unit> = runAuth {
+        auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, email = email, token = token)
+    }
+
+    override suspend fun updatePassword(newPassword: String): AuthOutcome<Unit> = runAuth {
+        auth.updateUser { password = newPassword }
+        Unit
     }
 
     override suspend fun signOut(): AuthOutcome<Unit> = runAuth {

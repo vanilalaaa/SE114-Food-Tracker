@@ -25,14 +25,24 @@
     <string name="auth_register_have_account">Đã có tài khoản?</string>
     <string name="auth_register_login_cta">Đăng nhập</string>
 
-    <!-- Forgot password -->
+    <!-- Forgot password (6-digit email OTP reset) -->
     <string name="auth_forgot_title">Đặt lại mật khẩu</string>
-    <string name="auth_forgot_subtitle">Nhập email của bạn, chúng tôi sẽ gửi liên kết đặt lại mật khẩu.</string>
     <string name="auth_forgot_email">Email</string>
-    <string name="auth_forgot_submit">Gửi liên kết</string>
-    <string name="auth_forgot_success">Đã gửi liên kết đặt lại. Vui lòng kiểm tra email của bạn.</string>
-    <string name="auth_forgot_error">Không gửi được liên kết. Vui lòng thử lại.</string>
     <string name="auth_forgot_back">Quay lại đăng nhập</string>
+    <string name="auth_reset_request_subtitle">Nhập email, chúng tôi sẽ gửi mã 6 số để đặt lại mật khẩu.</string>
+    <string name="auth_reset_send_code">Gửi mã</string>
+    <string name="auth_reset_verify_subtitle">Nhập mã gồm 6 chữ số đã gửi tới %1$s</string>
+    <string name="auth_reset_code_label">Mã OTP</string>
+    <string name="auth_reset_verify_submit">Xác nhận mã</string>
+    <string name="auth_reset_resend">Gửi lại mã</string>
+    <string name="auth_reset_resend_cooldown">Gửi lại mã (%1$d giây)</string>
+    <string name="auth_reset_new_password_subtitle">Tạo mật khẩu mới cho tài khoản của bạn.</string>
+    <string name="auth_reset_new_password_label">Mật khẩu mới</string>
+    <string name="auth_reset_confirm_password_label">Nhập lại mật khẩu</string>
+    <string name="auth_reset_submit">Đặt lại mật khẩu</string>
+    <string name="auth_reset_done_title">Đổi mật khẩu thành công</string>
+    <string name="auth_reset_done_subtitle">Hãy đăng nhập bằng mật khẩu mới của bạn.</string>
+    <string name="auth_reset_done_login">Đăng nhập</string>
 
     <!-- Auth errors -->
     <string name="auth_err_invalid_credentials">Email hoặc mật khẩu không đúng</string>
@@ -43,6 +53,7 @@
     <string name="auth_err_rate_limited">Bạn thao tác quá nhanh. Vui lòng thử lại sau giây lát.</string>
     <string name="auth_err_user_id_taken">User ID đã tồn tại</string>
     <string name="auth_err_user_id_cooldown">Bạn vừa đổi User ID gần đây. Vui lòng thử lại sau.</string>
+    <string name="auth_err_otp_invalid">Mã OTP không đúng hoặc đã hết hạn</string>
     <string name="auth_err_no_network">Không có kết nối mạng. Vui lòng kiểm tra Internet và thử lại.</string>
     <string name="auth_err_unknown">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
     <string name="auth_err_password_mismatch">Mật khẩu nhập lại không khớp</string>
