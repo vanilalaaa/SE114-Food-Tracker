@@ -43,7 +43,8 @@ fun MessageBubble(
     message: MessageUiModel,
     isMine: Boolean,
     onRetryClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    senderName: String = "Thành viên nhóm" // 🔥 ĐÃ BỔ SUNG: Tham số nhận tên để sinh Avatar động
 ) {
     // 1. Trường hợp đặc biệt: Tin nhắn hệ thống (System Message)
     if (message.isSystem) {
@@ -71,20 +72,28 @@ fun MessageBubble(
 
     // 2. Trường hợp thông thường: Tin nhắn Chat giữa các thành viên
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMine) {
-            // Avatar đối phương
+            // 🔥 ĐÃ NÂNG CẤP: Kiểm tra xem có Link ảnh Url hay không để đổi thành Avatar thật
+            // (Nếu sau này Vy có thêm trường avatarUrl trong MessageUiModel thì truyền vào đây, hiện tại lấy tạm hình mặc định sinh theo Tên)
+            val avatarChar = senderName.trim().take(1).uppercase()
+
             Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFAED9E0)),
+                    .background(LightGreenStat), // Màu nền xanh dương nhạt chuẩn Messenger
                 contentAlignment = Alignment.Center
             ) {
-                Text("A", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = TextPrimaryStat)
+                Text(
+                    text = avatarChar, // 🔥 ĐÃ ĐỒNG BỘ: Chữ cái đầu lấy theo đúng tên thật (H cho Thảo Uyên, A cho AnhZun)
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = Color.Black
+                )
             }
             Spacer(modifier = Modifier.width(6.dp))
         }
@@ -195,6 +204,7 @@ fun MessageBubblePeerPreview() {
                     imageUrl = null
                 ),
                 isMine = false,
+                senderName = "AnhZun",
                 onRetryClick = {}
             )
         }

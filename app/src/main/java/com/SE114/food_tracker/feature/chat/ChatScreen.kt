@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -18,9 +19,11 @@ import androidx.compose.runtime.* import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,7 +54,7 @@ fun ChatScreen(
     val hasWallet = conversationState?.walletId != null &&
             conversationState?.walletId != "wallet_default" &&
             conversationState?.walletId?.isNotBlank() == true
-    // 🔥 ĐÃ FIX: Chỉ gọi tải danh sách thành viên đúng 1 lần duy nhất khi conversationId thay đổi, chặn đứng lỗi chớp màn hình!
+
     LaunchedEffect(conversationId) {
         viewModel.loadGroupMembers(conversationId)
     }
@@ -190,6 +193,9 @@ fun ChatScreenContent(
     var textInput by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
+    // Ánh xạ danh sách mảng sang Map để tra cứu tên hiển thị động theo ID thần tốc
+    val memberMap = remember(memberList) { memberList.toMap() }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -280,13 +286,45 @@ fun ChatScreenContent(
                 items(reversedList.size, key = { reversedList[it].localId }) { index ->
                     val message = reversedList[index]
 
-                    MessageBubble(
-                        message = message,
-                        isMine = message.senderId == myId ||
-                                message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
-                                message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED,
-                        onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
-                    )
+                    val isMine = message.senderId == myId ||
+                            message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
+                            message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // Nếu là đối phương gửi và là phòng Chat Nhóm, hiển thị Tên hiển thị phía trên bong bóng
+                        if (!isMine && isGroup && message.senderId != "system") {
+                            val senderName = memberMap[message.senderId] ?: "Thành viên nhóm"
+                            Text(
+                                text = senderName,
+                                fontSize = 11.sp,
+                                color = Color.Gray,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(start = 56.dp, bottom = 2.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            if (!isMine && isGroup && message.senderId == "system") {
+                                Spacer(modifier = Modifier.width(44.dp))
+                            }
+
+                            // 🔥 ĐÃ FIX: Truyền thêm thuộc tính senderName lấy từ Map ra để MessageBubble tự sinh Avatar xịn
+                            val senderName = memberMap[message.senderId] ?: "Thành viên nhóm"
+
+                            MessageBubble(
+                                message = message,
+                                isMine = isMine,
+                                senderName = senderName, // 🔥 TRUYỀN THÊM VÀO ĐÂY
+                                onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
+                            )
+                        }
+                    }
 
                     val hasOlderMessage = index + 1 < reversedList.size
                     val olderMessage = if (hasOlderMessage) reversedList[index + 1] else null
