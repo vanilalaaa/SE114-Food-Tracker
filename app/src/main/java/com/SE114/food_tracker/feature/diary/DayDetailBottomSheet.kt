@@ -86,7 +86,7 @@ fun DayDetailBottomSheetContent(
     val scrollState = rememberScrollState()
 
     val totalEntry = items.sumOf { it.price }
-    val displayTotal = totalEntry.formatVndShort()
+    val displayTotal = LocalCurrencyDisplay.current.formatShort(totalEntry)
 
     val dayOfWeekLabel = when (selectedDate.dayOfWeek.ordinal) {
         0 -> "Thứ Hai"

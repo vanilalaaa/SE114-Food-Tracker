@@ -40,7 +40,7 @@ fun ChartItem(
     ) {
         if (value > 0) {
             Text(
-                text = value.formatVndShort(),
+                text = LocalCurrencyDisplay.current.formatShort(value),
                 style = StatLabelStyle,
                 color = TextPrimaryStat,
                 textAlign = TextAlign.Center,

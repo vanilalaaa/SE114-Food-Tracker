@@ -5,15 +5,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.theme.*
+import com.SE114.food_tracker.core.util.AppCurrency
 
+/**
+ * Display-currency picker. Choosing a currency only updates the display preference —
+ * there is deliberately no batch conversion of stored amounts (that would corrupt history).
+ */
 @Composable
 fun CurrencySelectionDialog(
-    onDismissRequest: () -> Unit,
-    onConfirmClick: () -> Unit
+    currencies: List<AppCurrency>,
+    selected: AppCurrency,
+    ratesStale: Boolean,
+    onSelect: (AppCurrency) -> Unit,
+    onDismissRequest: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
@@ -21,61 +31,38 @@ fun CurrencySelectionDialog(
             color = CardWhite,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp)
-            ) {
+            Column(modifier = Modifier.padding(24.dp)) {
                 Text(
-                    text = "Đơn vị tiền",
+                    text = stringResource(R.string.settings_currency_title),
                     style = AppTypography.titleMedium,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    CurrencyRadioItem(
-                        currencyCode = "đ VND",
-                        currencyName = "VIETNAMESE DONG",
-                        isSelected = true,
-                        onClick = { /* ViewModel lo */ }
-                    )
-                    CurrencyRadioItem(
-                        currencyCode = "€ EUR",
-                        currencyName = "EURO",
-                        isSelected = false,
-                        onClick = { /* ViewModel lo */ }
-                    )
-                    CurrencyRadioItem(
-                        currencyCode = "¥ JPY",
-                        currencyName = "JAPANESE YEN",
-                        isSelected = false,
-                        onClick = { /* ViewModel lo */ }
-                    )
-                    CurrencyRadioItem(
-                        currencyCode = "$ USD",
-                        currencyName = "US DOLLAR",
-                        isSelected = false,
-                        onClick = { /* ViewModel lo */ }
-                    )
-                    // Bổ sung Chinese Yen
-                    CurrencyRadioItem(
-                        currencyCode = "¥ CNY",
-                        currencyName = "CHINESE YEN",
-                        isSelected = false,
-                        onClick = { /* ViewModel lo */ }
-                    )
-                    // Bổ sung Korean Won
-                    CurrencyRadioItem(
-                        currencyCode = "₩ KRW",
-                        currencyName = "KOREAN WON",
-                        isSelected = false,
-                        onClick = { /* ViewModel lo */ }
-                    )
+                if (ratesStale) {
+                    OutdatedRateWarningBanner()
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    currencies.forEach { currency ->
+                        CurrencyRadioItem(
+                            currencyCode = "${currency.symbol} ${currency.code}",
+                            currencyName = currency.displayName,
+                            isSelected = currency == selected,
+                            onClick = {
+                                onSelect(currency)
+                                onDismissRequest()
+                            }
+                        )
+                    }
+                }
 
-                SettingActionButton(
-                    text = "CHỌN",
-                    onClick = onConfirmClick
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = stringResource(R.string.settings_currency_note),
+                    style = AppTypography.labelMedium,
+                    color = HintGray
                 )
             }
         }
@@ -87,8 +74,11 @@ fun CurrencySelectionDialog(
 fun CurrencySelectionDialogPreview() {
     FoodTrackerTheme {
         CurrencySelectionDialog(
-            onDismissRequest = {},
-            onConfirmClick = {}
+            currencies = AppCurrency.entries,
+            selected = AppCurrency.VND,
+            ratesStale = true,
+            onSelect = {},
+            onDismissRequest = {}
         )
     }
 }

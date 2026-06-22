@@ -49,7 +49,7 @@ fun LoginScreen(
 
     LoginContent(
         state = state,
-        onEmailChange = viewModel::onEmailChange,
+        onIdentifierChange = viewModel::onIdentifierChange,
         onPasswordChange = viewModel::onPasswordChange,
         onSubmit = viewModel::submit,
         onNavigateRegister = onNavigateRegister,
@@ -68,7 +68,7 @@ fun LoginScreen(
 @Composable
 private fun LoginContent(
     state: LoginUiState,
-    onEmailChange: (String) -> Unit,
+    onIdentifierChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onNavigateRegister: () -> Unit,
@@ -91,11 +91,12 @@ private fun LoginContent(
             )
 
             AppTextField(
-                value = state.email,
-                onValueChange = onEmailChange,
-                label = stringResource(R.string.auth_login_email),
+                value = state.identifier,
+                onValueChange = onIdentifierChange,
+                label = stringResource(R.string.auth_login_identifier),
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                supportingText = stringResource(R.string.auth_login_identifier_helper),
                 isError = state.error != null
             )
 
@@ -154,8 +155,8 @@ private fun LoginContent(
 private fun LoginContentPreview() {
     FoodTrackerTheme {
         LoginContent(
-            state = LoginUiState(email = "an@example.com", error = AuthError.InvalidCredentials),
-            onEmailChange = {},
+            state = LoginUiState(identifier = "an@example.com", error = AuthError.InvalidCredentials),
+            onIdentifierChange = {},
             onPasswordChange = {},
             onSubmit = {},
             onNavigateRegister = {},

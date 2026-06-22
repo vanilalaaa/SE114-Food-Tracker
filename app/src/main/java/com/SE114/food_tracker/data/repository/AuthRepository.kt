@@ -6,8 +6,23 @@ import kotlinx.coroutines.flow.Flow
 interface AuthRepository {
     fun currentSessionFlow(): Flow<SessionStatus>
     suspend fun signIn(email: String, password: String): AuthOutcome<Unit>
-    suspend fun signUp(email: String, password: String, displayName: String): AuthOutcome<Unit>
+    suspend fun signUp(email: String, password: String, displayName: String, userId: String): AuthOutcome<Unit>
     suspend fun signInWithGoogle(idToken: String, rawNonce: String): AuthOutcome<Unit>
+
+    /** Sends a recovery email; with the OTP template it delivers a 6-digit code. */
     suspend fun sendPasswordReset(email: String): AuthOutcome<Unit>
+
+    /** Verifies the 6-digit recovery code, yielding a temporary authenticated session. */
+    suspend fun verifyRecoveryOtp(email: String, token: String): AuthOutcome<Unit>
+
+    /** Verifies the 6-digit signup confirmation code; on success the user has an active session. */
+    suspend fun verifySignupOtp(email: String, token: String): AuthOutcome<Unit>
+
+    /** Re-sends the signup confirmation email (6-digit token) for an unconfirmed account. */
+    suspend fun resendSignupOtp(email: String): AuthOutcome<Unit>
+
+    /** Updates the password of the currently (recovery-)authenticated user. */
+    suspend fun updatePassword(newPassword: String): AuthOutcome<Unit>
+
     suspend fun signOut(): AuthOutcome<Unit>
 }

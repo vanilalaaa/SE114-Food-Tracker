@@ -60,7 +60,7 @@ fun LocalLineTrendChartCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${forecast.currentActual.formatVndShort()} đ",
+                        text = LocalCurrencyDisplay.current.formatShort(forecast.currentActual),
                         fontSize = 18.sp,
                         color = TextPrimaryStat,
                         fontWeight = FontWeight.Bold
@@ -74,7 +74,7 @@ fun LocalLineTrendChartCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${forecast.projectedTotal.formatVndShort()} đ",
+                        text = LocalCurrencyDisplay.current.formatShort(forecast.projectedTotal),
                         fontSize = 18.sp,
                         color = StatPinkDark,
                         fontWeight = FontWeight.Bold
@@ -155,7 +155,7 @@ fun LocalLineTrendChartCard(
                             fontWeight = if (i == 2) FontWeight.Bold else FontWeight.Normal
                         )
                         Text(
-                            text = "${points[i].toDouble().formatVndShort()} đ",
+                            text = LocalCurrencyDisplay.current.formatShort(points[i].toDouble()),
                             fontSize = 11.sp,
                             color = TextPrimaryStat
                         )

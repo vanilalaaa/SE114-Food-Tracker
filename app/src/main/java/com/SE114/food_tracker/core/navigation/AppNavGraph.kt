@@ -14,8 +14,10 @@ import com.SE114.food_tracker.feature.auth.LoginScreen
 import com.SE114.food_tracker.feature.auth.PostAuthDestination
 import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
+import com.SE114.food_tracker.feature.auth.VerifyEmailScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
 import com.SE114.food_tracker.feature.profile.MyProfileScreen
+import com.SE114.food_tracker.feature.settings.CategoryManagementScreen
 import com.SE114.food_tracker.feature.settings.SettingsScreen
 import com.SE114.food_tracker.feature.stats.StatisticsScreen
 import com.SE114.food_tracker.feature.feed.FeedScreen
@@ -81,7 +83,16 @@ fun AppNavGraph(
             composable(AppDestinations.Register.route) {
                 RegisterScreen(
                     onAuthenticated = ::navigatePostAuth,
+                    onNavigateToVerifyEmail = { email, displayName, userId ->
+                        navController.navigate(AppDestinations.VerifyEmail.createRoute(email, displayName, userId))
+                    },
                     onNavigateLogin = { navController.popBackStack() }
+                )
+            }
+            composable(AppDestinations.VerifyEmail.route) {
+                VerifyEmailScreen(
+                    onVerified = ::enterMain,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(AppDestinations.Forgot.route) {
@@ -161,12 +172,18 @@ fun AppNavGraph(
 
             composable(AppDestinations.Settings.route) {
                 SettingsScreen(
-                    onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) }
+                    onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) },
+                    onNavigateToCategories = { navController.navigate(AppDestinations.CategoryManagement.route) },
+                    onChangePassword = { navController.navigate(AppDestinations.Forgot.route) }
                 )
             }
 
             composable(AppDestinations.MyProfile.route) {
                 MyProfileScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(AppDestinations.CategoryManagement.route) {
+                CategoryManagementScreen(onBack = { navController.popBackStack() })
             }
         }
     }

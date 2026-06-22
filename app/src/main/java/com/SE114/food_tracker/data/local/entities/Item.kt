@@ -15,13 +15,17 @@ import java.util.UUID
     indices = [
         Index("category_id"),
         Index("sync_status"),
-        Index("entry_date")
+        Index("entry_date"),
+        Index("owner_id")
     ]
 )
 data class Item(
     @PrimaryKey
     @ColumnInfo(name = "item_id")
     var itemId: String = UUID.randomUUID().toString(), // Chuyển sang UUID String để sync không bị đè id chéo thiết bị
+
+    @ColumnInfo(name = "owner_id")
+    var ownerId: String = "", // Supabase auth uid của chủ sở hữu; set ở repository khi ghi
 
     @ColumnInfo(name = "category_id")
     var categoryId: String,

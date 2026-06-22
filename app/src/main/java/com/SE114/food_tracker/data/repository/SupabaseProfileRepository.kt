@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,9 +31,6 @@ class SupabaseProfileRepository @Inject constructor(
         @SerialName("user_id") val userId: String? = null,
         @SerialName("onboarding_completed") val onboardingCompleted: Boolean = false
     )
-
-    @Serializable
-    private data class UserIdRow(@SerialName("user_id") val userId: String? = null)
 
     @Serializable
     private data class MyProfileRow(
@@ -117,13 +116,20 @@ class SupabaseProfileRepository @Inject constructor(
 
     override suspend fun isUserIdAvailable(userId: String): AuthOutcome<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
-            val normalized = userId.trim()
-            // UX-only: a cheap exact-match probe. The DB's case-insensitive unique
-            // index is the real gate and surfaces UserIdTaken on submit.
-            db.from("profile")
-                .select(Columns.list("user_id")) { filter { eq("user_id", normalized) } }
-                .decodeList<UserIdRow>()
-                .isEmpty()
+            // RPC (not a direct select): register runs before auth, where RLS hides the
+            // profile table. The DB's case-insensitive unique index is the real gate on submit.
+            db.rpc("user_id_available", buildJsonObject { put("p_user_id", userId.trim()) })
+                .decodeAs<Boolean>()
+        }.fold(
+            onSuccess = { AuthOutcome.Success(it) },
+            onFailure = { AuthOutcome.Failure(it.toAuthError()) }
+        )
+    }
+
+    override suspend fun getEmailByUserId(userId: String): AuthOutcome<String?> = withContext(Dispatchers.IO) {
+        runCatching {
+            db.rpc("email_for_user_id", buildJsonObject { put("p_user_id", userId.trim()) })
+                .decodeAsOrNull<String>()
         }.fold(
             onSuccess = { AuthOutcome.Success(it) },
             onFailure = { AuthOutcome.Failure(it.toAuthError()) }

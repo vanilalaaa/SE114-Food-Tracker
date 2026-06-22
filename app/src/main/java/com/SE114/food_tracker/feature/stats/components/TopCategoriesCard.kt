@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
-import com.SE114.food_tracker.core.util.formatVndExact
+import com.SE114.food_tracker.core.util.LocalCurrencyDisplay
 import com.SE114.food_tracker.feature.stats.CategoryStat
 
 @Composable
@@ -93,7 +93,7 @@ fun CategoryStatItem(
 
         // ── Exact amount ─────────────────────────────────────────────────────
         Text(
-            text = amount.formatVndExact(),
+            text = LocalCurrencyDisplay.current.format(amount),
             style = StatLabelStyle,
             fontSize = 13.sp,
             color = TextLabelGray,

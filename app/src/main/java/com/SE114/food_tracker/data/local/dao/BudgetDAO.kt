@@ -26,4 +26,8 @@ interface BudgetDAO {
 
     @Query("UPDATE budget SET sync_status = 'FAILED' WHERE user_id = :userId")
     suspend fun markFailed(userId: String)
+
+    /** Clears the local budget on explicit logout; re-pulls from server on next login. */
+    @Query("DELETE FROM budget")
+    suspend fun clearAll()
 }

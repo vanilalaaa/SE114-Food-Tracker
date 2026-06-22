@@ -36,7 +36,7 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         FeedLike::class,
         FeedComment::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -57,6 +57,20 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.createFeedTables()
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE item ADD COLUMN owner_id TEXT NOT NULL DEFAULT ''")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_item_owner_id ON item(owner_id)")
+                // Rows created before owner_id are unscoped cross-account leftovers — the exact
+                // bug this migration fixes — and have no reliable owner. Deleting them is
+                // intentional: the correct per-user data re-pulls from Supabase on next login.
+                // System categories (owner_id NULL) are preserved.
+                db.execSQL("DELETE FROM item")
+                db.execSQL("DELETE FROM category WHERE is_system = 0")
+                db.execSQL("DELETE FROM budget")
             }
         }
     }

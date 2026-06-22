@@ -28,6 +28,7 @@ internal fun Throwable.toAuthError(): AuthError {
             AuthErrorCode.OverRequestRateLimit,
             AuthErrorCode.OverEmailSendRateLimit,
             AuthErrorCode.OverSmsSendRateLimit -> AuthError.RateLimited
+            AuthErrorCode.OtpExpired, AuthErrorCode.OtpDisabled -> AuthError.OtpInvalid
             else -> messageFallback()
         }
     }
@@ -72,6 +73,8 @@ private fun Throwable.messageFallback(): AuthError {
         "weak password" in msg || "password should be" in msg -> AuthError.WeakPassword
         "invalid email" in msg || "unable to validate email" in msg -> AuthError.InvalidEmail
         "rate limit" in msg || "too many requests" in msg -> AuthError.RateLimited
+        "otp" in msg || "token has expired" in msg || "invalid token" in msg ||
+            "expired or is invalid" in msg -> AuthError.OtpInvalid
         else -> AuthError.Unknown(message)
     }
 }

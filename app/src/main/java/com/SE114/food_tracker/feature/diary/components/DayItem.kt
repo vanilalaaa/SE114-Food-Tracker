@@ -91,7 +91,7 @@ fun DayItem(
             }
 
             Text(
-                text = price.formatVndExact(),
+                text = LocalCurrencyDisplay.current.format(price),
                 color = OrangeMain,
                 style = AppTypography.bodyLarge.copy(fontWeight = FontWeight.Bold)
             )
