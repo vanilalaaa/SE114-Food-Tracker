@@ -32,26 +32,51 @@ fun FriendScreen(
     val outgoingRequests by viewModel.outgoingRequests.collectAsStateWithLifecycle()
     val currentProfile by viewModel.currentProfile.collectAsStateWithLifecycle()
     val profileLoadError by viewModel.profileLoadError.collectAsStateWithLifecycle()
+    val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
 
-    FriendScreenContent(
-        myUserId = currentProfile?.userId?.takeIf { it.isNotBlank() }
-            ?: profileLoadError
-            ?: "Đang tải...",
-        searchQuery = searchQuery,
-        searchResult = searchResult,
-        isLoadingSearch = isLoadingSearch,
-        acceptedFriends = acceptedFriends,
-        incomingRequests = incomingRequests,
-        outgoingRequests = outgoingRequests,
-        onUpdateSearchQuery = viewModel::updateSearchQuery,
-        onSearchUser = viewModel::searchUser,
-        onSendFriendRequest = viewModel::sendFriendRequest,
-        onAcceptRequest = viewModel::acceptRequest,
-        onDeclineRequest = viewModel::declineRequest,
-        onCancelOutgoingRequest = viewModel::cancelOutgoingRequest,
-        onUnfriend = viewModel::unfriend,
-        onNavigateBack = onNavigateBack
-    )
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Surface failed friend actions as a one-shot snackbar.
+    LaunchedEffect(actionMessage) {
+        actionMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearActionMessage()
+        }
+    }
+    // Surface a profile-load failure with a retry action (instead of hiding it in the ID slot).
+    LaunchedEffect(profileLoadError) {
+        profileLoadError?.let {
+            val result = snackbarHostState.showSnackbar(message = it, actionLabel = "Thử lại")
+            if (result == SnackbarResult.ActionPerformed) viewModel.retryLoadProfile()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        FriendScreenContent(
+            myUserId = currentProfile?.userId?.takeIf { it.isNotBlank() }
+                ?: if (profileLoadError != null) "Không lấy được ID" else "Đang tải...",
+            searchQuery = searchQuery,
+            searchResult = searchResult,
+            isLoadingSearch = isLoadingSearch,
+            acceptedFriends = acceptedFriends,
+            incomingRequests = incomingRequests,
+            outgoingRequests = outgoingRequests,
+            onUpdateSearchQuery = viewModel::updateSearchQuery,
+            onSearchUser = viewModel::searchUser,
+            onSendFriendRequest = viewModel::sendFriendRequest,
+            onAcceptRequest = viewModel::acceptRequest,
+            onDeclineRequest = viewModel::declineRequest,
+            onCancelOutgoingRequest = viewModel::cancelOutgoingRequest,
+            onUnfriend = viewModel::unfriend,
+            onNavigateBack = onNavigateBack
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+        )
+    }
 }
 
 @Composable

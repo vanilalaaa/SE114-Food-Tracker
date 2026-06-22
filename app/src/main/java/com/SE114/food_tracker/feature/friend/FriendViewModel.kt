@@ -45,6 +45,10 @@ class FriendViewModel @Inject constructor(
     private val _profileLoadError = MutableStateFlow<String?>(null)
     val profileLoadError = _profileLoadError.asStateFlow()
 
+    // Transient one-shot message for failed friend actions (shown as a snackbar).
+    private val _actionMessage = MutableStateFlow<String?>(null)
+    val actionMessage = _actionMessage.asStateFlow()
+
     init {
         loadFriendData()
 
@@ -57,15 +61,20 @@ class FriendViewModel @Inject constructor(
         }
     }
 
+    fun retryLoadProfile() = loadFriendData()
+
+    fun clearActionMessage() { _actionMessage.value = null }
+
     private fun loadFriendData() {
         viewModelScope.launch {
+            // Reset first so a repeated failure is still a null -> error transition (re-shows snackbar).
+            _profileLoadError.value = null
             repository.refreshCurrentProfile()
                 .onSuccess {
-                    _profileLoadError.value = null
                     repository.refreshFriendships()
                 }
-                .onFailure {
-                    _profileLoadError.value = "Không lấy được ID"
+                .onFailure { e ->
+                    _profileLoadError.value = e.message ?: "Không lấy được ID"
                 }
         }
     }
@@ -95,30 +104,25 @@ class FriendViewModel @Inject constructor(
                     _searchResult.value = null
                     _searchQuery.value = ""
                 }
+                .onFailure { reportActionError(it) }
         }
     }
 
-    fun acceptRequest(friendshipId: String) {
+    fun acceptRequest(friendshipId: String) = runFriendAction { repository.acceptRequest(friendshipId) }
+
+    fun declineRequest(friendshipId: String) = runFriendAction { repository.declineRequest(friendshipId) }
+
+    fun unfriend(friendshipId: String) = runFriendAction { repository.unfriend(friendshipId) }
+
+    fun cancelOutgoingRequest(friendshipId: String) = runFriendAction { repository.cancelOutgoingRequest(friendshipId) }
+
+    private fun runFriendAction(action: suspend () -> Result<Unit>) {
         viewModelScope.launch {
-            repository.acceptRequest(friendshipId)
+            action().onFailure { reportActionError(it) }
         }
     }
 
-    fun declineRequest(friendshipId: String) {
-        viewModelScope.launch {
-            repository.declineRequest(friendshipId)
-        }
-    }
-
-    fun unfriend(friendshipId: String) {
-        viewModelScope.launch {
-            repository.unfriend(friendshipId)
-        }
-    }
-
-    fun cancelOutgoingRequest(friendshipId: String) {
-        viewModelScope.launch {
-            repository.cancelOutgoingRequest(friendshipId)
-        }
+    private fun reportActionError(t: Throwable) {
+        _actionMessage.value = t.message ?: "Đã xảy ra lỗi, vui lòng thử lại."
     }
 }

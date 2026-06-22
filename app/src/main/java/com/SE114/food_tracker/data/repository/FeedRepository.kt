@@ -19,6 +19,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -143,8 +144,10 @@ class FeedRepository @Inject constructor(
 
     suspend fun pullVisibleFromSupabase(ownerId: String): Boolean =
         runCatching {
+            // Only client-readable columns (migration 0001); `select *` would hit the
+            // ungranted sensitive columns (is_banned, …) and fail with a permission error.
             val profiles = supabaseClient.postgrest.from("profile")
-                .select()
+                .select(Columns.list("id", "display_name", "user_id", "avatar_url"))
                 .decodeList<ProfileDTO>()
                 .associateBy { it.id }
 
