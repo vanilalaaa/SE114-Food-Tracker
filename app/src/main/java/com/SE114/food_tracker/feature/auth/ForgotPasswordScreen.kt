@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.feature.auth
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +30,7 @@ import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
 import com.SE114.food_tracker.core.designsystem.components.AppScaffold
 import com.SE114.food_tracker.core.designsystem.components.AppTextField
+import com.SE114.food_tracker.core.designsystem.components.OtpInput
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
 @Composable
@@ -147,14 +148,13 @@ private fun VerifyStep(
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
-    AppTextField(
-        value = state.code,
-        onValueChange = onCodeChange,
-        label = stringResource(R.string.auth_reset_code_label),
-        leadingIcon = Icons.Outlined.Pin,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-        isError = state.error != null
-    )
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        OtpInput(
+            value = state.code,
+            onValueChange = onCodeChange,
+            isError = state.error != null
+        )
+    }
     AppButton(
         text = stringResource(R.string.auth_reset_verify_submit),
         onClick = onVerifyCode,

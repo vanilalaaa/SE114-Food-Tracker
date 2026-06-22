@@ -67,6 +67,14 @@ class SupabaseAuthRepository @Inject constructor(
         auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, email = email, token = token)
     }
 
+    override suspend fun verifySignupOtp(email: String, token: String): AuthOutcome<Unit> = runAuth {
+        auth.verifyEmailOtp(type = OtpType.Email.SIGNUP, email = email, token = token)
+    }
+
+    override suspend fun resendSignupOtp(email: String): AuthOutcome<Unit> = runAuth {
+        auth.resendEmail(type = OtpType.Email.SIGNUP, email = email)
+    }
+
     override suspend fun updatePassword(newPassword: String): AuthOutcome<Unit> = runAuth {
         auth.updateUser { password = newPassword }
         Unit

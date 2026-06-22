@@ -13,6 +13,7 @@ import com.SE114.food_tracker.feature.auth.LoginScreen
 import com.SE114.food_tracker.feature.auth.PostAuthDestination
 import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
+import com.SE114.food_tracker.feature.auth.VerifyEmailScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
 import com.SE114.food_tracker.feature.profile.MyProfileScreen
 import com.SE114.food_tracker.feature.settings.CategoryManagementScreen
@@ -80,7 +81,16 @@ fun AppNavGraph(
             composable(AppDestinations.Register.route) {
                 RegisterScreen(
                     onAuthenticated = ::navigatePostAuth,
+                    onNavigateToVerifyEmail = { email, displayName, userId ->
+                        navController.navigate(AppDestinations.VerifyEmail.createRoute(email, displayName, userId))
+                    },
                     onNavigateLogin = { navController.popBackStack() }
+                )
+            }
+            composable(AppDestinations.VerifyEmail.route) {
+                VerifyEmailScreen(
+                    onVerified = ::enterMain,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(AppDestinations.Forgot.route) {

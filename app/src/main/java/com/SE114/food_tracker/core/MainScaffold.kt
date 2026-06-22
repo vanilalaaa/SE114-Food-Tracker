@@ -48,7 +48,9 @@ private val AUTH_ROUTES = setOf(
     AppDestinations.Splash.route,
     AppDestinations.Login.route,
     AppDestinations.Register.route,
-    AppDestinations.Forgot.route
+    AppDestinations.Forgot.route,
+    // Pre-auth: no session exists until OTP verification, so the session guard must not bounce it.
+    AppDestinations.VerifyEmail.route
 )
 
 // complete_profile is post-auth but pre-onboarding: no bottom bar, but a dropped

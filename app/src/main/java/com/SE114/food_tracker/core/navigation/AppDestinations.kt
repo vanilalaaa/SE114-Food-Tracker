@@ -7,6 +7,10 @@ sealed class AppDestinations(val route: String) {
     data object Login : AppDestinations("login")
     data object Register : AppDestinations("register")
     data object Forgot : AppDestinations("forgot")
+    data object VerifyEmail : AppDestinations("verify_email/{email}/{displayName}/{userId}") {
+        fun createRoute(email: String, displayName: String, userId: String): String =
+            "verify_email/${Uri.encode(email)}/${Uri.encode(displayName)}/${Uri.encode(userId)}"
+    }
     data object CompleteProfile : AppDestinations("complete_profile")
     data object Diary : AppDestinations("diary")
     data object Stats : AppDestinations("stats")

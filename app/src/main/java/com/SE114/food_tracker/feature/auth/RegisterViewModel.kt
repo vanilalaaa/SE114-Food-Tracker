@@ -27,7 +27,8 @@ data class RegisterUiState(
     val confirmPassword: String = "",
     val isLoading: Boolean = false,
     val error: AuthError? = null,
-    val navTarget: PostAuthDestination? = null
+    val navTarget: PostAuthDestination? = null,
+    val pendingVerification: PendingVerification? = null
 ) {
     val passwordMismatch: Boolean get() = confirmPassword.isNotEmpty() && confirmPassword != password
 
@@ -44,6 +45,13 @@ data class RegisterUiState(
             confirmPassword == password &&
             !isLoading
 }
+
+/** Carries the typed-email signup details to the Verify-Email screen (no session exists yet). */
+data class PendingVerification(
+    val email: String,
+    val displayName: String,
+    val userId: String
+)
 
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -111,7 +119,17 @@ class RegisterViewModel @Inject constructor(
             )
             when (signUp) {
                 is AuthOutcome.Failure -> _state.update { it.copy(isLoading = false, error = signUp.error) }
-                is AuthOutcome.Success -> finishOnboarding(current.displayName.trim(), current.userId.trim())
+                // Email confirmation is ON: signUp returns no session — go verify the OTP first.
+                is AuthOutcome.Success -> _state.update {
+                    it.copy(
+                        isLoading = false,
+                        pendingVerification = PendingVerification(
+                            email = current.email.trim(),
+                            displayName = current.displayName.trim(),
+                            userId = current.userId.trim()
+                        )
+                    )
+                }
             }
         }
     }
@@ -127,24 +145,6 @@ class RegisterViewModel @Inject constructor(
     }
 
     fun onGoogleError() = _state.update { it.copy(isLoading = false, error = AuthError.Unknown(null)) }
-
-    // Email signup is authenticated immediately (email-confirmation disabled): fill the
-    // trigger-created profile row's user_id and flip onboarding_completed, then land in Diary.
-    private suspend fun finishOnboarding(displayName: String, userId: String) {
-        when (val outcome = profileRepository.completeOnboarding(displayName, userId, avatarUrl = null)) {
-            is AuthOutcome.Success -> {
-                syncManager.startInitialSync()
-                _state.update { it.copy(isLoading = false, navTarget = PostAuthDestination.Diary) }
-            }
-            is AuthOutcome.Failure -> _state.update {
-                it.copy(
-                    isLoading = false,
-                    error = outcome.error,
-                    userIdStatus = if (outcome.error == AuthError.UserIdTaken) UserIdStatus.Taken else it.userIdStatus
-                )
-            }
-        }
-    }
 
     // Google first-time users still route through Complete Profile.
     private suspend fun resolveDestination() {

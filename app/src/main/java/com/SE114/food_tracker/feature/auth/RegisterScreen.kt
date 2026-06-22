@@ -37,6 +37,7 @@ import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 @Composable
 fun RegisterScreen(
     onAuthenticated: (PostAuthDestination) -> Unit,
+    onNavigateToVerifyEmail: (email: String, displayName: String, userId: String) -> Unit,
     onNavigateLogin: () -> Unit,
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
@@ -44,6 +45,10 @@ fun RegisterScreen(
 
     LaunchedEffect(state.navTarget) {
         state.navTarget?.let(onAuthenticated)
+    }
+
+    LaunchedEffect(state.pendingVerification) {
+        state.pendingVerification?.let { onNavigateToVerifyEmail(it.email, it.displayName, it.userId) }
     }
 
     RegisterContent(
