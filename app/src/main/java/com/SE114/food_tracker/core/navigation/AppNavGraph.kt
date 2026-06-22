@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.core.navigation
 
 import android.net.Uri
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -23,6 +24,7 @@ import com.SE114.food_tracker.feature.feed.FeedScreen
 import com.SE114.food_tracker.feature.friend.FriendScreen
 import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
+import com.SE114.food_tracker.feature.chat.GroupWalletScreen
 import com.SE114.food_tracker.feature.profile.ProfileScreen
 
 object NavGraphs {
@@ -146,12 +148,24 @@ fun AppNavGraph(
                 val id = backStackEntry.arguments?.getString("conversationId") ?: ""
                 val name = backStackEntry.arguments?.getString("conversationName") ?: "Người dùng"
 
-                val chatDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>()
-
+                val chatDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>(
+                    key = id
+                )
                 ChatScreen(
                     conversationId = id,
                     conversationName = name,
                     viewModel = chatDetailViewModel,
+                    onBackClick = { navController.popBackStack() },
+                    onWalletClick = {
+                        navController.navigate("group_wallet_screen/$id")
+                    }
+                )
+            }
+            composable("group_wallet_screen/{conversationId}") { backStackEntry ->
+                val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+
+                GroupWalletScreen(
+                    conversationId = conversationId,
                     onBackClick = { navController.popBackStack() }
                 )
             }
