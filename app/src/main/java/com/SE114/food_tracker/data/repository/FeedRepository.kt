@@ -18,12 +18,15 @@ import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Instant
 import timber.log.Timber
 import java.io.File
@@ -102,8 +105,21 @@ class FeedRepository @Inject constructor(
         )
     }
 
-    suspend fun deletePost(postId: String) {
-        feedDao.softDeletePost(postId, currentUserId())
+    suspend fun deletePost(postId: String): Boolean {
+        val ownerId = currentAuthenticatedUserId()
+        val rowsUpdated = feedDao.softDeletePost(postId, ownerId)
+        if (rowsUpdated == 0) {
+            error("Cannot delete this post with the current account.")
+        }
+
+        val deletedPost = feedDao.getPostById(postId) ?: return false
+        return runCatching { pushPost(deletedPost, ownerId) }
+            .onSuccess { feedDao.markPostSynced(postId) }
+            .onFailure { throwable ->
+                Timber.e(throwable, "[FeedSync] immediate post delete failed id=$postId")
+                feedDao.markPostFailed(postId)
+            }
+            .isSuccess
     }
 
     suspend fun pushPendingToSupabase(ownerId: String): Boolean {
@@ -163,8 +179,8 @@ class FeedRepository @Inject constructor(
                     }
                 }
                 .decodeList<FeedPostRemoteDTO>()
-            val pendingDeletedPostIds = feedDao.getPendingDeletedPostIds().toSet()
-            val visibleRemotePosts = remotePosts.filterNot { it.id in pendingDeletedPostIds }
+            val locallyDeletedPostIds = feedDao.getDeletedPostIds().toSet()
+            val visibleRemotePosts = remotePosts.filterNot { it.id in locallyDeletedPostIds }
 
             val postEntities = visibleRemotePosts.map { dto ->
                 dto.toEntity(
@@ -234,28 +250,29 @@ class FeedRepository @Inject constructor(
     }
 
     private suspend fun pushPost(post: FeedPost, ownerId: String) {
-        if (post.ownerId != ownerId) {
-            error("post ownerId ${post.ownerId} does not match auth user $ownerId")
+        val latestPost = feedDao.getPostById(post.postId) ?: post
+        if (latestPost.ownerId != ownerId) {
+            error("post ownerId ${latestPost.ownerId} does not match auth user $ownerId")
         }
 
-        if (post.isDeleted) {
-            supabaseClient.postgrest.from("post").update(
-                mapOf(
-                    "is_deleted" to true,
-                    "deleted_at" to Instant.fromEpochMilliseconds(post.updatedAt).toString()
-                )
-            ) {
-                filter {
-                    eq("id", post.postId)
-                    eq("author_id", ownerId)
-                }
-            }
+        if (latestPost.isDeleted) {
+            softDeleteRemotePost(latestPost, ownerId)
             return
         }
 
-        val remoteImageUrl = uploadPostImageIfNeeded(post, ownerId)
-        val dto = post.toRemoteDTO(ownerId, remoteImageUrl)
+        val remoteImageUrl = uploadPostImageIfNeeded(latestPost, ownerId)
+        val postBeforeUpsert = feedDao.getPostById(latestPost.postId) ?: latestPost
+        if (postBeforeUpsert.isDeleted) {
+            softDeleteRemotePost(postBeforeUpsert, ownerId)
+            return
+        }
+
+        val dto = postBeforeUpsert.toRemoteDTO(ownerId, remoteImageUrl)
         supabaseClient.postgrest.from("post").upsert(dto)
+    }
+
+    private suspend fun softDeleteRemotePost(post: FeedPost, ownerId: String) {
+        supabaseClient.postgrest.from("post").upsert(post.toDeletedRemoteDTO(ownerId))
     }
 
     private suspend fun pushLike(like: FeedLike, ownerId: String) {
@@ -344,6 +361,19 @@ class FeedRepository @Inject constructor(
             deletedAt = null
         )
 
+    private fun FeedPost.toDeletedRemoteDTO(ownerId: String): FeedPostRemoteDTO =
+        FeedPostRemoteDTO(
+            id = postId,
+            authorId = ownerId,
+            itemId = itemId,
+            caption = caption.ifBlank { null },
+            imageUrl = imageUrl.ifBlank { null },
+            visibility = visibility,
+            isDeleted = true,
+            createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
+            deletedAt = Instant.fromEpochMilliseconds(updatedAt).toString()
+        )
+
     private fun FeedLike.toRemoteDTO(ownerId: String): FeedLikeRemoteDTO =
         FeedLikeRemoteDTO(
             postId = postId,
@@ -411,6 +441,21 @@ class FeedRepository @Inject constructor(
             avatarUrl = avatarUrl
         )
 
+    private suspend fun currentAuthenticatedUserId(): String {
+        supabaseClient.auth.currentUserOrNull()?.id?.let { return it }
+
+        val status = withTimeoutOrNull(AUTH_SESSION_WAIT_MS) {
+            supabaseClient.auth.sessionStatus.first { it !is SessionStatus.Initializing }
+        }
+
+        if (status is SessionStatus.Authenticated) {
+            status.session.user?.id?.let { return it }
+            supabaseClient.auth.currentUserOrNull()?.id?.let { return it }
+        }
+
+        error("Not authenticated")
+    }
+
     private fun stableLikeId(postId: String, userId: String): String =
         UUID.nameUUIDFromBytes("$postId:$userId".toByteArray()).toString()
 
@@ -418,5 +463,6 @@ class FeedRepository @Inject constructor(
         const val PAGE_SIZE = 30
         private const val EMOJI_IMAGE_PREFIX = "emoji:"
         private const val LOCAL_USER_ID = "local_user"
+        private const val AUTH_SESSION_WAIT_MS = 2_000L
     }
 }

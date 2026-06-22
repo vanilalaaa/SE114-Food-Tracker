@@ -157,7 +157,7 @@ fun FriendScreenContent(
                 SectionHeader(title = "Lời mời kết bạn", count = incomingRequests.size)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(incomingRequests) { request ->
+            items(incomingRequests, key = { it.friendshipId }) { request ->
                 IncomingRequestItem(
                     request = request,
                     onAccept = onAcceptRequest,
@@ -172,7 +172,7 @@ fun FriendScreenContent(
                 SectionHeader(title = "Lời mời đã gửi", count = outgoingRequests.size)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(outgoingRequests) { request ->
+            items(outgoingRequests, key = { it.friendshipId }) { request ->
                 OutgoingRequestItem(
                     request = request,
                     onCancel = onCancelOutgoingRequest
@@ -189,7 +189,7 @@ fun FriendScreenContent(
         if (acceptedFriends.isEmpty()) {
             item { EmptyFriendState() }
         } else {
-            items(acceptedFriends) { friend ->
+            items(acceptedFriends, key = { it.friendshipId }) { friend ->
                 val hasStory = friend.displayName.length % 2 == 0
                 FriendListItem(friend = friend, hasStory = hasStory, onUnfriend = onUnfriend)
             }

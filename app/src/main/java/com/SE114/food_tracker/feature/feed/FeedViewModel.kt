@@ -250,9 +250,12 @@ class FeedViewModel @Inject constructor(
     fun deletePost(postId: String) {
         viewModelScope.launch {
             runCatching { feedRepository.deletePost(postId) }
-                .onSuccess {
+                .onSuccess { remoteSynced ->
                     closePostDetail()
-                    SyncScheduler.triggerImmediateSync(context)
+                    if (!remoteSynced) {
+                        _error.value = "Đã ẩn bài viết, sẽ thử đồng bộ xóa lại khi có mạng"
+                        SyncScheduler.triggerImmediateSync(context)
+                    }
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Delete post failed")

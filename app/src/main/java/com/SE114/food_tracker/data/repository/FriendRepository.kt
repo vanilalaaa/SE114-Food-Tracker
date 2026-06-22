@@ -73,6 +73,13 @@ class FriendRepository @Inject constructor(
             fetchProfileById(otherProfileId)?.let { friendDao.insertUserCache(it.toCacheEntity()) }
             friendDao.insertFriendship(dto.toEntity())
         }
+
+        val remoteIds = remoteFriendships.map { it.id }
+        if (remoteIds.isEmpty()) {
+            friendDao.softDeleteAllFriendshipsForUser(me.id)
+        } else {
+            friendDao.softDeleteFriendshipsMissingFromRemote(me.id, remoteIds)
+        }
     }
 
     suspend fun acceptRequest(friendshipId: String): Result<Unit> =
@@ -180,6 +187,11 @@ class FriendRepository @Inject constructor(
             val friendship = friendDao.getFriendshipById(friendshipId)
                 ?: error("Không tìm thấy lời mời kết bạn.")
 
+            val me = requireCurrentProfile()
+            if (friendship.senderId != me.id && friendship.receiverId != me.id) {
+                error("Không thể cập nhật lời mời này.")
+            }
+
             supabaseClient.postgrest.from("friendship").update(
                 {
                     set("status", status)
@@ -192,8 +204,24 @@ class FriendRepository @Inject constructor(
 
     private suspend fun deleteRemoteFriendship(friendshipId: String): Result<Unit> =
         runCatching {
+            val friendship = friendDao.getFriendshipById(friendshipId)
+                ?: error("Không tìm thấy kết bạn.")
+            val me = requireCurrentProfile()
+            if (friendship.senderId != me.id && friendship.receiverId != me.id) {
+                error("Không thể xóa kết bạn này.")
+            }
+
             supabaseClient.postgrest.from("friendship").delete {
                 filter { eq("id", friendshipId) }
+            }
+            val stillExists = supabaseClient.postgrest.from("friendship")
+                .select {
+                    filter { eq("id", friendshipId) }
+                }
+                .decodeList<FriendshipDTO>()
+                .isNotEmpty()
+            if (stillExists) {
+                error("Chưa xóa được kết bạn trên server.")
             }
             friendDao.softDeleteFriendship(friendshipId, syncStatus = "SYNCED")
         }

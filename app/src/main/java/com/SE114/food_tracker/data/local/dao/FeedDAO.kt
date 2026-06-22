@@ -142,6 +142,15 @@ interface FeedDAO {
     )
     suspend fun getPendingDeletedPostIds(): List<String>
 
+    @Query(
+        """
+        SELECT post_id
+        FROM feed_post
+        WHERE is_deleted = 1
+        """
+    )
+    suspend fun getDeletedPostIds(): List<String>
+
     @Query("SELECT * FROM feed_like WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingLikes(): List<FeedLike>
 
@@ -150,6 +159,9 @@ interface FeedDAO {
 
     @Query("SELECT * FROM feed_like WHERE post_id = :postId AND user_id = :userId LIMIT 1")
     suspend fun getLike(postId: String, userId: String): FeedLike?
+
+    @Query("SELECT * FROM feed_post WHERE post_id = :postId LIMIT 1")
+    suspend fun getPostById(postId: String): FeedPost?
 
     @Query("UPDATE feed_post SET image_url = :imageUrl, updated_at = :updatedAt WHERE post_id = :postId")
     suspend fun updatePostImageUrl(postId: String, imageUrl: String, updatedAt: Long = System.currentTimeMillis())
@@ -198,7 +210,7 @@ interface FeedDAO {
         postId: String,
         ownerId: String,
         updatedAt: Long = System.currentTimeMillis()
-    )
+    ): Int
 
     @Transaction
     suspend fun toggleLike(postId: String, userId: String) {

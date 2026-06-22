@@ -38,10 +38,13 @@ interface FriendDAO {
                c.avatar_url AS avatarUrl, 
                f.status AS status
         FROM friendship f
-        INNER JOIN user_profile_cache c ON (c.user_id = f.sender_id OR c.user_id = f.receiver_id)
+        INNER JOIN user_profile_cache c ON c.user_id = CASE
+            WHEN f.sender_id = :myUserId THEN f.receiver_id
+            ELSE f.sender_id
+        END
         WHERE f.status = 'accepted' 
         AND f.is_deleted = 0 
-        AND c.user_id != :myUserId
+        AND (f.sender_id = :myUserId OR f.receiver_id = :myUserId)
     """)
     fun getAcceptedFriends(myUserId: String): Flow<List<FriendItemDto>>
 
@@ -85,6 +88,32 @@ interface FriendDAO {
     suspend fun softDeleteFriendship(
         friendshipId: String,
         syncStatus: String = "PENDING",
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("""
+        UPDATE friendship
+        SET is_deleted = 1, sync_status = :syncStatus, updated_at = :updatedAt
+        WHERE is_deleted = 0
+        AND (sender_id = :myUserId OR receiver_id = :myUserId)
+        AND friendship_id NOT IN (:remoteFriendshipIds)
+    """)
+    suspend fun softDeleteFriendshipsMissingFromRemote(
+        myUserId: String,
+        remoteFriendshipIds: List<String>,
+        syncStatus: String = "SYNCED",
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("""
+        UPDATE friendship
+        SET is_deleted = 1, sync_status = :syncStatus, updated_at = :updatedAt
+        WHERE is_deleted = 0
+        AND (sender_id = :myUserId OR receiver_id = :myUserId)
+    """)
+    suspend fun softDeleteAllFriendshipsForUser(
+        myUserId: String,
+        syncStatus: String = "SYNCED",
         updatedAt: Long = System.currentTimeMillis()
     )
 }
