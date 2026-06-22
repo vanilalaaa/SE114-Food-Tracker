@@ -60,7 +60,7 @@ fun ConversationItem(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = if (conversation.isGroup) "Nhóm: Nhấp để xem tin nhắn..." else "Nhấp để vào phòng chat 1-1",
+                text =  "Nhấp để xem tin nhắn...",
                 fontSize = 13.sp,
                 color = TextLabelGray,
                 maxLines = 1,
