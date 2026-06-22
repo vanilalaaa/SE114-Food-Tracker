@@ -2,9 +2,9 @@ package com.SE114.food_tracker.feature.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.FriendRepository
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
-import com.SE114.food_tracker.feature.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow

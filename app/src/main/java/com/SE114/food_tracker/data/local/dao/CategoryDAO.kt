@@ -47,6 +47,8 @@ interface CategoryDAO {
 
     @Query("SELECT * FROM category WHERE is_hidden = 0 AND is_deleted = 0 ORDER BY is_system DESC, name ASC")
     fun getVisibleCategories(): Flow<List<Category>>
+    @Query("SELECT * FROM category WHERE category_id = :id")
+    suspend fun getCategoryByIdOneShot(id: String): Category?
 
     // ── SYNC ──
 
