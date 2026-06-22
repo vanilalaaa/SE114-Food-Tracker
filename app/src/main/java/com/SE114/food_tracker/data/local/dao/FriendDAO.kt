@@ -45,6 +45,7 @@ interface FriendDAO {
         WHERE f.status = 'accepted' 
         AND f.is_deleted = 0 
         AND (f.sender_id = :myUserId OR f.receiver_id = :myUserId)
+        ORDER BY lower(c.display_name), c.user_id
     """)
     fun getAcceptedFriends(myUserId: String): Flow<List<FriendItemDto>>
 
@@ -59,6 +60,7 @@ interface FriendDAO {
         WHERE f.receiver_id = :myUserId 
         AND f.status = 'pending' 
         AND f.is_deleted = 0
+        ORDER BY f.created_at DESC, f.friendship_id
     """)
     fun getIncomingRequests(myUserId: String): Flow<List<FriendItemDto>>
 
@@ -73,6 +75,7 @@ interface FriendDAO {
         WHERE f.sender_id = :myUserId 
         AND f.status = 'pending' 
         AND f.is_deleted = 0
+        ORDER BY f.created_at DESC, f.friendship_id
     """)
     fun getOutgoingRequests(myUserId: String): Flow<List<FriendItemDto>>
 
