@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -146,16 +147,25 @@ class ChatViewModel @Inject constructor(
         return chatDAO.getAllConversations()
     }
 
-    // Hàm gọi bốc số dư và lịch sử giao dịch thật từ Server về máy
+    // 1. 🔥 ĐÃ FIX: Chuyển số dư về StateFlow để UI lắng nghe live biến động 100%
+    private val _walletBalanceFlow = MutableStateFlow(0.0)
+    val walletBalanceFlow: StateFlow<Double> = _walletBalanceFlow.asStateFlow()
+
+    // Hàm bốc dữ liệu Quỹ
     fun loadWalletData(conversationId: String) {
         viewModelScope.launch {
-            walletBalance = chatRepository.getWalletBalance(conversationId)
+            // Lấy số dư thật
+            val balance = chatRepository.getWalletBalance(conversationId)
+            _walletBalanceFlow.value = balance
+            walletBalance = balance // Giữ lại biến cũ để tránh lỗi compile nếu nơi khác xài
+
+            // Lấy lịch sử giao dịch thật
             _walletTransactions.value =
                 chatRepository.fetchWalletTransactionsFromServer(conversationId)
         }
     }
 
-    // Hàm xử lý kích hoạt giao dịch từ Giao diện gửi lên thẳng RPC server thật
+    // 2. 🔥 ĐÃ FIX: Lấy đúng walletId từ Conversation local trước khi gọi hàm RPC giao dịch!
     fun executeWalletTransaction(
         conversationId: String,
         amount: Double,
@@ -163,20 +173,35 @@ class ChatViewModel @Inject constructor(
         note: String
     ) {
         viewModelScope.launch {
-            val transactionType = if (isDeposit) "deposit" else "withdrawal"
+            try {
+                val transactionType = if (isDeposit) "deposit" else "withdrawal"
 
-            val success = chatRepository.executeWalletTransaction(
-                conversationId = conversationId,
-                amount = amount,
-                txType = transactionType,
-                note = note,
-                itemId = null
-            )
+                // Bốc thông tin phòng chat từ Room DB để lấy walletId thật
+                val conversation = chatDAO.getConversationById(conversationId).first()
+                val actualWalletId = conversation?.walletId
 
-            if (success) {
-                loadWalletData(conversationId)
+                if (actualWalletId.isNullOrBlank() || actualWalletId == "wallet_default") {
+                    println("Lỗi giao dịch: Phòng chat này chưa được gắn WalletId thật!")
+                    return@launch
+                }
+
+                // Truyền đúng actualWalletId vào lòng Repository nhe Vy!
+                val success = chatRepository.executeWalletTransaction(
+                    conversationId = conversationId, // Truyền để bắn tin nhắn hệ thống
+                    amount = amount,
+                    txType = transactionType,
+                    note = note,
+                    itemId = null
+                )
+
+                if (success) {
+                    loadWalletData(conversationId) // Làm mới số dư và lịch sử live liền
+                }
+                isTransactionSuccess = success
+            } catch (e: Exception) {
+                e.printStackTrace()
+                println("Lỗi thực thi giao dịch RPC: ${e.localizedMessage}")
             }
-            isTransactionSuccess = success
         }
     }
 

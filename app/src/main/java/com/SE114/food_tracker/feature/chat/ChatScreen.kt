@@ -294,7 +294,7 @@ fun ChatScreenContent(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         // Nếu là đối phương gửi và là phòng Chat Nhóm, hiển thị Tên hiển thị phía trên bong bóng
-                        if (!isMine && isGroup && message.senderId != "system") {
+                        if (!isMine && isGroup && !message.isSystem && message.senderId != "system") {
                             val senderName = memberMap[message.senderId] ?: "Thành viên nhóm"
                             Text(
                                 text = senderName,
