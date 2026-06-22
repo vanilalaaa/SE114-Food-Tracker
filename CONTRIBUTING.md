@@ -289,25 +289,7 @@ private fun DiaryScreenPreview() {
 
 Khai báo route vào navigation graph của feature.
 
-## Quy tắc đặc biệt — Mảng Diary và Stats
-
-Plan dự án có một ngoại lệ: **UI và logic của Diary / Stats nằm ở 2 người khác nhau**:
-
-- **UI Nhật ký**: TV3 dựng → branch `feature/ui-diary-base`
-- **UI Thống kê**: TV4 dựng → branch `feature/ui-stats-base`
-- **Logic (ViewModel + Repository)**: TV2 phụ trách
-
-### State contract (BẮT BUỘC chốt ngày 1 Sprint 1)
-
-Trước khi viết code, TV2 + TV3 + TV4 ngồi cùng chốt:
-
-1. **TV2 expose state gì**: `DiaryUiState` chứa field nào (items, selectedDate, filter, isLoading...).
-2. **TV2 expose action gì**: hàm trong ViewModel mà UI sẽ gọi (`onDateSelect`, `onAddItem`, `onFilterChange`...).
-3. **TV3 / TV4 commit UI base lên branch trước** để TV2 import và ráp ViewModel.
-
-File chốt: `docs/state-contracts/diary.md` và `docs/state-contracts/stats.md`. Mọi thay đổi state contract sau ngày 1 phải báo cả hai bên.
-
-## Sync Framework (do Lead xây dựng)
+## Sync Framework 
 
 Mọi feature có data sync với Supabase phải dùng `SyncManager`:
 
