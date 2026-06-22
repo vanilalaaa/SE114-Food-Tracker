@@ -1,9 +1,10 @@
 package com.SE114.food_tracker.feature.auth
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.SE114.food_tracker.R
+import com.SE114.food_tracker.data.repository.AuthError
+import com.SE114.food_tracker.data.repository.AuthOutcome
+import com.SE114.food_tracker.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,7 @@ data class ForgotPasswordUiState(
     val email: String = "",
     val isLoading: Boolean = false,
     val sent: Boolean = false,
-    @StringRes val errorRes: Int? = null
+    val error: AuthError? = null
 ) {
     val canSubmit: Boolean get() = email.isNotBlank() && !isLoading && !sent
 }
@@ -29,18 +30,17 @@ class ForgotPasswordViewModel @Inject constructor(
     private val _state = MutableStateFlow(ForgotPasswordUiState())
     val state: StateFlow<ForgotPasswordUiState> = _state.asStateFlow()
 
-    fun onEmailChange(value: String) = _state.update { it.copy(email = value, errorRes = null) }
+    fun onEmailChange(value: String) = _state.update { it.copy(email = value, error = null) }
 
     fun submit() {
         val current = _state.value
         if (!current.canSubmit) return
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, errorRes = null) }
-            authRepository.sendPasswordReset(current.email.trim())
-                .onSuccess { _state.update { it.copy(isLoading = false, sent = true) } }
-                .onFailure {
-                    _state.update { it.copy(isLoading = false, errorRes = R.string.auth_forgot_error) }
-                }
+            _state.update { it.copy(isLoading = true, error = null) }
+            when (val outcome = authRepository.sendPasswordReset(current.email.trim())) {
+                is AuthOutcome.Success -> _state.update { it.copy(isLoading = false, sent = true) }
+                is AuthOutcome.Failure -> _state.update { it.copy(isLoading = false, error = outcome.error) }
+            }
         }
     }
 }
