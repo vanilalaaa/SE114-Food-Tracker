@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 const val OTP_LENGTH = 6
+private const val MIN_PASSWORD_LENGTH = 6
 
 enum class ResetStep { Request, Verify, NewPassword, Done }
 
@@ -127,7 +128,6 @@ class ForgotPasswordViewModel @Inject constructor(
     }
 
     companion object {
-        private const val MIN_PASSWORD_LENGTH = 6
         private const val RESEND_COOLDOWN_SECONDS = 60
     }
 }
