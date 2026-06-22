@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.sync.LocalDataCleaner
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.Profile
 import com.SE114.food_tracker.data.repository.ProfileRepository
@@ -15,7 +16,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val localDataCleaner: LocalDataCleaner
 ) : ViewModel() {
 
     val profile: StateFlow<Profile?> = profileRepository.observeMyProfile()
@@ -25,8 +27,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { profileRepository.refreshMyProfile() }
     }
 
-    /** The session observer in MainScaffold reacts to NotAuthenticated and routes to login. */
+    /**
+     * Explicit logout: wipe local user-owned data first, then sign out. The session
+     * observer in MainScaffold reacts to NotAuthenticated and routes to login.
+     */
     fun logout() {
-        viewModelScope.launch { authRepository.signOut() }
+        viewModelScope.launch {
+            localDataCleaner.clearUserOwnedData()
+            authRepository.signOut()
+        }
     }
 }

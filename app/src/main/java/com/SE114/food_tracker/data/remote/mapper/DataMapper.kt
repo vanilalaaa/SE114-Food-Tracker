@@ -25,6 +25,7 @@ object DataMapper {
 
         return Item(
             itemId       = this.id,
+            ownerId      = this.ownerId,
             categoryId   = this.categoryId,
             name         = this.name,
             timeType     = this.timeType,

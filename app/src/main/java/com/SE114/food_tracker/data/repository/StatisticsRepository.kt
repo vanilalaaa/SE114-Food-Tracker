@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.data.repository
 
+import com.SE114.food_tracker.core.network.SessionProvider
 import com.SE114.food_tracker.core.util.TimeFrame
 import com.SE114.food_tracker.core.util.TimeRangeProvider
 import com.SE114.food_tracker.core.util.toDayLabel
@@ -23,19 +24,22 @@ import javax.inject.Inject
 
 class StatisticsRepository @Inject constructor(
     private val itemDAO: ItemDAO,
-    private val categoryDAO: CategoryDAO
+    private val categoryDAO: CategoryDAO,
+    private val sessionProvider: SessionProvider
 ) {
+
+    private fun owner(): String = sessionProvider.currentUserId().orEmpty()
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
     fun getTotalSpent(start: Long, end: Long): Flow<Double> =
-        itemDAO.getTotalExpenseForDay(start, end).map { it ?: 0.0 }
+        itemDAO.getTotalExpenseForDay(owner(), start, end).map { it ?: 0.0 }
 
     fun getItemCount(start: Long, end: Long): Flow<Int> =
-        itemDAO.getItemCountForDay(start, end)
+        itemDAO.getItemCountForDay(owner(), start, end)
 
     fun getTotalSpentForRange(start: Long, end: Long): Flow<Double> =
-        itemDAO.getTotalExpenseForRange(start, end).map { it ?: 0.0 }
+        itemDAO.getTotalExpenseForRange(owner(), start, end).map { it ?: 0.0 }
 
     /**
      * Average personal spend per forecast-cycle over the last 7 cycles immediately
@@ -48,7 +52,7 @@ class StatisticsRepository @Inject constructor(
      */
     fun getHistoricalCycleAverage(timeFrame: TimeFrame, anchor: LocalDate): Flow<Double> {
         val lookback = TimeRangeProvider.lastSevenCyclesRangeFor(timeFrame, anchor)
-        return itemDAO.getTotalExpenseForRange(lookback.start, lookback.end).map { total ->
+        return itemDAO.getTotalExpenseForRange(owner(), lookback.start, lookback.end).map { total ->
             (total ?: 0.0) / 7.0
         }
     }
@@ -60,7 +64,7 @@ class StatisticsRepository @Inject constructor(
 
             // DAY — always 3 bars: Sáng / Trưa / Tối
             TimeFrame.DAY ->
-                itemDAO.getExpenseByTimeType(start, end).map { rows ->
+                itemDAO.getExpenseByTimeType(owner(), start, end).map { rows ->
                     val byType = rows.associateBy { it.timeType }
                     listOf(0, 1, 2).map { t ->
                         ChartBar(label = t.toSessionLabel(), value = byType[t]?.total ?: 0.0)
@@ -69,7 +73,7 @@ class StatisticsRepository @Inject constructor(
 
             // WEEK — always 7 bars: T2 … CN, in Mon→Sun order
             TimeFrame.WEEK ->
-                itemDAO.getExpenseByDateBucket(start, end).map { rows ->
+                itemDAO.getExpenseByDateBucket(owner(), start, end).map { rows ->
                     val byLabel = rows.associate { it.entryDate.toDayLabel(TimeFrame.WEEK) to it.total }
                     listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN").map { label ->
                         ChartBar(label = label, value = byLabel[label] ?: 0.0)
@@ -79,7 +83,7 @@ class StatisticsRepository @Inject constructor(
             // MONTH — 4 bars representing weeks 1–4 of the month.
             // Week boundaries: [1–7], [8–14], [15–21], [22–28/29/30/31]
             TimeFrame.MONTH ->
-                itemDAO.getExpenseByDateBucket(start, end).map { rows ->
+                itemDAO.getExpenseByDateBucket(owner(), start, end).map { rows ->
                     // Group all item dates into 4 week buckets and sum by bucket
                     val weekBuckets = mutableMapOf(1 to 0.0, 2 to 0.0, 3 to 0.0, 4 to 0.0)
                     rows.forEach { expense ->
@@ -102,7 +106,7 @@ class StatisticsRepository @Inject constructor(
 
             // YEAR — always 12 bars: Th1 … Th12
             TimeFrame.YEAR ->
-                itemDAO.getExpenseByMonthBucket(start, end).map { rows ->
+                itemDAO.getExpenseByMonthBucket(owner(), start, end).map { rows ->
                     val byLabel = rows.associate { it.monthEpoch.toDayLabel(TimeFrame.YEAR) to it.total }
                     (1..12).map { m ->
                         ChartBar(label = "T$m", value = byLabel["T$m"] ?: 0.0)
@@ -114,8 +118,8 @@ class StatisticsRepository @Inject constructor(
 
     fun getDonutData(start: Long, end: Long): Flow<List<ChartSlice>> =
         combine(
-            itemDAO.getPersonalExpenseByCategory(start, end),
-            categoryDAO.getAllCategories()
+            itemDAO.getPersonalExpenseByCategory(owner(), start, end),
+            categoryDAO.getAllCategories(owner())
         ) { expenses, categories ->
             val byId = categories.associateBy { it.categoryId }
             expenses.map { exp ->
@@ -140,8 +144,8 @@ class StatisticsRepository @Inject constructor(
 
     fun getWalletDestroyer(start: Long, end: Long): Flow<WalletDestroyerItem?> =
         combine(
-            itemDAO.getTopExpensiveItems(start, end, limit = 1),
-            categoryDAO.getAllCategories()
+            itemDAO.getTopExpensiveItems(owner(), start, end, limit = 1),
+            categoryDAO.getAllCategories(owner())
         ) { items, categories ->
             val item = items.firstOrNull() ?: return@combine null
             val byId = categories.associateBy { it.categoryId }
@@ -166,8 +170,8 @@ class StatisticsRepository @Inject constructor(
      */
     fun getDetailItems(start: Long, end: Long): Flow<List<DetailItem>> =
         combine(
-            itemDAO.getItemsByDateRange(start, end),
-            categoryDAO.getAllCategories()
+            itemDAO.getItemsByDateRange(owner(), start, end),
+            categoryDAO.getAllCategories(owner())
         ) { items, categories ->
             val byId = categories.associateBy { it.categoryId }
             val tz   = TimeZone.UTC
