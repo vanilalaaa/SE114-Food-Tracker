@@ -11,7 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.AppButton
+import com.SE114.food_tracker.core.designsystem.components.AppScaffold
 import com.SE114.food_tracker.core.designsystem.components.AppTextField
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
@@ -36,10 +36,26 @@ fun ForgotPasswordScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    ForgotPasswordContent(
+        state = state,
+        onEmailChange = viewModel::onEmailChange,
+        onSubmit = viewModel::submit,
+        onBack = onBack
+    )
+}
+
+@Composable
+private fun ForgotPasswordContent(
+    state: ForgotPasswordUiState,
+    onEmailChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onBack: () -> Unit
+) {
+    AppScaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -57,12 +73,12 @@ fun ForgotPasswordScreen(
 
             AppTextField(
                 value = state.email,
-                onValueChange = viewModel::onEmailChange,
+                onValueChange = onEmailChange,
                 label = stringResource(R.string.auth_forgot_email),
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 enabled = !state.sent,
-                isError = state.errorRes != null
+                isError = state.error != null
             )
 
             if (state.sent) {
@@ -73,9 +89,9 @@ fun ForgotPasswordScreen(
                 )
             }
 
-            if (state.errorRes != null) {
+            state.error?.let { error ->
                 Text(
-                    text = stringResource(state.errorRes!!),
+                    text = error.asMessage(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -83,7 +99,7 @@ fun ForgotPasswordScreen(
 
             AppButton(
                 text = stringResource(R.string.auth_forgot_submit),
-                onClick = viewModel::submit,
+                onClick = onSubmit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.canSubmit,
                 loading = state.isLoading
@@ -101,8 +117,13 @@ fun ForgotPasswordScreen(
 
 @Preview(showBackground = true)
 @Composable
-private fun ForgotPasswordScreenPreview() {
+private fun ForgotPasswordContentPreview() {
     FoodTrackerTheme {
-        ForgotPasswordScreen(onBack = {})
+        ForgotPasswordContent(
+            state = ForgotPasswordUiState(email = "an@example.com", sent = true),
+            onEmailChange = {},
+            onSubmit = {},
+            onBack = {}
+        )
     }
 }

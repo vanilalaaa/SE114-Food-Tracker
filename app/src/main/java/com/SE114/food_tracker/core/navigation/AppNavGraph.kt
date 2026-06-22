@@ -1,22 +1,27 @@
 package com.SE114.food_tracker.core.navigation
 
-import androidx.compose.material3.Text
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.SE114.food_tracker.feature.auth.CompleteProfileScreen
 import com.SE114.food_tracker.feature.auth.ForgotPasswordScreen
 import com.SE114.food_tracker.feature.auth.LoginScreen
+import com.SE114.food_tracker.feature.auth.PostAuthDestination
 import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
+import com.SE114.food_tracker.feature.profile.MyProfileScreen
+import com.SE114.food_tracker.feature.settings.SettingsScreen
 import com.SE114.food_tracker.feature.stats.StatisticsScreen
 import com.SE114.food_tracker.feature.feed.FeedScreen
 import com.SE114.food_tracker.feature.friend.FriendScreen
 import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
+import com.SE114.food_tracker.feature.profile.ProfileScreen
 
 object NavGraphs {
     const val AUTH = "auth_graph"
@@ -31,10 +36,21 @@ fun AppNavGraph(
     triggerDiaryAdd: Boolean = false,
     onDiaryAddHandled: () -> Unit = {}
 ) {
-    fun enterMainClearingAuth() {
+    fun enterMain() {
         navController.navigate(NavGraphs.MAIN) {
+            popUpTo(navController.graph.id) { inclusive = true }
+        }
+    }
+
+    fun goToCompleteProfile() {
+        navController.navigate(AppDestinations.CompleteProfile.route) {
             popUpTo(NavGraphs.AUTH) { inclusive = true }
         }
+    }
+
+    fun navigatePostAuth(destination: PostAuthDestination) = when (destination) {
+        PostAuthDestination.Diary -> enterMain()
+        PostAuthDestination.CompleteProfile -> goToCompleteProfile()
     }
 
     NavHost(
@@ -45,7 +61,7 @@ fun AppNavGraph(
         navigation(startDestination = AppDestinations.Splash.route, route = NavGraphs.AUTH) {
             composable(AppDestinations.Splash.route) {
                 SplashScreen(
-                    onAuthenticated = ::enterMainClearingAuth,
+                    onResolved = ::navigatePostAuth,
                     onUnauthenticated = {
                         navController.navigate(AppDestinations.Login.route) {
                             popUpTo(AppDestinations.Splash.route) { inclusive = true }
@@ -55,20 +71,24 @@ fun AppNavGraph(
             }
             composable(AppDestinations.Login.route) {
                 LoginScreen(
-                    onLoginSuccess = ::enterMainClearingAuth,
+                    onAuthenticated = ::navigatePostAuth,
                     onNavigateRegister = { navController.navigate(AppDestinations.Register.route) },
                     onNavigateForgot = { navController.navigate(AppDestinations.Forgot.route) }
                 )
             }
             composable(AppDestinations.Register.route) {
                 RegisterScreen(
-                    onRegisterSuccess = ::enterMainClearingAuth,
+                    onAuthenticated = ::navigatePostAuth,
                     onNavigateLogin = { navController.popBackStack() }
                 )
             }
             composable(AppDestinations.Forgot.route) {
                 ForgotPasswordScreen(onBack = { navController.popBackStack() })
             }
+        }
+
+        composable(AppDestinations.CompleteProfile.route) {
+            CompleteProfileScreen(onComplete = ::enterMain)
         }
 
         navigation(startDestination = AppDestinations.Diary.route, route = NavGraphs.MAIN) {
@@ -82,7 +102,10 @@ fun AppNavGraph(
 
             composable(AppDestinations.Feed.route) {
                 FeedScreen(
-                    onNavigateToFriend = { navController.navigate(AppDestinations.Friend.route) }
+                    onNavigateToFriend = { navController.navigate(AppDestinations.Friend.route) },
+                    onNavigateToProfile = { profileId ->
+                        navController.navigate(AppDestinations.Profile.createRoute(profileId))
+                    }
                 )
             }
 
@@ -91,12 +114,21 @@ fun AppNavGraph(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+
+            composable(AppDestinations.Profile.route) { backStackEntry ->
+                ProfileScreen(
+                    profileId = backStackEntry.arguments?.getString("profileId").orEmpty(),
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
             composable(AppDestinations.Chat.route)     {
                 ConversationListScreen(
                     onConversationClick = { conversationId, conversationName ->
-                        navController.navigate("chat_screen/$conversationId/$conversationName")
-                    },
-                    onBackClick = { navController.popBackStack() }
+                        navController.navigate(
+                            "chat_screen/$conversationId/${Uri.encode(conversationName)}"
+                        )
+                    }
                 )
             }
             composable("chat_screen/{conversationId}/{conversationName}") { backStackEntry ->
@@ -113,7 +145,15 @@ fun AppNavGraph(
                 )
             }
 
-            composable(AppDestinations.Settings.route) { Text("TODO: Settings (TV5)") }
+            composable(AppDestinations.Settings.route) {
+                SettingsScreen(
+                    onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) }
+                )
+            }
+
+            composable(AppDestinations.MyProfile.route) {
+                MyProfileScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
 }

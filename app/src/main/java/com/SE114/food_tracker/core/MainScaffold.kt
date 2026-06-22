@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.core
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,8 +24,20 @@ private val BAR_ROUTES = listOf(
     AppDestinations.Diary.route,
     AppDestinations.Stats.route,
     AppDestinations.Feed.route,
+    AppDestinations.Chat.route,
     AppDestinations.Settings.route
 )
+
+private const val CHAT_DETAIL_ROUTE = "chat_screen/{conversationId}/{conversationName}"
+
+private fun bottomBarRouteFor(route: String?): String? =
+    when (route) {
+        AppDestinations.Friend.route -> AppDestinations.Feed.route
+        AppDestinations.Profile.route -> AppDestinations.Feed.route
+        AppDestinations.MyProfile.route -> AppDestinations.Settings.route
+        CHAT_DETAIL_ROUTE -> AppDestinations.Chat.route
+        else -> route
+    }
 
 private val AUTH_ROUTES = setOf(
     AppDestinations.Splash.route,
@@ -32,6 +45,10 @@ private val AUTH_ROUTES = setOf(
     AppDestinations.Register.route,
     AppDestinations.Forgot.route
 )
+
+// complete_profile is post-auth but pre-onboarding: no bottom bar, but a dropped
+// session there should still bounce to login (so it stays out of the guard skip set).
+private val NO_BOTTOM_BAR_ROUTES = AUTH_ROUTES + AppDestinations.CompleteProfile.route
 
 @Composable
 fun MainScaffold() {
@@ -42,8 +59,9 @@ fun MainScaffold() {
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
 
-    val selectedIndex = BAR_ROUTES.indexOf(currentRoute).coerceAtLeast(0)
-    val showBottomBar = currentRoute != null && currentRoute !in AUTH_ROUTES
+    val selectedRoute = bottomBarRouteFor(currentRoute)
+    val selectedIndex = BAR_ROUTES.indexOf(selectedRoute).coerceAtLeast(0)
+    val showBottomBar = currentRoute != null && currentRoute !in NO_BOTTOM_BAR_ROUTES
 
     // FAB state lives here; DiaryScreen receives a callback to trigger the add flow
     var triggerDiaryAdd by remember { mutableStateOf(false) }
@@ -58,16 +76,30 @@ fun MainScaffold() {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
                 BottomBar(
                     selectedIndex = selectedIndex,
                     onItemSelected = { index ->
-                        navController.navigate(BAR_ROUTES[index]) {
-                            // Diary is the main graph's start destination.
-                            popUpTo(AppDestinations.Diary.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                        val targetRoute = BAR_ROUTES[index]
+                        if (selectedRoute == targetRoute && currentRoute != targetRoute) {
+                            val poppedToTabRoot = navController.popBackStack(
+                                route = targetRoute,
+                                inclusive = false
+                            )
+                            if (!poppedToTabRoot) {
+                                navController.navigate(targetRoute) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        } else {
+                            navController.navigate(targetRoute) {
+                                // Diary is the main graph's start destination.
+                                popUpTo(AppDestinations.Diary.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = targetRoute != AppDestinations.Feed.route
+                            }
                         }
                     }
                 )

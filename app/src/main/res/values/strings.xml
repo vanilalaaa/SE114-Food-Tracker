@@ -19,15 +19,6 @@
     <string name="auth_register_email">Email</string>
     <string name="auth_register_password">Mật khẩu</string>
     <string name="auth_register_display_name">Tên hiển thị</string>
-    <string name="auth_register_user_id">Tên đăng nhập</string>
-    <string name="auth_register_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
-    <string name="auth_register_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
-    <string name="auth_register_user_id_checking">Đang kiểm tra…</string>
-    <string name="auth_register_user_id_available">Tên đăng nhập khả dụng</string>
-    <string name="auth_register_user_id_taken">Tên đăng nhập đã được sử dụng</string>
-    <string name="auth_register_user_id_error">Không kiểm tra được, vui lòng thử lại</string>
-    <string name="auth_register_user_id_available_desc">Khả dụng</string>
-    <string name="auth_register_user_id_taken_desc">Đã được dùng</string>
     <string name="auth_register_submit">Đăng ký</string>
     <string name="auth_register_error">Đăng ký không thành công. Vui lòng thử lại.</string>
     <string name="auth_register_have_account">Đã có tài khoản?</string>
@@ -41,4 +32,72 @@
     <string name="auth_forgot_success">Đã gửi liên kết đặt lại. Vui lòng kiểm tra email của bạn.</string>
     <string name="auth_forgot_error">Không gửi được liên kết. Vui lòng thử lại.</string>
     <string name="auth_forgot_back">Quay lại đăng nhập</string>
+
+    <!-- Auth errors -->
+    <string name="auth_err_invalid_credentials">Email hoặc mật khẩu không đúng</string>
+    <string name="auth_err_email_not_confirmed">Email chưa được xác nhận. Vui lòng kiểm tra hộp thư của bạn.</string>
+    <string name="auth_err_email_registered">Email đã được đăng ký</string>
+    <string name="auth_err_weak_password">Mật khẩu quá yếu — cần ít nhất 6 ký tự</string>
+    <string name="auth_err_invalid_email">Email không hợp lệ</string>
+    <string name="auth_err_rate_limited">Bạn thao tác quá nhanh. Vui lòng thử lại sau giây lát.</string>
+    <string name="auth_err_user_id_taken">User ID đã tồn tại</string>
+    <string name="auth_err_user_id_cooldown">Bạn vừa đổi User ID gần đây. Vui lòng thử lại sau.</string>
+    <string name="auth_err_no_network">Không có kết nối mạng. Vui lòng kiểm tra Internet và thử lại.</string>
+    <string name="auth_err_unknown">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
+    <string name="auth_err_password_mismatch">Mật khẩu nhập lại không khớp</string>
+
+    <!-- Register confirm password -->
+    <string name="auth_register_confirm_password">Nhập lại mật khẩu</string>
+
+    <!-- Complete profile -->
+    <string name="auth_complete_title">Hoàn tất hồ sơ</string>
+    <string name="auth_complete_subtitle">Chọn một User ID để bạn bè có thể tìm thấy bạn.</string>
+    <string name="auth_complete_display_name">Tên hiển thị</string>
+    <string name="auth_complete_display_name_required">Tên hiển thị không được để trống</string>
+    <string name="auth_complete_avatar_desc">Ảnh đại diện</string>
+    <string name="auth_complete_change_avatar">Đổi ảnh đại diện</string>
+    <string name="auth_complete_user_id">User ID</string>
+    <string name="auth_complete_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
+    <string name="auth_complete_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
+    <string name="auth_complete_user_id_checking">Đang kiểm tra…</string>
+    <string name="auth_complete_user_id_available">User ID khả dụng</string>
+    <string name="auth_complete_user_id_taken">User ID đã được sử dụng</string>
+    <string name="auth_complete_user_id_error">Không kiểm tra được, vui lòng thử lại</string>
+    <string name="auth_complete_user_id_available_desc">Khả dụng</string>
+    <string name="auth_complete_user_id_taken_desc">Đã được dùng</string>
+    <string name="auth_complete_submit">Hoàn tất</string>
+
+    <!-- Google sign-in -->
+    <string name="auth_google_signin">Tiếp tục với Google</string>
+
+    <string name="auth_retry">Thử lại</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Cài đặt</string>
+    <string name="settings_default_name">Người dùng</string>
+    <string name="settings_no_user_id">Chưa đặt User ID</string>
+    <string name="settings_open_profile">Mở hồ sơ</string>
+    <string name="settings_avatar_desc">Ảnh đại diện</string>
+    <string name="settings_logout">Đăng xuất</string>
+    <string name="settings_logout_confirm_title">Đăng xuất khỏi tài khoản?</string>
+    <string name="settings_logout_confirm_body">Bạn sẽ cần đăng nhập lại để tiếp tục.</string>
+    <string name="settings_logout_confirm_yes">Đăng xuất</string>
+    <string name="settings_logout_confirm_cancel">Huỷ</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Hồ sơ của tôi</string>
+    <string name="profile_back">Quay lại</string>
+    <string name="profile_avatar_desc">Ảnh đại diện</string>
+    <string name="profile_change_avatar">Đổi ảnh đại diện</string>
+    <string name="profile_display_name">Tên hiển thị</string>
+    <string name="profile_display_name_required">Tên hiển thị không được để trống</string>
+    <string name="profile_user_id">User ID</string>
+    <string name="profile_user_id_helper">4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới</string>
+    <string name="profile_user_id_invalid">Chỉ dùng chữ thường, số, dấu chấm hoặc gạch dưới (4–20 ký tự)</string>
+    <string name="profile_user_id_checking">Đang kiểm tra…</string>
+    <string name="profile_user_id_available">User ID khả dụng</string>
+    <string name="profile_user_id_taken">User ID đã được sử dụng</string>
+    <string name="profile_user_id_check_error">Không kiểm tra được, vui lòng thử lại</string>
+    <string name="profile_user_id_cooldown">Có thể đổi sau %1$d ngày</string>
+    <string name="profile_save">Lưu</string>
 </resources>

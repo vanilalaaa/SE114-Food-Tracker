@@ -13,16 +13,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.Conversation
 import com.SE114.food_tracker.feature.chat.components.ConversationItem
 
 @Composable
 fun ConversationListScreen(
-    viewModel: ChatViewModel = viewModel(),
+    viewModel: ChatViewModel = hiltViewModel(),
     onConversationClick: (id: String, name: String) -> Unit = { _, _ -> },
-    onBackClick: () -> Unit = {}
+    onBackClick: (() -> Unit)? = null
 ) {
     // Đọc danh sách cuộc hội thoại realtime từ Room DB thông qua Flow
     val conversationList by viewModel.getConversationsFlow().collectAsState(initial = emptyList())
@@ -39,7 +39,7 @@ fun ConversationListScreen(
 fun ConversationListScreenContent(
     conversationList: List<Conversation>,
     onConversationClick: (id: String, name: String) -> Unit,
-    onBackClick: () -> Unit,
+    onBackClick: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -53,8 +53,10 @@ fun ConversationListScreenContent(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)

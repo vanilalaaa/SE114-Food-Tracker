@@ -15,7 +15,11 @@ import com.SE114.food_tracker.data.local.entities.ConversationParticipant
 import com.SE114.food_tracker.data.local.entities.Message
 import com.SE114.food_tracker.data.local.entities.FriendshipEntity
 import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
+import com.SE114.food_tracker.data.local.entities.FeedComment
+import com.SE114.food_tracker.data.local.entities.FeedLike
+import com.SE114.food_tracker.data.local.entities.FeedPost
 import com.SE114.food_tracker.data.local.dao.ChatDAO
+import com.SE114.food_tracker.data.local.dao.FeedDAO
 import com.SE114.food_tracker.data.local.dao.FriendDAO
 
 @Database(
@@ -27,9 +31,12 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         ConversationParticipant::class,
         Message::class,
         FriendshipEntity::class,
-        UserProfileCacheEntity::class
+        UserProfileCacheEntity::class,
+        FeedPost::class,
+        FeedLike::class,
+        FeedComment::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -38,6 +45,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDAO(): BudgetDAO
     abstract fun chatDao(): ChatDAO
     abstract fun friendDao(): FriendDAO
+    abstract fun feedDao(): FeedDAO
 
     companion object {
         val MIGRATION_8_9 = object : Migration(8, 9) {
@@ -45,5 +53,70 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE category ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
             }
         }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.createFeedTables()
+            }
+        }
     }
+}
+
+private fun SupportSQLiteDatabase.createFeedTables() {
+    execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS feed_post (
+            post_id TEXT NOT NULL PRIMARY KEY,
+            owner_id TEXT NOT NULL,
+            owner_name TEXT NOT NULL,
+            item_id TEXT,
+            image_url TEXT NOT NULL,
+            caption TEXT NOT NULL,
+            visibility TEXT NOT NULL DEFAULT 'friends',
+            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+        """.trimIndent()
+    )
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_post_owner_id ON feed_post(owner_id)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_post_item_id ON feed_post(item_id)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_post_created_at ON feed_post(created_at)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_post_sync_status ON feed_post(sync_status)")
+
+    execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS feed_like (
+            like_id TEXT NOT NULL PRIMARY KEY,
+            post_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+        """.trimIndent()
+    )
+    execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_feed_like_post_id_user_id ON feed_like(post_id, user_id)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_like_sync_status ON feed_like(sync_status)")
+
+    execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS feed_comment (
+            comment_id TEXT NOT NULL PRIMARY KEY,
+            post_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            body TEXT NOT NULL,
+            sync_status TEXT NOT NULL DEFAULT 'PENDING',
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+        """.trimIndent()
+    )
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_post_id ON feed_comment(post_id)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_user_id ON feed_comment(user_id)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_sync_status ON feed_comment(sync_status)")
 }
