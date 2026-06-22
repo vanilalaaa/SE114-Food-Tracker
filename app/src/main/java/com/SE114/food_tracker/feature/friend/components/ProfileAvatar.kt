@@ -13,14 +13,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
-fun ProfileAvatar(avatarUrl: String?, hasStory: Boolean = false, modifier: Modifier = Modifier) {
-    val imageSize = Modifier.size(50.dp).clip(CircleShape)
+fun ProfileAvatar(
+    avatarUrl: String?,
+    hasStory: Boolean = false,
+    modifier: Modifier = Modifier,
+    size: Dp = 50.dp
+) {
+    val imageSize = Modifier.size(size).clip(CircleShape)
 
     Box(
         contentAlignment = Alignment.Center,

@@ -36,7 +36,13 @@ class ProfileViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    error = null,
+                    diaryError = null
+                )
+            }
 
             val authId = profileRepository.currentAuthUserId()
 
@@ -50,12 +56,40 @@ class ProfileViewModel @Inject constructor(
                             error = null
                         )
                     }
+                    loadSharedDiary()
                 }
                 .onFailure { error ->
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             error = error.message ?: "Không tải được profile."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun loadSharedDiary() {
+        if (profileId.isBlank()) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDiaryLoading = true, diaryError = null) }
+
+            profileRepository.fetchSharedItems(profileId)
+                .onSuccess { items ->
+                    _uiState.update {
+                        it.copy(
+                            isDiaryLoading = false,
+                            sharedItems = items,
+                            diaryError = null
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            isDiaryLoading = false,
+                            diaryError = error.message ?: "Không tải được nhật ký."
                         )
                     }
                 }

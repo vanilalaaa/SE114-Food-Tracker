@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.profile
 
+import com.SE114.food_tracker.data.model.ProfileSharedItem
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 
 enum class ProfileTab {
@@ -12,7 +13,10 @@ data class ProfileUiState(
     val profile: ProfileDTO? = null,
     val isSelf: Boolean = false,
     val error: String? = null,
-    val selectedTab: ProfileTab = ProfileTab.DIARY
+    val selectedTab: ProfileTab = ProfileTab.DIARY,
+    val sharedItems: List<ProfileSharedItem> = emptyList(),
+    val isDiaryLoading: Boolean = false,
+    val diaryError: String? = null
 ) {
     val displayName: String
         get() = profile?.displayName?.takeIf { it.isNotBlank() }

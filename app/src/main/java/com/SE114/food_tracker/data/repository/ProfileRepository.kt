@@ -2,6 +2,9 @@ package com.SE114.food_tracker.data.repository
 
 import com.SE114.food_tracker.data.local.dao.FriendDAO
 import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
+import com.SE114.food_tracker.data.model.ProfileSharedItem
+import com.SE114.food_tracker.data.remote.dto.CategoryDTO
+import com.SE114.food_tracker.data.remote.dto.ItemDTO
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
@@ -33,6 +36,46 @@ class ProfileRepository @Inject constructor(
             }
         }
 
+    suspend fun fetchSharedItems(ownerId: String): Result<List<ProfileSharedItem>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (supabaseClient.auth.currentUserOrNull() == null) {
+                    error("Chưa đăng nhập")
+                }
+
+                val items = supabaseClient.postgrest.from("item")
+                    .select {
+                        filter {
+                            eq("owner_id", ownerId)
+                            eq("is_shared", true)
+                            eq("is_deleted", false)
+                        }
+                    }
+                    .decodeList<ItemDTO>()
+                    .sortedWith(
+                        compareByDescending<ItemDTO> { it.entryDate }
+                            .thenByDescending { it.createdAt }
+                    )
+
+                val categories = supabaseClient.postgrest.from("category")
+                    .select {
+                        filter {
+                            eq("is_deleted", false)
+                            or {
+                                eq("owner_id", ownerId)
+                                eq("is_system", true)
+                            }
+                        }
+                    }
+                    .decodeList<CategoryDTO>()
+                    .associateBy { it.id }
+
+                items.map { dto ->
+                    dto.toProfileSharedItem(categories[dto.categoryId])
+                }
+            }
+        }
+
     suspend fun currentAuthUserId(): String? =
         withContext(Dispatchers.IO) {
             supabaseClient.auth.currentUserOrNull()?.id
@@ -46,4 +89,24 @@ class ProfileRepository @Inject constructor(
                 ?: "Người dùng",
             avatarUrl = avatarUrl.orEmpty()
         )
+
+    private fun ItemDTO.toProfileSharedItem(category: CategoryDTO?): ProfileSharedItem =
+        ProfileSharedItem(
+            itemId = id,
+            name = name,
+            categoryName = category?.name ?: "Khác",
+            categoryIcon = category?.iconUrl.orEmpty(),
+            price = price,
+            timeLabel = timeType.toProfileTimeLabel(),
+            imageUrl = imageUrl,
+            entryDate = entryDate
+        )
+
+    private fun Int.toProfileTimeLabel(): String =
+        when (this) {
+            0 -> "Sáng"
+            1 -> "Trưa/Chiều"
+            2 -> "Tối"
+            else -> "Khác"
+        }
 }
