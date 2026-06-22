@@ -42,6 +42,7 @@ class FeedViewModel @Inject constructor(
     private val _isCreateSheetOpen = MutableStateFlow(false)
     private val _selectedSourceItem = MutableStateFlow<FeedSourceItemDto?>(null)
     private val _pickedImageUri = MutableStateFlow<Uri?>(null)
+    private val _draftFreeImageTitle = MutableStateFlow("")
     private val _draftCaption = MutableStateFlow("")
     private val _draftVisibility = MutableStateFlow(FeedVisibility.FRIENDS.value)
     private val _isLoading = MutableStateFlow(false)
@@ -67,6 +68,7 @@ class FeedViewModel @Inject constructor(
             _isCreateSheetOpen,
             _selectedSourceItem,
             _pickedImageUri,
+            _draftFreeImageTitle,
             _draftCaption,
             _draftVisibility,
             _isLoading,
@@ -75,6 +77,7 @@ class FeedViewModel @Inject constructor(
         ) { values ->
             @Suppress("UNCHECKED_CAST")
             FeedUiState(
+                currentUserId = feedRepository.currentUserId(),
                 posts = values[0] as List<FeedPostDto>,
                 sourceItems = values[1] as List<FeedSourceItemDto>,
                 selectedPostId = values[2] as String?,
@@ -84,11 +87,12 @@ class FeedViewModel @Inject constructor(
                 isCreateSheetOpen = values[6] as Boolean,
                 selectedSourceItem = values[7] as FeedSourceItemDto?,
                 pickedImageUri = values[8] as Uri?,
-                draftCaption = values[9] as String,
-                draftVisibility = values[10] as String,
-                isLoading = values[11] as Boolean,
-                isCreatingPost = values[12] as Boolean,
-                error = values[13] as String?
+                draftFreeImageTitle = values[9] as String,
+                draftCaption = values[10] as String,
+                draftVisibility = values[11] as String,
+                isLoading = values[12] as Boolean,
+                isCreatingPost = values[13] as Boolean,
+                error = values[14] as String?
             )
         }
             .catch { throwable ->
@@ -126,6 +130,7 @@ class FeedViewModel @Inject constructor(
         _selectedSourceItem.value = item
         if (item != null) {
             _pickedImageUri.value = null
+            _draftFreeImageTitle.value = ""
             if (_draftCaption.value.isBlank()) {
                 _draftCaption.value = item.name
             }
@@ -136,7 +141,14 @@ class FeedViewModel @Inject constructor(
         _pickedImageUri.value = uri
         if (uri != null) {
             _selectedSourceItem.value = null
+            if (_draftFreeImageTitle.value.isBlank()) {
+                _draftFreeImageTitle.value = "Ảnh của tôi"
+            }
         }
+    }
+
+    fun updateDraftFreeImageTitle(title: String) {
+        _draftFreeImageTitle.value = title
     }
 
     fun updateDraftCaption(caption: String) {
@@ -172,6 +184,7 @@ class FeedViewModel @Inject constructor(
             try {
                 val sourceItem = _selectedSourceItem.value
                 val pickedImageUri = _pickedImageUri.value
+                val freeImageTitle = _draftFreeImageTitle.value
                 val caption = _draftCaption.value
                 val visibility = _draftVisibility.value
 
@@ -182,11 +195,17 @@ class FeedViewModel @Inject constructor(
                         visibility = visibility
                     )
 
-                    pickedImageUri != null -> feedRepository.createPostFromImage(
-                        imageUrl = copyPickedImageToFeedStorage(pickedImageUri),
-                        caption = caption,
-                        visibility = visibility
-                    )
+                    pickedImageUri != null -> {
+                        if (freeImageTitle.isBlank()) {
+                            _error.value = "Nhập tên loại ảnh trước khi đăng nha"
+                        } else {
+                            feedRepository.createPostFromImage(
+                                imageUrl = copyPickedImageToFeedStorage(pickedImageUri),
+                                caption = buildFreeImageCaption(freeImageTitle, caption),
+                                visibility = visibility
+                            )
+                        }
+                    }
 
                     else -> _error.value = "Chọn món trong nhật ký hoặc chọn ảnh trước nha"
                 }
@@ -228,13 +247,32 @@ class FeedViewModel @Inject constructor(
         }
     }
 
+    fun deletePost(postId: String) {
+        viewModelScope.launch {
+            runCatching { feedRepository.deletePost(postId) }
+                .onSuccess {
+                    closePostDetail()
+                    SyncScheduler.triggerImmediateSync(context)
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Delete post failed")
+                    _error.value = throwable.message ?: "Không xóa được bài viết"
+                }
+        }
+    }
+
     fun clearError() {
         _error.value = null
+    }
+
+    fun showError(message: String) {
+        _error.value = message
     }
 
     private fun clearDraft() {
         _selectedSourceItem.value = null
         _pickedImageUri.value = null
+        _draftFreeImageTitle.value = ""
         _draftCaption.value = ""
         _draftVisibility.value = FeedVisibility.FRIENDS.value
     }

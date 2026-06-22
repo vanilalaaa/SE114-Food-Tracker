@@ -21,6 +21,7 @@ import com.SE114.food_tracker.feature.feed.FeedScreen
 import com.SE114.food_tracker.feature.friend.FriendScreen
 import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
+import com.SE114.food_tracker.feature.profile.ProfileScreen
 
 object NavGraphs {
     const val AUTH = "auth_graph"
@@ -101,7 +102,10 @@ fun AppNavGraph(
 
             composable(AppDestinations.Feed.route) {
                 FeedScreen(
-                    onNavigateToFriend = { navController.navigate(AppDestinations.Friend.route) }
+                    onNavigateToFriend = { navController.navigate(AppDestinations.Friend.route) },
+                    onNavigateToProfile = { profileId ->
+                        navController.navigate(AppDestinations.Profile.createRoute(profileId))
+                    }
                 )
             }
 
@@ -110,6 +114,14 @@ fun AppNavGraph(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+
+            composable(AppDestinations.Profile.route) { backStackEntry ->
+                ProfileScreen(
+                    profileId = backStackEntry.arguments?.getString("profileId").orEmpty(),
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
             composable(AppDestinations.Chat.route)     {
                 ConversationListScreen(
                     onConversationClick = { conversationId, conversationName ->
@@ -135,11 +147,11 @@ fun AppNavGraph(
 
             composable(AppDestinations.Settings.route) {
                 SettingsScreen(
-                    onNavigateToProfile = { navController.navigate(AppDestinations.Profile.route) }
+                    onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) }
                 )
             }
 
-            composable(AppDestinations.Profile.route) {
+            composable(AppDestinations.MyProfile.route) {
                 MyProfileScreen(onBack = { navController.popBackStack() })
             }
         }

@@ -30,6 +30,15 @@ private val BAR_ROUTES = listOf(
 
 private const val CHAT_DETAIL_ROUTE = "chat_screen/{conversationId}/{conversationName}"
 
+private fun bottomBarRouteFor(route: String?): String? =
+    when (route) {
+        AppDestinations.Friend.route -> AppDestinations.Feed.route
+        AppDestinations.Profile.route -> AppDestinations.Feed.route
+        AppDestinations.MyProfile.route -> AppDestinations.Settings.route
+        CHAT_DETAIL_ROUTE -> AppDestinations.Chat.route
+        else -> route
+    }
+
 private val AUTH_ROUTES = setOf(
     AppDestinations.Splash.route,
     AppDestinations.Login.route,
@@ -50,12 +59,7 @@ fun MainScaffold() {
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
 
-    // Chat detail keeps the Chat tab highlighted; complete_profile (and the auth
-    // routes) hide the bottom bar entirely.
-    val selectedRoute = when (currentRoute) {
-        CHAT_DETAIL_ROUTE -> AppDestinations.Chat.route
-        else -> currentRoute
-    }
+    val selectedRoute = bottomBarRouteFor(currentRoute)
     val selectedIndex = BAR_ROUTES.indexOf(selectedRoute).coerceAtLeast(0)
     val showBottomBar = currentRoute != null && currentRoute !in NO_BOTTOM_BAR_ROUTES
 
@@ -78,11 +82,24 @@ fun MainScaffold() {
                 BottomBar(
                     selectedIndex = selectedIndex,
                     onItemSelected = { index ->
-                        navController.navigate(BAR_ROUTES[index]) {
-                            // Diary is the main graph's start destination.
-                            popUpTo(AppDestinations.Diary.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                        val targetRoute = BAR_ROUTES[index]
+                        if (selectedRoute == targetRoute && currentRoute != targetRoute) {
+                            val poppedToTabRoot = navController.popBackStack(
+                                route = targetRoute,
+                                inclusive = false
+                            )
+                            if (!poppedToTabRoot) {
+                                navController.navigate(targetRoute) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        } else {
+                            navController.navigate(targetRoute) {
+                                // Diary is the main graph's start destination.
+                                popUpTo(AppDestinations.Diary.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = targetRoute != AppDestinations.Feed.route
+                            }
                         }
                     }
                 )

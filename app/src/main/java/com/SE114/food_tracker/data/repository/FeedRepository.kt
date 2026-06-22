@@ -10,6 +10,7 @@ import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.data.local.entities.FeedComment
 import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
+import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
 import com.SE114.food_tracker.data.remote.dto.FeedCommentRemoteDTO
 import com.SE114.food_tracker.data.remote.dto.FeedLikeRemoteDTO
 import com.SE114.food_tracker.data.remote.dto.FeedPostRemoteDTO
@@ -100,6 +101,10 @@ class FeedRepository @Inject constructor(
         )
     }
 
+    suspend fun deletePost(postId: String) {
+        feedDao.softDeletePost(postId, currentUserId())
+    }
+
     suspend fun pushPendingToSupabase(ownerId: String): Boolean {
         var anyError = false
 
@@ -143,14 +148,31 @@ class FeedRepository @Inject constructor(
                 .decodeList<ProfileDTO>()
                 .associateBy { it.id }
 
-            val remotePosts = supabaseClient.postgrest.from("post")
-                .select()
-                .decodeList<FeedPostRemoteDTO>()
+            val profileEntities = profiles.values.map { it.toCacheEntity() }
+            if (profileEntities.isNotEmpty()) {
+                feedDao.insertUserProfiles(profileEntities)
+            }
 
-            val postEntities = remotePosts.map { dto ->
+            val remotePosts = supabaseClient.postgrest.from("post")
+                .select {
+                    filter {
+                        eq("is_deleted", false)
+                    }
+                }
+                .decodeList<FeedPostRemoteDTO>()
+            val pendingDeletedPostIds = feedDao.getPendingDeletedPostIds().toSet()
+            val visibleRemotePosts = remotePosts.filterNot { it.id in pendingDeletedPostIds }
+
+            val postEntities = visibleRemotePosts.map { dto ->
                 dto.toEntity(
                     ownerName = profiles[dto.authorId].displayNameOrFallback(dto.authorId)
                 )
+            }
+            val remotePostIds = visibleRemotePosts.map { it.id }
+            if (remotePostIds.isEmpty()) {
+                feedDao.deleteAllSyncedPosts()
+            } else {
+                feedDao.deleteSyncedPostsMissingFromRemote(remotePostIds)
             }
             if (postEntities.isNotEmpty()) {
                 feedDao.insertPosts(postEntities)
@@ -214,7 +236,12 @@ class FeedRepository @Inject constructor(
         }
 
         if (post.isDeleted) {
-            supabaseClient.postgrest.from("post").delete {
+            supabaseClient.postgrest.from("post").update(
+                mapOf(
+                    "is_deleted" to true,
+                    "deleted_at" to Instant.fromEpochMilliseconds(post.updatedAt).toString()
+                )
+            ) {
                 filter {
                     eq("id", post.postId)
                     eq("author_id", ownerId)
@@ -309,7 +336,9 @@ class FeedRepository @Inject constructor(
             caption = caption.ifBlank { null },
             imageUrl = remoteImageUrl.ifBlank { null },
             visibility = visibility,
-            createdAt = Instant.fromEpochMilliseconds(createdAt).toString()
+            isDeleted = false,
+            createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
+            deletedAt = null
         )
 
     private fun FeedLike.toRemoteDTO(ownerId: String): FeedLikeRemoteDTO =
@@ -338,7 +367,7 @@ class FeedRepository @Inject constructor(
             caption = caption.orEmpty(),
             visibility = visibility,
             syncStatus = SyncStatus.SYNCED.name,
-            isDeleted = false,
+            isDeleted = isDeleted,
             createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
             updatedAt = Instant.parse(createdAt).toEpochMilliseconds()
         )
@@ -371,6 +400,13 @@ class FeedRepository @Inject constructor(
         this?.displayName?.takeIf { it.isNotBlank() }
             ?: this?.userId?.takeIf { it.isNotBlank() }
             ?: profileId.take(8)
+
+    private fun ProfileDTO.toCacheEntity(): UserProfileCacheEntity =
+        UserProfileCacheEntity(
+            userId = id,
+            displayName = this.displayNameOrFallback(id),
+            avatarUrl = avatarUrl
+        )
 
     private fun stableLikeId(postId: String, userId: String): String =
         UUID.nameUUIDFromBytes("$postId:$userId".toByteArray()).toString()

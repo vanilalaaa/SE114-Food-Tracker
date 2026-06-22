@@ -4,6 +4,7 @@ data class FeedPostDto(
     val postId: String,
     val ownerId: String,
     val ownerName: String,
+    val ownerAvatarUrl: String?,
     val itemId: String?,
     val itemName: String?,
     val categoryIconUrl: String?,
@@ -21,6 +22,7 @@ data class FeedCommentDto(
     val postId: String,
     val userId: String,
     val displayName: String,
+    val avatarUrl: String?,
     val body: String,
     val createdAt: Long
 )

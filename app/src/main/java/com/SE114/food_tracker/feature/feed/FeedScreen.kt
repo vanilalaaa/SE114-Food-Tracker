@@ -1,5 +1,7 @@
 package com.SE114.food_tracker.feature.feed
 
+import android.content.Context
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,11 +18,16 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
@@ -32,13 +39,17 @@ import com.SE114.food_tracker.feature.feed.components.FeedComposerSheet
 import com.SE114.food_tracker.feature.feed.components.FeedGridContent
 import com.SE114.food_tracker.feature.feed.components.FeedPagingEffect
 import com.SE114.food_tracker.feature.feed.components.FeedPostDetailOverlay
+import java.io.File
 
 @Composable
 fun FeedScreen(
     onNavigateToFriend: () -> Unit,
+    onNavigateToProfile: (String) -> Unit,
     viewModel: FeedViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -47,16 +58,36 @@ fun FeedScreen(
             viewModel.openCreateSheet()
         }
     }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { isSuccess ->
+        if (isSuccess) {
+            pendingCameraUri?.let { uri ->
+                viewModel.onImagePicked(uri)
+                viewModel.openCreateSheet()
+            }
+        }
+    }
 
     FeedScreenContent(
         uiState = uiState,
         onNavigateToFriend = onNavigateToFriend,
+        onNavigateToProfile = onNavigateToProfile,
         onPostClick = viewModel::openPostDetail,
         onLoadNextPage = viewModel::loadNextPage,
         onOpenComposer = viewModel::openCreateSheet,
         onCloseComposer = viewModel::closeCreateSheet,
         onPickImage = { imagePicker.launch("image/*") },
+        onTakePhoto = {
+            runCatching { createFeedCameraUri(context) }
+                .onSuccess { uri ->
+                    pendingCameraUri = uri
+                    cameraLauncher.launch(uri)
+                }
+                .onFailure { viewModel.showError("Không mở được camera") }
+        },
         onSelectSourceItem = viewModel::selectSourceItem,
+        onFreeImageTitleChange = viewModel::updateDraftFreeImageTitle,
         onCaptionChange = viewModel::updateDraftCaption,
         onVisibilityChange = viewModel::updateDraftVisibility,
         onCreatePost = viewModel::createPost,
@@ -64,6 +95,7 @@ fun FeedScreen(
         onClosePostDetail = viewModel::closePostDetail,
         onSelectPostAt = viewModel::selectPostAt,
         onToggleLike = viewModel::toggleLike,
+        onDeletePost = viewModel::deletePost,
         onAddComment = viewModel::addComment
     )
 }
@@ -73,12 +105,15 @@ fun FeedScreen(
 fun FeedScreenContent(
     uiState: FeedUiState,
     onNavigateToFriend: () -> Unit,
+    onNavigateToProfile: (String) -> Unit,
     onPostClick: (String) -> Unit,
     onLoadNextPage: () -> Unit,
     onOpenComposer: () -> Unit,
     onCloseComposer: () -> Unit,
     onPickImage: () -> Unit,
+    onTakePhoto: () -> Unit,
     onSelectSourceItem: (FeedSourceItemDto?) -> Unit,
+    onFreeImageTitleChange: (String) -> Unit,
     onCaptionChange: (String) -> Unit,
     onVisibilityChange: (FeedVisibility) -> Unit,
     onCreatePost: () -> Unit,
@@ -86,6 +121,7 @@ fun FeedScreenContent(
     onClosePostDetail: () -> Unit,
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
+    onDeletePost: (String) -> Unit,
     onAddComment: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -132,7 +168,9 @@ fun FeedScreenContent(
                 FeedComposerSheet(
                     uiState = uiState,
                     onPickImage = onPickImage,
+                    onTakePhoto = onTakePhoto,
                     onSelectSourceItem = onSelectSourceItem,
+                    onFreeImageTitleChange = onFreeImageTitleChange,
                     onCaptionChange = onCaptionChange,
                     onVisibilityChange = onVisibilityChange,
                     onCreatePost = onCreatePost,
@@ -145,8 +183,10 @@ fun FeedScreenContent(
         FeedPostDetailOverlay(
             uiState = uiState,
             onClose = onClosePostDetail,
+            onNavigateToProfile = onNavigateToProfile,
             onSelectPostAt = onSelectPostAt,
             onToggleLike = onToggleLike,
+            onDeletePost = onDeletePost,
             onAddComment = onAddComment
         )
     }
@@ -159,12 +199,15 @@ private fun FeedScreenPreview() {
         FeedScreenContent(
             uiState = FeedUiState(posts = previewFeedPosts()),
             onNavigateToFriend = {},
+            onNavigateToProfile = {},
             onPostClick = {},
             onLoadNextPage = {},
             onOpenComposer = {},
             onCloseComposer = {},
             onPickImage = {},
+            onTakePhoto = {},
             onSelectSourceItem = {},
+            onFreeImageTitleChange = {},
             onCaptionChange = {},
             onVisibilityChange = {},
             onCreatePost = {},
@@ -172,6 +215,7 @@ private fun FeedScreenPreview() {
             onClosePostDetail = {},
             onSelectPostAt = {},
             onToggleLike = {},
+            onDeletePost = {},
             onAddComment = { _, _ -> }
         )
     }
@@ -184,12 +228,15 @@ private fun FeedScreenEmptyPreview() {
         FeedScreenContent(
             uiState = FeedUiState(),
             onNavigateToFriend = {},
+            onNavigateToProfile = {},
             onPostClick = {},
             onLoadNextPage = {},
             onOpenComposer = {},
             onCloseComposer = {},
             onPickImage = {},
+            onTakePhoto = {},
             onSelectSourceItem = {},
+            onFreeImageTitleChange = {},
             onCaptionChange = {},
             onVisibilityChange = {},
             onCreatePost = {},
@@ -197,6 +244,7 @@ private fun FeedScreenEmptyPreview() {
             onClosePostDetail = {},
             onSelectPostAt = {},
             onToggleLike = {},
+            onDeletePost = {},
             onAddComment = { _, _ -> }
         )
     }
@@ -208,6 +256,7 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             postId = "preview-1",
             ownerId = "user-1",
             ownerName = "Thảo Uyên",
+            ownerAvatarUrl = null,
             itemId = "item-1",
             itemName = "Matcha latte",
             categoryIconUrl = "🥤",
@@ -223,6 +272,7 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             postId = "preview-2",
             ownerId = "user-2",
             ownerName = "Bảo Anh",
+            ownerAvatarUrl = null,
             itemId = "item-2",
             itemName = "Cơm tấm",
             categoryIconUrl = "🍚",
@@ -238,6 +288,7 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             postId = "preview-3",
             ownerId = "user-3",
             ownerName = "Minh Quan",
+            ownerAvatarUrl = null,
             itemId = null,
             itemName = null,
             categoryIconUrl = null,
@@ -253,6 +304,7 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             postId = "preview-4",
             ownerId = "user-4",
             ownerName = "Ngọc Hân",
+            ownerAvatarUrl = null,
             itemId = "item-4",
             itemName = "Bánh mì",
             categoryIconUrl = "🥖",
@@ -265,3 +317,19 @@ private fun previewFeedPosts(): List<FeedPostDto> =
             createdAt = 1_718_000_300_000
         )
     )
+
+private fun createFeedCameraUri(context: Context): Uri {
+    val tempFile = File.createTempFile(
+        "FEED_${System.currentTimeMillis()}_",
+        ".jpg",
+        context.cacheDir
+    ).apply {
+        createNewFile()
+        deleteOnExit()
+    }
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        tempFile
+    )
+}
