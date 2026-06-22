@@ -15,6 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,17 +49,31 @@ import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.HintGrayStat
+import com.SE114.food_tracker.core.util.AppCurrency
 import com.SE114.food_tracker.data.repository.Profile
+import com.SE114.food_tracker.feature.settings.components.CurrencySelectionDialog
 
 @Composable
 fun SettingsScreen(
     onNavigateToProfile: () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
+    onNavigateToCategories: () -> Unit,
+    onChangePassword: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel(),
+    currencyViewModel: CurrencyViewModel = hiltViewModel()
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
+    val currencyState by currencyViewModel.uiState.collectAsStateWithLifecycle()
+
     SettingsContent(
         profile = profile,
+        displayCurrency = currencyState.displayCurrency,
+        currencies = currencyState.currencies,
+        ratesStale = currencyState.ratesStale,
         onProfileClick = onNavigateToProfile,
+        onCategoriesClick = onNavigateToCategories,
+        onChangePasswordClick = onChangePassword,
+        onCurrencyDialogOpen = currencyViewModel::refreshRates,
+        onSelectCurrency = currencyViewModel::selectCurrency,
         onLogout = viewModel::logout
     )
 }
@@ -64,10 +81,18 @@ fun SettingsScreen(
 @Composable
 private fun SettingsContent(
     profile: Profile?,
+    displayCurrency: AppCurrency,
+    currencies: List<AppCurrency>,
+    ratesStale: Boolean,
     onProfileClick: () -> Unit,
+    onCategoriesClick: () -> Unit,
+    onChangePasswordClick: () -> Unit,
+    onCurrencyDialogOpen: () -> Unit,
+    onSelectCurrency: (AppCurrency) -> Unit,
     onLogout: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showCurrencyDialog by remember { mutableStateOf(false) }
 
     AppScaffold { innerPadding ->
         Column(
@@ -86,8 +111,27 @@ private fun SettingsContent(
 
             ProfileHeaderCard(profile = profile, onClick = onProfileClick)
 
-            // Options go here. Each future option (currency, categories, change password,
-            // delete all) is added as a SettingsRow above the logout button.
+            SettingsRow(
+                icon = Icons.Outlined.Payments,
+                title = stringResource(R.string.settings_currency),
+                subtitle = "${displayCurrency.symbol} ${displayCurrency.code}",
+                onClick = {
+                    onCurrencyDialogOpen()
+                    showCurrencyDialog = true
+                }
+            )
+
+            SettingsRow(
+                icon = Icons.Outlined.Category,
+                title = stringResource(R.string.settings_category_manage),
+                onClick = onCategoriesClick
+            )
+
+            SettingsRow(
+                icon = Icons.Outlined.Lock,
+                title = stringResource(R.string.settings_change_password),
+                onClick = onChangePasswordClick
+            )
 
             Spacer(Modifier.height(24.dp))
 
@@ -98,6 +142,16 @@ private fun SettingsContent(
                 variant = AppButtonVariant.Destructive
             )
         }
+    }
+
+    if (showCurrencyDialog) {
+        CurrencySelectionDialog(
+            currencies = currencies,
+            selected = displayCurrency,
+            ratesStale = ratesStale,
+            onSelect = onSelectCurrency,
+            onDismissRequest = { showCurrencyDialog = false }
+        )
     }
 
     if (showLogoutDialog) {
@@ -174,7 +228,7 @@ private fun ProfileAvatar(avatarUrl: String?, size: androidx.compose.ui.unit.Dp)
     }
 }
 
-/** Reusable settings option row; future options (currency, categories, …) drop in here. */
+/** Reusable settings option row. */
 @Composable
 fun SettingsRow(
     icon: ImageVector,
@@ -220,7 +274,14 @@ private fun SettingsContentPreview() {
     FoodTrackerTheme {
         SettingsContent(
             profile = Profile(id = "u1", displayName = "An Nguyễn", userId = "an.nguyen", avatarUrl = null),
+            displayCurrency = AppCurrency.VND,
+            currencies = AppCurrency.entries,
+            ratesStale = false,
             onProfileClick = {},
+            onCategoriesClick = {},
+            onChangePasswordClick = {},
+            onCurrencyDialogOpen = {},
+            onSelectCurrency = {},
             onLogout = {}
         )
     }

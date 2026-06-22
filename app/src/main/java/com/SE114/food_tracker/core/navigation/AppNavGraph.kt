@@ -148,7 +148,9 @@ fun AppNavGraph(
 
             composable(AppDestinations.Settings.route) {
                 SettingsScreen(
-                    onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) }
+                    onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) },
+                    onNavigateToCategories = { navController.navigate(AppDestinations.CategoryManagement.route) },
+                    onChangePassword = { navController.navigate(AppDestinations.Forgot.route) }
                 )
             }
 

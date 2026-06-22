@@ -93,6 +93,7 @@
     <string name="settings_currency">Đơn vị tiền tệ</string>
     <string name="settings_currency_title">Đơn vị tiền</string>
     <string name="settings_currency_note">Giá đã nhập được giữ nguyên; chỉ thay đổi cách hiển thị.</string>
+    <string name="settings_change_password">Đổi mật khẩu</string>
     <string name="settings_logout">Đăng xuất</string>
 
     <!-- Category management -->
