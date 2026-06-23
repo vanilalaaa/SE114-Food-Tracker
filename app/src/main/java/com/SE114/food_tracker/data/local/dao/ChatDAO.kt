@@ -69,5 +69,6 @@ interface ChatDAO {
 
     @Query("SELECT * FROM messages WHERE id = :serverId LIMIT 1")
     suspend fun getMessageByServerId(serverId: String): Message?
-
+    @Query("DELETE FROM conversations WHERE id = :conversationId")
+    suspend fun deleteConversationById(conversationId: String)
 }

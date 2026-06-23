@@ -47,14 +47,24 @@ class ChatViewModel @Inject constructor(
     init {
         fetchConversationsFromServer()
         chatRepository.subscribeToGlobalConversationsRealtime()
+
+        // THÀNH VIÊN
         viewModelScope.launch {
             chatRepository.memberUpdateSignal.collect { convId: String ->
                 // Tự động load lại danh sách thành viên vào StateFlow
                 loadGroupMembers(convId)
+                // Kéo ngay tin nhắn hệ thống (Mời vào/Kick ra) về
+                refreshChatData(convId)
             }
-            chatRepository.walletUpdateSignal.collect { convId ->
+        }
+
+        // QUỸ NHÓM
+        viewModelScope.launch {
+            chatRepository.walletUpdateSignal.collect { convId: String ->
                 // Nạp lại data ví tĩnh thành data động
                 loadWalletData(convId)
+                // Kéo ngay tin nhắn hệ thống (Nạp/Rút quỹ) về
+                refreshChatData(convId)
             }
         }
     }

@@ -170,7 +170,8 @@ class ChatRepository @Inject constructor(
                 }.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
 
             myParticipations.forEach { part ->
-                val convId = part["conversation_id"]?.toString()?.replace("\"", "") ?: return@forEach
+                val convId =
+                    part["conversation_id"]?.toString()?.replace("\"", "") ?: return@forEach
                 try {
                     val response = supabaseClient.from("conversation")
                         .select {
@@ -202,26 +203,51 @@ class ChatRepository @Inject constructor(
             try {
                 val channel = supabaseClient.channel("chat_channel_$conversationId")
 
-                val changeFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-                    table = "message"
+                val changeFlow =
+                    channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                        table = "message"
+                    }
+
+                val conversationUpdateFlow =
+                    channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                        table = "conversation"
+                    }
+
+                val walletUpdateFlow =
+                    channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                        table = "group_wallet"
+                    }
+
+                val transactionInsertFlow =
+                    channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                        table = "wallet_transaction"
+                    }
+
+                val participantInsert =
+                    channel.postgresChangeFlow<io.github.jan.supabase.realtime.PostgresAction.Insert>(
+                        schema = "public"
+                    ) {
+                        table = "conversation_participant"
+                    }
+                val participantDelete =
+                    channel.postgresChangeFlow<io.github.jan.supabase.realtime.PostgresAction.Delete>(
+                        schema = "public"
+                    ) {
+                        table = "conversation_participant"
+                    }
+                // Bắn tín hiệu nạp lại thành viên khi có người vào
+                repositoryScope.launch {
+                    participantInsert.collect {
+                        _memberUpdateSignal.tryEmit(conversationId)
+                    }
                 }
 
-                val conversationUpdateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
-                    table = "conversation"
+                // Bắn tín hiệu nạp lại thành viên khi có người ra
+                repositoryScope.launch {
+                    participantDelete.collect {
+                        _memberUpdateSignal.tryEmit(conversationId)
+                    }
                 }
-
-                val walletUpdateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
-                    table = "group_wallet"
-                }
-
-                val transactionInsertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-                    table = "wallet_transaction"
-                }
-
-                val participantFlow = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
-                    table = "conversation_participant"
-                }
-
                 repositoryScope.launch {
                     changeFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
@@ -251,7 +277,8 @@ class ChatRepository @Inject constructor(
                     conversationUpdateFlow.collect { action ->
                         val updatedDto = action.decodeRecord<SupabaseConversationDto>()
                         if (updatedDto.id == conversationId) {
-                            val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
+                            val currentConv =
+                                chatDAO.getConversationById(conversationId).firstOrNull()
                             currentConv?.let {
                                 chatDAO.insertConversation(
                                     it.copy(
@@ -278,12 +305,6 @@ class ChatRepository @Inject constructor(
                     }
                 }
 
-                repositoryScope.launch {
-                    participantFlow.collect {
-                        _memberUpdateSignal.tryEmit(conversationId)
-                    }
-                }
-
                 channel.subscribe()
                 activeChannels[conversationId] = channel
                 println("Supabase Realtime: Đã mở cổng đồng bộ cho phòng $conversationId")
@@ -293,6 +314,7 @@ class ChatRepository @Inject constructor(
             }
         }
     }
+
     fun subscribeToGlobalConversationsRealtime() {
         val currentUserId = getAuthenticatedUserId()
         if (currentUserId.isBlank()) return
@@ -301,15 +323,46 @@ class ChatRepository @Inject constructor(
             try {
                 val globalChannel = supabaseClient.channel("global_conv_channel_$currentUserId")
 
-                // Lắng nghe TẤT CẢ biến động (Insert thành viên mới, Delete thành viên cũ) trên bảng conversation_participant
-                val participantChangeFlow = globalChannel.postgresChangeFlow<PostgresAction>(schema = "public") {
-                    table = "conversation_participant"
+                val insertFlow =
+                    globalChannel.postgresChangeFlow<io.github.jan.supabase.realtime.PostgresAction.Insert>(
+                        schema = "public"
+                    ) {
+                        table = "conversation_participant"
+                    }
+
+                val deleteFlow =
+                    globalChannel.postgresChangeFlow<io.github.jan.supabase.realtime.PostgresAction.Delete>(
+                        schema = "public"
+                    ) {
+                        table = "conversation_participant"
+                    }
+
+                repositoryScope.launch {
+                    insertFlow.collect { action ->
+
+                        val userIdStr =
+                            action.record["user_id"]?.toString()?.replace("\"", "")?.lowercase()
+                        if (userIdStr == currentUserId) {
+                            println("Realtime Global: Được mời vào nhóm mới!")
+                            fetchAndSaveConversationsToLocal()
+                        }
+                    }
                 }
 
                 repositoryScope.launch {
-                    participantChangeFlow.collect { action ->
-                        println("Realtime Global: Nhận thấy thay đổi cơ cấu nhóm (Tạo nhóm mới / Bị mời ra). Tiến hành nạp lại vào Room...")
-                        fetchAndSaveConversationsToLocal()
+                    deleteFlow.collect { action ->
+
+                        val userIdStr = action.oldRecord["user_id"]?.toString()?.replace("\"", "")?.lowercase()
+                        val convIdStr = action.oldRecord["conversation_id"]?.toString()?.replace("\"", "")
+
+                        if (userIdStr == currentUserId) {
+                            println("Realtime Global: Bị kick khỏi nhóm!")
+
+                            if (convIdStr != null) {
+                                chatDAO.deleteConversationById(convIdStr)
+                            }
+                            fetchAndSaveConversationsToLocal()
+                        }
                     }
                 }
 
@@ -494,19 +547,29 @@ class ChatRepository @Inject constructor(
 
             val cacheList = mutableListOf<UserProfileCacheEntity>()
             val pairResult = response.map { row ->
-                val userId = row["user_id"]?.toString()?.replace("\"", "")?.lowercase()?.trim() ?: ""
+                val userId =
+                    row["user_id"]?.toString()?.replace("\"", "")?.lowercase()?.trim() ?: ""
                 val profileElement = row["profile"]
                 var displayName = "Thành viên"
                 var avatarUrl: String? = null
 
                 try {
                     if (profileElement != null) {
-                        displayName = profileElement.jsonObject["display_name"]?.jsonPrimitive?.content ?: "Thành viên"
+                        displayName =
+                            profileElement.jsonObject["display_name"]?.jsonPrimitive?.content
+                                ?: "Thành viên"
                         avatarUrl = profileElement.jsonObject["avatar_url"]?.jsonPrimitive?.content
                     }
-                } catch (e: Exception) { }
+                } catch (e: Exception) {
+                }
 
-                cacheList.add(UserProfileCacheEntity(userId = userId, displayName = displayName, avatarUrl = avatarUrl))
+                cacheList.add(
+                    UserProfileCacheEntity(
+                        userId = userId,
+                        displayName = displayName,
+                        avatarUrl = avatarUrl
+                    )
+                )
                 Pair(userId, displayName)
             }
 
@@ -538,14 +601,16 @@ class ChatRepository @Inject constructor(
             }
 
             sendSystemMessage(conversationId, "Tên nhóm đã được đổi thành '$newName'")
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+        }
     }
 
     suspend fun kickMember(conversationId: String, userIdToKick: String, memberName: String) {
         try {
             val currentAdminId = getAuthenticatedUserId()
             val actualGroupMembers = fetchGroupMembersFromServer(conversationId)
-            val adminName = actualGroupMembers.find { it.first == currentAdminId }?.second ?: "Admin"
+            val adminName =
+                actualGroupMembers.find { it.first == currentAdminId }?.second ?: "Admin"
 
             supabaseClient.from("conversation_participant").delete {
                 filter {
@@ -556,7 +621,8 @@ class ChatRepository @Inject constructor(
 
             fetchAndSaveConversationsToLocal()
             sendSystemMessage(conversationId, "$adminName đã mời $memberName rời khỏi nhóm.")
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+        }
     }
 
     suspend fun sendSystemMessage(conversationId: String, content: String) {
@@ -609,7 +675,10 @@ class ChatRepository @Inject constructor(
                 chatDAO.insertConversation(it.copy(walletId = walletUuid))
             }
 
-            sendSystemMessage(conversationId, "Quỹ nhóm '$walletName' đã được thiết lập thành công.")
+            sendSystemMessage(
+                conversationId,
+                "Quỹ nhóm '$walletName' đã được thiết lập thành công."
+            )
             true
         } catch (e: Exception) {
             false
@@ -649,7 +718,8 @@ class ChatRepository @Inject constructor(
             if (walletId.isBlank() || walletId == "wallet_default") return false
 
             val actualGroupMembers = fetchGroupMembersFromServer(conversationId)
-            val currentUserName = actualGroupMembers.find { it.first == currentUserId }?.second ?: "Thành viên"
+            val currentUserName =
+                actualGroupMembers.find { it.first == currentUserId }?.second ?: "Thành viên"
 
             val rpcArgs = WalletRpcArgs(
                 walletId = walletId,
@@ -658,19 +728,48 @@ class ChatRepository @Inject constructor(
             )
 
             val messageText = if (txType == "deposit") {
-                "Hệ thống: ${currentUserName} đã nộp ${String.format("%,.0f", amount)} VND vào quỹ nhóm. Nội dung: $note"
+                "Hệ thống: ${currentUserName} đã nộp ${
+                    String.format(
+                        "%,.0f",
+                        amount
+                    )
+                } VND vào quỹ nhóm. Nội dung: $note"
             } else {
-                "Hệ thống: ${currentUserName} đã rút ${String.format("%,.0f", amount)} VND từ quỹ nhóm. Nội dung: $note"
+                "Hệ thống: ${currentUserName} đã rút ${
+                    String.format(
+                        "%,.0f",
+                        amount
+                    )
+                } VND từ quỹ nhóm. Nội dung: $note"
             }
 
             when (txType) {
                 "deposit" -> {
-                    supabaseClient.postgrest.rpc(function = "rpc_wallet_deposit", parameters = rpcArgs)
-                    sendMessage(conversationId = conversationId, senderId = "system", body = messageText, imageUrl = null, isSystem = true)
+                    supabaseClient.postgrest.rpc(
+                        function = "rpc_wallet_deposit",
+                        parameters = rpcArgs
+                    )
+                    sendMessage(
+                        conversationId = conversationId,
+                        senderId = "system",
+                        body = messageText,
+                        imageUrl = null,
+                        isSystem = true
+                    )
                 }
+
                 "withdrawal" -> {
-                    supabaseClient.postgrest.rpc(function = "rpc_wallet_withdraw", parameters = rpcArgs)
-                    sendMessage(conversationId = conversationId, senderId = "system", body = messageText, imageUrl = null, isSystem = true)
+                    supabaseClient.postgrest.rpc(
+                        function = "rpc_wallet_withdraw",
+                        parameters = rpcArgs
+                    )
+                    sendMessage(
+                        conversationId = conversationId,
+                        senderId = "system",
+                        body = messageText,
+                        imageUrl = null,
+                        isSystem = true
+                    )
                 }
             }
             true
@@ -730,7 +829,8 @@ class ChatRepository @Inject constructor(
                     chatDAO.insertMessage(newLocalMessage)
                 }
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+        }
     }
 
     private suspend fun performNetworkSend(message: Message) {
@@ -738,7 +838,10 @@ class ChatRepository @Inject constructor(
             var finalImageUrl = message.imageUrl
             val currentUserId = getAuthenticatedUserId()
 
-            if (message.imageUrl != null && (message.imageUrl.startsWith("content://") || message.imageUrl.startsWith("file://"))) {
+            if (message.imageUrl != null && (message.imageUrl.startsWith("content://") || message.imageUrl.startsWith(
+                    "file://"
+                ))
+            ) {
                 try {
                     val uri = android.net.Uri.parse(message.imageUrl)
                     val inputStream = context.contentResolver.openInputStream(uri)
@@ -753,10 +856,11 @@ class ChatRepository @Inject constructor(
                         }
                         finalImageUrl = storageBucket.publicUrl(fileName)
                     }
-                } catch (storageErr: Exception) { }
+                } catch (storageErr: Exception) {
+                }
             }
 
-            val finalSenderId = if (message.isSystem || message.senderId == "system") "system" else currentUserId
+            val finalSenderId = currentUserId
 
             val messageDto = SupabaseMessageDto(
                 conversationId = message.conversationId,
