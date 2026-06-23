@@ -1,23 +1,26 @@
 package com.SE114.food_tracker.feature.report
 
+import androidx.annotation.StringRes
+import com.SE114.food_tracker.R
+
 enum class ReportReason(
-    val label: String,
+    @StringRes val labelResId: Int,
     val remoteValue: String
 ) {
     SPAM(
-        label = "Spam",
+        labelResId = R.string.report_reason_spam,
         remoteValue = "spam"
     ),
     INAPPROPRIATE(
-        label = "Nội dung không phù hợp",
+        labelResId = R.string.report_reason_inappropriate,
         remoteValue = "inappropriate"
     ),
     HARASSMENT(
-        label = "Quấy rối",
+        labelResId = R.string.report_reason_harassment,
         remoteValue = "harassment"
     ),
     OTHER(
-        label = "Khác",
+        labelResId = R.string.report_reason_other,
         remoteValue = "other"
     )
 }

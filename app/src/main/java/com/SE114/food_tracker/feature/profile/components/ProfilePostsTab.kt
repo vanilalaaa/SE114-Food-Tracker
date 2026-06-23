@@ -14,9 +14,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
@@ -47,7 +49,7 @@ fun ProfilePostsTab(
 
             posts.isEmpty() -> {
                 Text(
-                    text = "Người dùng chưa có bài viết nào",
+                    text = stringResource(R.string.profile_posts_empty),
                     color = TextLabelGray,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(top = 32.dp)

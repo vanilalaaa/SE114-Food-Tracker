@@ -31,10 +31,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.LoadingShimmer
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
@@ -103,7 +105,7 @@ private fun ProfileHeaderTopBar(
         ) {
             Icon(
                 imageVector = Icons.Default.ArrowBack,
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.profile_back),
                 tint = TextPrimary,
                 modifier = Modifier.size(28.dp)
             )
@@ -112,7 +114,7 @@ private fun ProfileHeaderTopBar(
         Spacer(modifier = Modifier.width(10.dp))
 
         Text(
-            text = "Profile",
+            text = stringResource(R.string.profile_viewer_title),
             color = TextPrimary,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
@@ -125,7 +127,7 @@ private fun ProfileHeaderTopBar(
                 IconButton(onClick = { isMenuExpanded = true }) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Mở menu",
+                        contentDescription = stringResource(R.string.profile_menu_open),
                         tint = TextPrimary
                     )
                 }
@@ -141,7 +143,7 @@ private fun ProfileHeaderTopBar(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = "Báo cáo",
+                                text = stringResource(R.string.profile_report),
                                 color = Color.Black,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -199,7 +201,7 @@ private fun ProfileHeaderContent(
         if (isSelf) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Đây là profile của bạn",
+                text = stringResource(R.string.profile_self_badge),
                 color = TextLabelGray,
                 fontSize = 13.sp
             )
@@ -250,7 +252,7 @@ private fun ProfileHeaderErrorContent(
             fontSize = 14.sp
         )
         TextButton(onClick = onRetry) {
-            Text("Thử lại")
+            Text(stringResource(R.string.profile_retry))
         }
     }
 }

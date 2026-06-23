@@ -16,9 +16,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
 import com.SE114.food_tracker.data.model.ProfileSharedItem
@@ -58,7 +60,7 @@ fun ProfileDiaryTab(
                 ) {
                     Text(text = error, color = TextLabelGray, fontSize = 14.sp)
                     TextButton(onClick = onRetry) {
-                        Text("Thử lại")
+                        Text(stringResource(R.string.profile_retry))
                     }
                 }
             }
@@ -109,7 +111,7 @@ private fun ProfileDiaryEmptyState(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Người dùng chưa chia sẻ món nào",
+            text = stringResource(R.string.profile_diary_empty),
             color = TextLabelGray,
             fontSize = 14.sp
         )

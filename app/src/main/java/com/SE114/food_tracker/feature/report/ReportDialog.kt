@@ -24,10 +24,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.StatPinkDark
@@ -55,7 +57,9 @@ fun ReportDialog(
                 shape = RoundedCornerShape(24.dp)
             ) {
                 Text(
-                    text = if (isSubmitting) "Đang gửi..." else "Gửi báo cáo",
+                    text = stringResource(
+                        if (isSubmitting) R.string.report_submitting else R.string.report_submit
+                    ),
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
@@ -66,12 +70,12 @@ fun ReportDialog(
                 onClick = onDismissRequest,
                 enabled = !isSubmitting
             ) {
-                Text("Hủy", color = TextLabelGray)
+                Text(stringResource(R.string.report_cancel), color = TextLabelGray)
             }
         },
         title = {
             Text(
-                text = "Báo cáo người dùng",
+                text = stringResource(R.string.report_dialog_title),
                 color = TextPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
@@ -83,7 +87,7 @@ fun ReportDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Chọn lý do báo cáo:",
+                    text = stringResource(R.string.report_reason_prompt),
                     color = TextSecondary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
@@ -106,7 +110,7 @@ fun ReportDialog(
                             colors = RadioButtonDefaults.colors(selectedColor = StatPinkDark)
                         )
                         Text(
-                            text = reason.label,
+                            text = stringResource(reason.labelResId),
                             color = TextPrimary,
                             fontSize = 14.sp
                         )
