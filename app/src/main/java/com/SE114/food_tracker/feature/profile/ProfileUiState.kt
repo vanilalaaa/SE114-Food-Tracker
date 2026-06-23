@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.profile
 
+import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.model.ProfileSharedItem
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 
@@ -16,7 +17,9 @@ data class ProfileUiState(
     val selectedTab: ProfileTab = ProfileTab.DIARY,
     val sharedItems: List<ProfileSharedItem> = emptyList(),
     val isDiaryLoading: Boolean = false,
-    val diaryError: String? = null
+    val diaryError: String? = null,
+    val posts: List<FeedPostDto> = emptyList(),
+    val isPostsLoading: Boolean = false
 ) {
     val displayName: String
         get() = profile?.displayName?.takeIf { it.isNotBlank() }

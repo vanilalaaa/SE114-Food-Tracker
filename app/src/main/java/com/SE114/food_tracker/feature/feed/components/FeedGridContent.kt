@@ -164,7 +164,7 @@ private fun FeedGrid(
             items = posts,
             key = { it.postId }
         ) { post ->
-            FeedPostTile(
+            FeedGridPostTile(
                 post = post,
                 onClick = { onPostClick(post.postId) }
             )
@@ -173,7 +173,7 @@ private fun FeedGrid(
 }
 
 @Composable
-private fun FeedPostTile(
+fun FeedGridPostTile(
     post: FeedPostDto,
     onClick: () -> Unit
 ) {

@@ -9,6 +9,7 @@ import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +24,9 @@ class ProfileViewerRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             runCatching {
                 val profile = supabaseClient.postgrest["profile"]
-                    .select { filter { eq("id", profileId) } }
+                    .select(Columns.list("id", "display_name", "user_id", "avatar_url")) {
+                        filter { eq("id", profileId) }
+                    }
                     .decodeSingleOrNull<ProfileDTO>()
                     ?: error("Không tìm thấy người dùng.")
 

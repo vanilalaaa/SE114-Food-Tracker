@@ -3,9 +3,11 @@ package com.SE114.food_tracker.feature.profile
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.ProfileViewerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,10 +17,12 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val profileRepository: ProfileViewerRepository,
+    private val feedRepository: FeedRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val profileId: String = savedStateHandle.get<String>("profileId").orEmpty()
+    private var postsJob: Job? = null
 
     private val _uiState = MutableStateFlow(ProfileUiState(isLoading = true))
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
@@ -57,6 +61,7 @@ class ProfileViewModel @Inject constructor(
                         )
                     }
                     loadSharedDiary()
+                    observeAuthorPosts()
                 }
                 .onFailure { error ->
                     _uiState.update {
@@ -93,6 +98,28 @@ class ProfileViewModel @Inject constructor(
                         )
                     }
                 }
+        }
+    }
+
+    private fun observeAuthorPosts() {
+        if (profileId.isBlank()) return
+
+        postsJob?.cancel()
+        postsJob = viewModelScope.launch {
+            _uiState.update { it.copy(isPostsLoading = true) }
+
+            feedRepository.observePostsByAuthor(
+                ownerId = profileId,
+                pageSize = FeedRepository.PAGE_SIZE,
+                page = 1
+            ).collect { posts ->
+                _uiState.update {
+                    it.copy(
+                        posts = posts,
+                        isPostsLoading = false
+                    )
+                }
+            }
         }
     }
 
