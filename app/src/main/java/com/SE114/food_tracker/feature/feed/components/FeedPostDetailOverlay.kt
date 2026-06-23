@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +44,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -105,6 +107,7 @@ fun FeedPostDetailOverlay(
         )
         var commentText by rememberSaveable { mutableStateOf("") }
         var isCommentsSheetOpen by rememberSaveable { mutableStateOf(false) }
+        var pendingDeletePostId by rememberSaveable { mutableStateOf<String?>(null) }
         val snackbarHostState = remember { SnackbarHostState() }
 
         LaunchedEffect(uiState.error) {
@@ -146,7 +149,7 @@ fun FeedPostDetailOverlay(
                             emptyList()
                         },
                         onToggleLike = onToggleLike,
-                        onDeletePost = onDeletePost,
+                        onDeletePost = { postId -> pendingDeletePostId = postId },
                         onOpenComments = { isCommentsSheetOpen = true },
                         onNavigateToProfile = { profileId ->
                             onClose()
@@ -196,6 +199,29 @@ fun FeedPostDetailOverlay(
                             }
                         },
                         onDismiss = { isCommentsSheetOpen = false }
+                    )
+                }
+
+                pendingDeletePostId?.let { postId ->
+                    AlertDialog(
+                        onDismissRequest = { pendingDeletePostId = null },
+                        title = { Text(text = "Xóa bài viết?") },
+                        text = { Text(text = "Bài viết sẽ bị ẩn khỏi bảng tin và đồng bộ xóa lên Supabase.") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    pendingDeletePostId = null
+                                    onDeletePost(postId)
+                                }
+                            ) {
+                                Text(text = "Xóa")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { pendingDeletePostId = null }) {
+                                Text(text = "Hủy")
+                            }
+                        }
                     )
                 }
             }
