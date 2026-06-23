@@ -105,7 +105,9 @@ private fun ChangePasswordContent(
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                supportingText = stringResource(R.string.auth_password_hint)
+                supportingText = stringResource(R.string.auth_password_hint),
+                isError = state.newSameAsCurrent,
+                errorText = stringResource(R.string.auth_change_pw_same)
             )
 
             AppTextField(
@@ -120,9 +122,15 @@ private fun ChangePasswordContent(
             )
 
             // The current-password error renders on its field; show other errors here.
+            // For Unknown, surface the underlying reason instead of a vague generic message.
             state.error?.takeIf { it != AuthError.InvalidCredentials }?.let { error ->
+                val message = when (error) {
+                    is AuthError.Unknown -> error.raw?.takeIf { it.isNotBlank() }
+                        ?: stringResource(R.string.auth_err_unknown)
+                    else -> error.asMessage()
+                }
                 Text(
-                    text = error.asMessage(),
+                    text = message,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )

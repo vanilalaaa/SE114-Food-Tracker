@@ -25,10 +25,14 @@ data class ChangePasswordUiState(
 ) {
     val passwordMismatch: Boolean get() = confirmPassword.isNotEmpty() && confirmPassword != newPassword
 
+    /** The server rejects an unchanged password; block it up front with a clear message. */
+    val newSameAsCurrent: Boolean get() = newPassword.isNotEmpty() && newPassword == currentPassword
+
     val canSubmit: Boolean
         get() = currentPassword.isNotBlank() &&
             newPassword.length >= MIN_PASSWORD_LENGTH &&
             confirmPassword == newPassword &&
+            !newSameAsCurrent &&
             !isLoading
 }
 
