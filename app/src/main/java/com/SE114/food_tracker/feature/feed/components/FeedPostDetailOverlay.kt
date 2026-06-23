@@ -33,14 +33,18 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -82,7 +86,8 @@ fun FeedPostDetailOverlay(
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
     onDeletePost: (String) -> Unit,
-    onAddComment: (String, String) -> Unit
+    onAddComment: (String, String) -> Unit,
+    onClearError: () -> Unit
 ) {
     val posts = uiState.posts
     val selectedIndex = uiState.selectedPostIndex
@@ -102,6 +107,16 @@ fun FeedPostDetailOverlay(
         )
         var commentText by rememberSaveable { mutableStateOf("") }
         var isCommentsSheetOpen by rememberSaveable { mutableStateOf(false) }
+        var pendingDeletePostId by rememberSaveable { mutableStateOf<String?>(null) }
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        LaunchedEffect(uiState.error) {
+            val error = uiState.error
+            if (error != null) {
+                snackbarHostState.showSnackbar(error)
+                onClearError()
+            }
+        }
 
         LaunchedEffect(selectedIndex, posts.size) {
             val targetPage = selectedIndex.coerceIn(posts.indices)
@@ -134,7 +149,7 @@ fun FeedPostDetailOverlay(
                             emptyList()
                         },
                         onToggleLike = onToggleLike,
-                        onDeletePost = onDeletePost,
+                        onDeletePost = { postId -> pendingDeletePostId = postId },
                         onOpenComments = { isCommentsSheetOpen = true },
                         onNavigateToProfile = { profileId ->
                             onClose()
@@ -158,6 +173,14 @@ fun FeedPostDetailOverlay(
                     )
                 }
 
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                )
+
                 if (isCommentsSheetOpen) {
                     FeedCommentsBottomSheet(
                         comments = uiState.selectedComments,
@@ -176,6 +199,29 @@ fun FeedPostDetailOverlay(
                             }
                         },
                         onDismiss = { isCommentsSheetOpen = false }
+                    )
+                }
+
+                pendingDeletePostId?.let { postId ->
+                    AlertDialog(
+                        onDismissRequest = { pendingDeletePostId = null },
+                        title = { Text(text = "Xóa bài viết?") },
+                        text = { Text(text = "Bài viết sẽ bị ẩn khỏi bảng tin và đồng bộ xóa lên Supabase.") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    pendingDeletePostId = null
+                                    onDeletePost(postId)
+                                }
+                            ) {
+                                Text(text = "Xóa")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { pendingDeletePostId = null }) {
+                                Text(text = "Hủy")
+                            }
+                        }
                     )
                 }
             }

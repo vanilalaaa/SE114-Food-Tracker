@@ -63,6 +63,23 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND (
+            p.owner_id = :currentUserId
+            OR p.visibility = 'public'
+            OR (
+                p.visibility = 'friends'
+                AND EXISTS(
+                    SELECT 1
+                    FROM friendship f
+                    WHERE f.status = 'accepted'
+                        AND f.is_deleted = 0
+                        AND (
+                            (f.sender_id = :currentUserId AND f.receiver_id = p.owner_id)
+                            OR (f.receiver_id = :currentUserId AND f.sender_id = p.owner_id)
+                        )
+                )
+            )
+        )
         ORDER BY p.created_at DESC
         LIMIT :limit OFFSET :offset
         """
@@ -142,6 +159,15 @@ interface FeedDAO {
     )
     suspend fun getPendingDeletedPostIds(): List<String>
 
+    @Query(
+        """
+        SELECT post_id
+        FROM feed_post
+        WHERE is_deleted = 1
+        """
+    )
+    suspend fun getDeletedPostIds(): List<String>
+
     @Query("SELECT * FROM feed_like WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingLikes(): List<FeedLike>
 
@@ -150,6 +176,9 @@ interface FeedDAO {
 
     @Query("SELECT * FROM feed_like WHERE post_id = :postId AND user_id = :userId LIMIT 1")
     suspend fun getLike(postId: String, userId: String): FeedLike?
+
+    @Query("SELECT * FROM feed_post WHERE post_id = :postId LIMIT 1")
+    suspend fun getPostById(postId: String): FeedPost?
 
     @Query("UPDATE feed_post SET image_url = :imageUrl, updated_at = :updatedAt WHERE post_id = :postId")
     suspend fun updatePostImageUrl(postId: String, imageUrl: String, updatedAt: Long = System.currentTimeMillis())
@@ -198,7 +227,7 @@ interface FeedDAO {
         postId: String,
         ownerId: String,
         updatedAt: Long = System.currentTimeMillis()
-    )
+    ): Int
 
     @Transaction
     suspend fun toggleLike(postId: String, userId: String) {

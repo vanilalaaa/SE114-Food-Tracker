@@ -15,8 +15,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +54,11 @@ fun FeedScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
+
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -74,6 +83,7 @@ fun FeedScreen(
         onNavigateToFriend = onNavigateToFriend,
         onNavigateToProfile = onNavigateToProfile,
         onPostClick = viewModel::openPostDetail,
+        onRefresh = viewModel::refresh,
         onLoadNextPage = viewModel::loadNextPage,
         onOpenComposer = viewModel::openCreateSheet,
         onCloseComposer = viewModel::closeCreateSheet,
@@ -107,6 +117,7 @@ fun FeedScreenContent(
     onNavigateToFriend: () -> Unit,
     onNavigateToProfile: (String) -> Unit,
     onPostClick: (String) -> Unit,
+    onRefresh: () -> Unit,
     onLoadNextPage: () -> Unit,
     onOpenComposer: () -> Unit,
     onCloseComposer: () -> Unit,
@@ -126,6 +137,15 @@ fun FeedScreenContent(
     modifier: Modifier = Modifier
 ) {
     val gridState = rememberLazyGridState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.error, uiState.selectedPostId) {
+        val error = uiState.error
+        if (error != null && uiState.selectedPostId == null) {
+            snackbarHostState.showSnackbar(error)
+            onClearError()
+        }
+    }
 
     FeedPagingEffect(
         gridState = gridState,
@@ -138,12 +158,18 @@ fun FeedScreenContent(
             .fillMaxSize()
             .background(MainBackground)
     ) {
-        FeedGridContent(
-            uiState = uiState,
-            gridState = gridState,
-            onNavigateToFriend = onNavigateToFriend,
-            onPostClick = onPostClick
-        )
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            FeedGridContent(
+                uiState = uiState,
+                gridState = gridState,
+                onNavigateToFriend = onNavigateToFriend,
+                onPostClick = onPostClick
+            )
+        }
 
         FloatingActionButton(
             onClick = onOpenComposer,
@@ -158,6 +184,13 @@ fun FeedScreenContent(
                 contentDescription = "Tạo bài viết"
             )
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+        )
 
         if (uiState.isCreateSheetOpen) {
             ModalBottomSheet(
@@ -187,7 +220,8 @@ fun FeedScreenContent(
             onSelectPostAt = onSelectPostAt,
             onToggleLike = onToggleLike,
             onDeletePost = onDeletePost,
-            onAddComment = onAddComment
+            onAddComment = onAddComment,
+            onClearError = onClearError
         )
     }
 }
@@ -201,6 +235,7 @@ private fun FeedScreenPreview() {
             onNavigateToFriend = {},
             onNavigateToProfile = {},
             onPostClick = {},
+            onRefresh = {},
             onLoadNextPage = {},
             onOpenComposer = {},
             onCloseComposer = {},
@@ -230,6 +265,7 @@ private fun FeedScreenEmptyPreview() {
             onNavigateToFriend = {},
             onNavigateToProfile = {},
             onPostClick = {},
+            onRefresh = {},
             onLoadNextPage = {},
             onOpenComposer = {},
             onCloseComposer = {},

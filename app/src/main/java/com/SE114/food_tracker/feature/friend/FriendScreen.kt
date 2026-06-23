@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.data.local.dao.FriendItemDto
-import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.friend.components.*
 
@@ -35,6 +35,7 @@ fun FriendScreen(
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    var friendPendingDelete by remember { mutableStateOf<FriendItemDto?>(null) }
 
     // Surface failed friend actions as a one-shot snackbar.
     LaunchedEffect(actionMessage) {
@@ -62,14 +63,27 @@ fun FriendScreen(
             incomingRequests = incomingRequests,
             outgoingRequests = outgoingRequests,
             onUpdateSearchQuery = viewModel::updateSearchQuery,
-            onSearchUser = viewModel::searchUser,
             onSendFriendRequest = viewModel::sendFriendRequest,
             onAcceptRequest = viewModel::acceptRequest,
             onDeclineRequest = viewModel::declineRequest,
             onCancelOutgoingRequest = viewModel::cancelOutgoingRequest,
-            onUnfriend = viewModel::unfriend,
+            onUnfriend = { friend -> friendPendingDelete = friend },
             onNavigateBack = onNavigateBack
         )
+        friendPendingDelete?.let { friend ->
+            ConfirmDialog(
+                title = "Xóa bạn bè?",
+                body = "Bạn có chắc muốn xóa ${friend.displayName} khỏi danh sách bạn bè không?",
+                confirmLabel = "Xóa",
+                cancelLabel = "Hủy",
+                destructive = true,
+                onConfirm = {
+                    friendPendingDelete = null
+                    viewModel.unfriend(friend.friendshipId)
+                },
+                onDismiss = { friendPendingDelete = null }
+            )
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -83,18 +97,17 @@ fun FriendScreen(
 fun FriendScreenContent(
     myUserId: String,
     searchQuery: String,
-    searchResult: Result<ProfileDTO>?,
+    searchResult: Result<FriendSearchResult>?,
     isLoadingSearch: Boolean,
     acceptedFriends: List<FriendItemDto>,
     incomingRequests: List<FriendItemDto>,
     outgoingRequests: List<FriendItemDto>,
     onUpdateSearchQuery: (String) -> Unit,
-    onSearchUser: () -> Unit,
     onSendFriendRequest: (String) -> Unit,
     onAcceptRequest: (String) -> Unit,
     onDeclineRequest: (String) -> Unit,
     onCancelOutgoingRequest: (String) -> Unit,
-    onUnfriend: (String) -> Unit,
+    onUnfriend: (FriendItemDto) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     LazyColumn(
@@ -123,8 +136,7 @@ fun FriendScreenContent(
         item {
             CustomSearchBar(
                 query = searchQuery,
-                onQueryChange = onUpdateSearchQuery,
-                onSearch = onSearchUser
+                onQueryChange = onUpdateSearchQuery
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -142,8 +154,12 @@ fun FriendScreenContent(
         } else {
             searchResult?.let { result ->
                 item {
-                    result.onSuccess { profile ->
-                        SearchResultItem(profile = profile, onSendRequest = onSendFriendRequest)
+                    result.onSuccess { search ->
+                        SearchResultItem(
+                            profile = search.profile,
+                            relationship = search.relationship,
+                            onSendRequest = onSendFriendRequest
+                        )
                     }.onFailure { error ->
                         Text("Không tìm thấy: ${error.message}", color = StatRed, modifier = Modifier.padding(vertical = 8.dp))
                     }
@@ -157,7 +173,7 @@ fun FriendScreenContent(
                 SectionHeader(title = "Lời mời kết bạn", count = incomingRequests.size)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(incomingRequests) { request ->
+            items(incomingRequests, key = { it.friendshipId }) { request ->
                 IncomingRequestItem(
                     request = request,
                     onAccept = onAcceptRequest,
@@ -172,7 +188,7 @@ fun FriendScreenContent(
                 SectionHeader(title = "Lời mời đã gửi", count = outgoingRequests.size)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(outgoingRequests) { request ->
+            items(outgoingRequests, key = { it.friendshipId }) { request ->
                 OutgoingRequestItem(
                     request = request,
                     onCancel = onCancelOutgoingRequest
@@ -189,9 +205,13 @@ fun FriendScreenContent(
         if (acceptedFriends.isEmpty()) {
             item { EmptyFriendState() }
         } else {
-            items(acceptedFriends) { friend ->
+            items(acceptedFriends, key = { it.friendshipId }) { friend ->
                 val hasStory = friend.displayName.length % 2 == 0
-                FriendListItem(friend = friend, hasStory = hasStory, onUnfriend = onUnfriend)
+                FriendListItem(
+                    friend = friend,
+                    hasStory = hasStory,
+                    onUnfriend = { onUnfriend(friend) }
+                )
             }
         }
     }
@@ -212,7 +232,6 @@ fun Preview_EmptyFriendScreen() {
                 FriendItemDto("5", "waiting", "Pending Friend", null, "pending")
             ),
             onUpdateSearchQuery = {},
-            onSearchUser = {},
             onSendFriendRequest = {},
             onAcceptRequest = {},
             onDeclineRequest = {},
@@ -244,7 +263,6 @@ fun Preview_FilledFriendScreen() {
                 FriendItemDto("5", "waiting", "Pending Friend", null, "pending")
             ),
             onUpdateSearchQuery = {},
-            onSearchUser = {},
             onSendFriendRequest = {},
             onAcceptRequest = {},
             onDeclineRequest = {},
