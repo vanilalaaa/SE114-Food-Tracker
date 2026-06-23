@@ -3,7 +3,7 @@ package com.SE114.food_tracker.feature.profile
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.SE114.food_tracker.data.repository.ProfileRepository
+import com.SE114.food_tracker.data.repository.ProfileViewerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val profileRepository: ProfileRepository,
+    private val profileRepository: ProfileViewerRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 

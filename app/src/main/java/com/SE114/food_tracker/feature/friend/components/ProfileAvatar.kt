@@ -21,7 +21,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.HintGrayStat
-import com.SE114.food_tracker.core.designsystem.theme.StoryBorderYellow
+import com.SE114.food_tracker.core.designsystem.theme.OrangeMain
 
 @Composable
 fun ProfileAvatar(
@@ -39,7 +39,7 @@ fun ProfileAvatar(
         modifier = modifier.then(
             if (hasStory) {
                 Modifier
-                    .border(2.dp, StoryBorderYellow, CircleShape)
+                    .border(2.dp, OrangeMain, CircleShape)
                     .padding(4.dp)
             } else {
                 Modifier.padding(6.dp)
