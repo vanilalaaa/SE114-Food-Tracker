@@ -42,6 +42,9 @@ interface ItemDAO {
     @Query("SELECT * FROM item WHERE owner_id = :ownerId AND (sync_status = 'PENDING' OR sync_status = 'FAILED')")
     suspend fun getPendingItems(ownerId: String): List<Item>
 
+    @Query(" SELECT DISTINCT entry_date FROM item WHERE owner_id = :ownerId AND is_deleted = 0 ORDER BY entry_date DESC")
+    suspend fun getDistinctEntryDates(ownerId: String): List<Long>
+
     @Upsert
     suspend fun upsertItemsFromServer(items: List<Item>)
 
