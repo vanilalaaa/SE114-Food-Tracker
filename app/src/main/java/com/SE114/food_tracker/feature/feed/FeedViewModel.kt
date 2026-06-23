@@ -229,7 +229,7 @@ class FeedViewModel @Inject constructor(
 
                     pickedImageUri != null -> {
                         if (freeImageTitle.isBlank()) {
-                            _error.value = "Nhập tên loại ảnh trước khi đăng nha"
+                            _error.value = "Nhập tên loại ảnh trước khi đăng"
                         } else {
                             feedRepository.createPostFromImage(
                                 imageUrl = copyPickedImageToFeedStorage(pickedImageUri),

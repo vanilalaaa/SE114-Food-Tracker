@@ -134,15 +134,13 @@ private fun FeedHeader(
 
         IconButton(
             onClick = onNavigateToFriend,
-            modifier = Modifier
-                .size(52.dp)
-                .background(MintGreen.copy(alpha = 0.18f), CircleShape)
+            modifier = Modifier.size(52.dp)
         ) {
             Icon(
                 imageVector = Icons.Outlined.Groups,
                 contentDescription = "Bạn bè",
                 tint = TextPrimary,
-                modifier = Modifier.size(30.dp)
+                modifier = Modifier.size(32.dp)
             )
         }
     }

@@ -37,6 +37,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -401,7 +402,6 @@ private fun FeedAuthorBlock(
         ) {
             ProfileAvatar(
                 avatarUrl = post.ownerAvatarUrl,
-                hasStory = false,
                 modifier = Modifier.size(42.dp)
             )
             Spacer(Modifier.width(8.dp))
@@ -646,7 +646,6 @@ private fun FeedCommentRow(
     ) {
         ProfileAvatar(
             avatarUrl = comment.avatarUrl,
-            hasStory = false,
             modifier = Modifier
                 .size(42.dp)
                 .clickable { onNavigateToProfile(comment.userId) }
@@ -756,6 +755,7 @@ private fun FeedCommentInput(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.weight(1f),
+            textStyle = LocalTextStyle.current.copy(color = Color.White),
             placeholder = {
                 Text(
                     text = "Viết bình luận...",
