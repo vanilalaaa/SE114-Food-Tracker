@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.ProfileViewerRepository
+import com.SE114.food_tracker.data.repository.ReportRepository
+import com.SE114.food_tracker.feature.report.ReportReason
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -18,6 +20,7 @@ import kotlinx.coroutines.launch
 class ProfileViewModel @Inject constructor(
     private val profileRepository: ProfileViewerRepository,
     private val feedRepository: FeedRepository,
+    private val reportRepository: ReportRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -125,5 +128,50 @@ class ProfileViewModel @Inject constructor(
 
     fun selectTab(tab: ProfileTab) {
         _uiState.update { it.copy(selectedTab = tab) }
+    }
+
+    fun submitReport(reason: ReportReason) {
+        if (profileId.isBlank() || _uiState.value.isSelf || _uiState.value.isReportSubmitting) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isReportSubmitting = true, reportMessage = null) }
+
+            reportRepository.submitProfileReport(
+                targetId = profileId,
+                reason = reason.remoteValue
+            ).onSuccess {
+                _uiState.update {
+                    it.copy(
+                        isReportSubmitting = false,
+                        reportMessage = "Đã gửi báo cáo, admin sẽ xem xét"
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isReportSubmitting = false,
+                        reportMessage = error.toReportMessage()
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearReportMessage() {
+        _uiState.update { it.copy(reportMessage = null) }
+    }
+
+    private fun Throwable.toReportMessage(): String {
+        val rawMessage = message.orEmpty()
+        return when {
+            rawMessage.contains("duplicate", ignoreCase = true) ||
+                rawMessage.contains("unique", ignoreCase = true) ->
+                "Bạn đã gửi báo cáo cho người dùng này rồi."
+            rawMessage.contains("permission denied", ignoreCase = true) ||
+                rawMessage.contains("row-level security", ignoreCase = true) ->
+                "Chưa có quyền gửi báo cáo. Kiểm tra RLS Supabase."
+            rawMessage.isNotBlank() -> rawMessage
+            else -> "Không gửi được báo cáo. Vui lòng thử lại."
+        }
     }
 }

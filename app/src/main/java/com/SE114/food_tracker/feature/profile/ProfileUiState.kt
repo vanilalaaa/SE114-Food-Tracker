@@ -19,7 +19,9 @@ data class ProfileUiState(
     val isDiaryLoading: Boolean = false,
     val diaryError: String? = null,
     val posts: List<FeedPostDto> = emptyList(),
-    val isPostsLoading: Boolean = false
+    val isPostsLoading: Boolean = false,
+    val isReportSubmitting: Boolean = false,
+    val reportMessage: String? = null
 ) {
     val displayName: String
         get() = profile?.displayName?.takeIf { it.isNotBlank() }

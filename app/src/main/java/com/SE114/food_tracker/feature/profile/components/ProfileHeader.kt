@@ -11,11 +11,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -37,10 +44,18 @@ fun ProfileHeader(
     uiState: ProfileUiState,
     onNavigateBack: () -> Unit,
     onRetry: () -> Unit,
+    onReportClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        ProfileHeaderTopBar(onNavigateBack = onNavigateBack)
+        ProfileHeaderTopBar(
+            onNavigateBack = onNavigateBack,
+            showReportAction = !uiState.isSelf &&
+                !uiState.isLoading &&
+                uiState.error == null &&
+                uiState.profile != null,
+            onReportClick = onReportClick
+        )
 
         Spacer(Modifier.height(24.dp))
 
@@ -63,8 +78,12 @@ fun ProfileHeader(
 @Composable
 private fun ProfileHeaderTopBar(
     onNavigateBack: () -> Unit,
+    showReportAction: Boolean,
+    onReportClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isMenuExpanded by remember { mutableStateOf(false) }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -84,6 +103,29 @@ private fun ProfileHeaderTopBar(
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
         )
+        Spacer(modifier = Modifier.weight(1f))
+
+        if (showReportAction) {
+            IconButton(onClick = { isMenuExpanded = true }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Mở menu",
+                    tint = TextPrimary
+                )
+            }
+            DropdownMenu(
+                expanded = isMenuExpanded,
+                onDismissRequest = { isMenuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Báo cáo") },
+                    onClick = {
+                        isMenuExpanded = false
+                        onReportClick()
+                    }
+                )
+            }
+        }
     }
 }
 

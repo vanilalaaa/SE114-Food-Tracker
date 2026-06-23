@@ -1,6 +1,8 @@
 package com.SE114.food_tracker.feature.profile
 
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,8 +10,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -23,6 +30,8 @@ import com.SE114.food_tracker.feature.profile.components.ProfileDiaryTab
 import com.SE114.food_tracker.feature.profile.components.ProfileHeader
 import com.SE114.food_tracker.feature.profile.components.ProfilePostsTab
 import com.SE114.food_tracker.feature.profile.components.ProfileTabRow
+import com.SE114.food_tracker.feature.report.ReportDialog
+import com.SE114.food_tracker.feature.report.ReportReason
 
 @Composable
 fun ProfileScreen(
@@ -38,7 +47,9 @@ fun ProfileScreen(
         onRetry = viewModel::loadProfile,
         onRetryDiary = viewModel::loadSharedDiary,
         onTabSelected = viewModel::selectTab,
-        onPostClick = {}
+        onPostClick = {},
+        onReportClick = viewModel::submitReport,
+        onReportMessageShown = viewModel::clearReportMessage
     )
 }
 
@@ -49,45 +60,72 @@ fun ProfileScreenContent(
     onRetry: () -> Unit,
     onRetryDiary: () -> Unit,
     onTabSelected: (ProfileTab) -> Unit,
-    onPostClick: (String) -> Unit
+    onPostClick: (String) -> Unit,
+    onReportClick: (ReportReason) -> Unit,
+    onReportMessageShown: () -> Unit
 ) {
-    Column(
+    val context = LocalContext.current
+    var isReportDialogOpen by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.reportMessage) {
+        val message = uiState.reportMessage
+        if (message != null) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            onReportMessageShown()
+        }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MainBackground)
             .statusBarsPadding()
             .padding(horizontal = 24.dp)
     ) {
-        ProfileHeader(
-            uiState = uiState,
-            onNavigateBack = onNavigateBack,
-            onRetry = onRetry
-        )
-
-        if (!uiState.isLoading && uiState.error == null) {
-            Spacer(Modifier.height(20.dp))
-            ProfileTabRow(
-                selectedTab = uiState.selectedTab,
-                onTabSelected = onTabSelected
+        Column(modifier = Modifier.fillMaxSize()) {
+            ProfileHeader(
+                uiState = uiState,
+                onNavigateBack = onNavigateBack,
+                onRetry = onRetry,
+                onReportClick = { isReportDialogOpen = true }
             )
-            Spacer(Modifier.height(16.dp))
 
-            when (uiState.selectedTab) {
-                ProfileTab.DIARY -> ProfileDiaryTab(
-                    items = uiState.sharedItems,
-                    isLoading = uiState.isDiaryLoading,
-                    error = uiState.diaryError,
-                    onRetry = onRetryDiary,
-                    modifier = Modifier.weight(1f)
+            if (!uiState.isLoading && uiState.error == null) {
+                Spacer(Modifier.height(20.dp))
+                ProfileTabRow(
+                    selectedTab = uiState.selectedTab,
+                    onTabSelected = onTabSelected
                 )
+                Spacer(Modifier.height(16.dp))
 
-                ProfileTab.POSTS -> ProfilePostsTab(
-                    posts = uiState.posts,
-                    isLoading = uiState.isPostsLoading,
-                    onPostClick = onPostClick,
-                    modifier = Modifier.weight(1f)
-                )
+                when (uiState.selectedTab) {
+                    ProfileTab.DIARY -> ProfileDiaryTab(
+                        items = uiState.sharedItems,
+                        isLoading = uiState.isDiaryLoading,
+                        error = uiState.diaryError,
+                        onRetry = onRetryDiary,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    ProfileTab.POSTS -> ProfilePostsTab(
+                        posts = uiState.posts,
+                        isLoading = uiState.isPostsLoading,
+                        onPostClick = onPostClick,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
+        }
+
+        if (isReportDialogOpen) {
+            ReportDialog(
+                isSubmitting = uiState.isReportSubmitting,
+                onDismissRequest = { isReportDialogOpen = false },
+                onConfirmReport = { reason ->
+                    onReportClick(reason)
+                    isReportDialogOpen = false
+                }
+            )
         }
     }
 }
@@ -122,7 +160,9 @@ private fun ProfileScreenDiaryPreview() {
             onRetry = {},
             onRetryDiary = {},
             onTabSelected = {},
-            onPostClick = {}
+            onPostClick = {},
+            onReportClick = {},
+            onReportMessageShown = {}
         )
     }
 }
@@ -163,7 +203,9 @@ private fun ProfileScreenPostsPreview() {
             onRetry = {},
             onRetryDiary = {},
             onTabSelected = {},
-            onPostClick = {}
+            onPostClick = {},
+            onReportClick = {},
+            onReportMessageShown = {}
         )
     }
 }
@@ -178,7 +220,9 @@ private fun ProfileScreenLoadingPreview() {
             onRetry = {},
             onRetryDiary = {},
             onTabSelected = {},
-            onPostClick = {}
+            onPostClick = {},
+            onReportClick = {},
+            onReportMessageShown = {}
         )
     }
 }
@@ -195,7 +239,9 @@ private fun ProfileScreenErrorPreview() {
             onRetry = {},
             onRetryDiary = {},
             onTabSelected = {},
-            onPostClick = {}
+            onPostClick = {},
+            onReportClick = {},
+            onReportMessageShown = {}
         )
     }
 }
