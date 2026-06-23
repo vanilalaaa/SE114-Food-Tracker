@@ -173,34 +173,40 @@ private fun EditableAvatar(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.size(96.dp).clip(CircleShape).clickable(onClick = onClick)) {
-        if (avatarUrl.isNullOrBlank()) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(HintGrayStat),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Outlined.Person, contentDescription = null, tint = CardWhite, modifier = Modifier.size(48.dp))
+    // Clip only the image so the edit-pencil badge at the edge is never cut by the circle.
+    Box(modifier = modifier.size(96.dp).clickable(onClick = onClick)) {
+        Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(HintGrayStat)) {
+            if (avatarUrl.isNullOrBlank()) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = null,
+                    tint = CardWhite,
+                    modifier = Modifier.align(Alignment.Center).size(48.dp)
+                )
+            } else {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(avatarUrl).crossfade(true).build(),
+                    contentDescription = stringResource(R.string.auth_complete_avatar_desc),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
-        } else {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(avatarUrl).crossfade(true).build(),
-                contentDescription = stringResource(R.string.auth_complete_avatar_desc),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+
+            if (uploading) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = CardWhite, modifier = Modifier.size(28.dp))
+                }
+            }
         }
 
-        if (uploading) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = CardWhite, modifier = Modifier.size(28.dp))
-            }
-        } else {
+        if (!uploading) {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
+                border = androidx.compose.foundation.BorderStroke(2.dp, CardWhite),
                 modifier = Modifier.align(Alignment.BottomEnd).size(28.dp)
             ) {
                 Icon(
