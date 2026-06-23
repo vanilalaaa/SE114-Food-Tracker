@@ -34,18 +34,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -70,8 +64,6 @@ fun MyProfileScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    var isEditing by rememberSaveable { mutableStateOf(false) }
-
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
@@ -79,31 +71,19 @@ fun MyProfileScreen(
         }
     }
 
-    // A successful save returns to the read-only view.
+    // A successful save returns to Settings, where the profile block reflects the change.
     LaunchedEffect(state.saveSucceeded) {
         if (state.saveSucceeded) {
-            isEditing = false
             viewModel.consumeSaveSuccess()
+            onBack()
         }
     }
 
     MyProfileContent(
         state = state,
-        isEditing = isEditing,
-        onBack = {
-            if (isEditing) {
-                viewModel.discardEdits()
-                isEditing = false
-            } else {
-                onBack()
-            }
-        },
-        onAvatarTap = {
-            if (isEditing) {
-                avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            } else {
-                isEditing = true
-            }
+        onBack = onBack,
+        onPickAvatar = {
+            avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },
         onDisplayNameChange = viewModel::onDisplayNameChange,
         onUserIdChange = viewModel::onUserIdChange,
@@ -114,9 +94,8 @@ fun MyProfileScreen(
 @Composable
 private fun MyProfileContent(
     state: MyProfileUiState,
-    isEditing: Boolean,
     onBack: () -> Unit,
-    onAvatarTap: () -> Unit,
+    onPickAvatar: () -> Unit,
     onDisplayNameChange: (String) -> Unit,
     onUserIdChange: (String) -> Unit,
     onSave: () -> Unit
@@ -138,7 +117,7 @@ private fun MyProfileContent(
                     )
                 }
                 Text(
-                    text = stringResource(R.string.profile_title),
+                    text = stringResource(R.string.profile_edit_title),
                     style = MaterialTheme.typography.titleLarge
                 )
             }
@@ -148,57 +127,37 @@ private fun MyProfileContent(
             EditableAvatar(
                 avatarUrl = state.avatarUrl,
                 uploading = state.isUploadingAvatar,
-                showPencil = true,
                 size = 120.dp,
-                onClick = onAvatarTap,
+                onClick = onPickAvatar,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
 
-            if (!isEditing) {
+            AppTextField(
+                value = state.displayName,
+                onValueChange = onDisplayNameChange,
+                label = stringResource(R.string.profile_display_name),
+                leadingIcon = Icons.Outlined.Person,
+                isError = !state.displayNameValid,
+                errorText = stringResource(R.string.profile_display_name_required)
+            )
+
+            UserIdField(state = state, onUserIdChange = onUserIdChange)
+
+            state.error?.let { error ->
                 Text(
-                    text = state.displayName.takeIf { it.isNotBlank() }
-                        ?: stringResource(R.string.settings_default_name),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    text = state.userId.takeIf { it.isNotBlank() }?.let { "@$it" }
-                        ?: stringResource(R.string.settings_no_user_id),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else {
-                AppTextField(
-                    value = state.displayName,
-                    onValueChange = onDisplayNameChange,
-                    label = stringResource(R.string.profile_display_name),
-                    leadingIcon = Icons.Outlined.Person,
-                    isError = !state.displayNameValid,
-                    errorText = stringResource(R.string.profile_display_name_required)
-                )
-
-                UserIdField(state = state, onUserIdChange = onUserIdChange)
-
-                state.error?.let { error ->
-                    Text(
-                        text = error.profileMessage(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-
-                AppButton(
-                    text = stringResource(R.string.profile_save),
-                    onClick = onSave,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = state.canSave,
-                    loading = state.isSaving
+                    text = error.profileMessage(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error
                 )
             }
+
+            AppButton(
+                text = stringResource(R.string.profile_save),
+                onClick = onSave,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.canSave,
+                loading = state.isSaving
+            )
         }
     }
 }
@@ -267,14 +226,13 @@ private fun UserIdStatusIcon(status: UserIdCheckStatus) {
 }
 
 /**
- * Circular avatar with an optional edit-pencil badge. The circular clip is applied only to the
- * image, so the badge sits at the edge and is never clipped by the circle.
+ * Circular avatar with an edit-pencil badge. The circular clip is applied only to the image,
+ * so the badge sits at the edge and is never clipped by the circle.
  */
 @Composable
 private fun EditableAvatar(
     avatarUrl: String?,
     uploading: Boolean,
-    showPencil: Boolean,
     size: Dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -307,7 +265,7 @@ private fun EditableAvatar(
             }
         }
 
-        if (showPencil && !uploading) {
+        if (!uploading) {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
@@ -333,30 +291,9 @@ private fun AuthError.profileMessage(): String = when (this) {
     else -> stringResource(R.string.auth_err_unknown)
 }
 
-@Preview(showBackground = true, name = "Profile view")
+@Preview(showBackground = true)
 @Composable
-private fun MyProfileViewPreview() {
-    FoodTrackerTheme {
-        MyProfileContent(
-            state = MyProfileUiState(
-                loading = false,
-                displayName = "An Nguyễn",
-                userId = "an.nguyen",
-                originalUserId = "an.nguyen"
-            ),
-            isEditing = false,
-            onBack = {},
-            onAvatarTap = {},
-            onDisplayNameChange = {},
-            onUserIdChange = {},
-            onSave = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Profile edit")
-@Composable
-private fun MyProfileEditPreview() {
+private fun MyProfileContentPreview() {
     FoodTrackerTheme {
         MyProfileContent(
             state = MyProfileUiState(
@@ -366,9 +303,8 @@ private fun MyProfileEditPreview() {
                 originalUserId = "an.nguyen",
                 userIdEditable = true
             ),
-            isEditing = true,
             onBack = {},
-            onAvatarTap = {},
+            onPickAvatar = {},
             onDisplayNameChange = {},
             onUserIdChange = {},
             onSave = {}

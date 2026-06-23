@@ -25,7 +25,6 @@ data class MyProfileUiState(
     val displayName: String = "",
     val userId: String = "",
     val originalUserId: String = "",
-    val originalDisplayName: String = "",
     val avatarUrl: String? = null,
     val userIdEditable: Boolean = false,
     val cooldownDays: Int = 0,
@@ -58,7 +57,6 @@ class MyProfileViewModel @Inject constructor(
     private val userIdInput = MutableStateFlow("")
     private var profileId: String? = null
     private var pendingAvatarUrl: String? = null
-    private var loadedAvatarUrl: String? = null
 
     init {
         viewModelScope.launch {
@@ -90,21 +88,6 @@ class MyProfileViewModel @Inject constructor(
     }
 
     fun onDisplayNameChange(value: String) = _state.update { it.copy(displayName = value, error = null) }
-
-    /** Revert unsaved edits (name/user_id/avatar) when leaving edit mode without saving. */
-    fun discardEdits() {
-        pendingAvatarUrl = null
-        _state.update {
-            it.copy(
-                displayName = it.originalDisplayName,
-                userId = it.originalUserId,
-                avatarUrl = loadedAvatarUrl,
-                userIdStatus = UserIdCheckStatus.Idle,
-                error = null
-            )
-        }
-        userIdInput.value = _state.value.originalUserId
-    }
 
     fun consumeSaveSuccess() = _state.update { it.copy(saveSucceeded = false) }
 
@@ -150,7 +133,6 @@ class MyProfileViewModel @Inject constructor(
                         it.copy(
                             isSaving = false,
                             originalUserId = it.userId.trim(),
-                            originalDisplayName = it.displayName.trim(),
                             userIdStatus = UserIdCheckStatus.Idle,
                             saveSucceeded = true
                         )
@@ -164,7 +146,6 @@ class MyProfileViewModel @Inject constructor(
 
     private fun applyProfile(p: Profile) {
         profileId = p.id
-        loadedAvatarUrl = p.avatarUrl
         _state.update { s ->
             if (s.loading) {
                 s.copy(
@@ -172,13 +153,11 @@ class MyProfileViewModel @Inject constructor(
                     displayName = p.displayName.orEmpty(),
                     userId = p.userId.orEmpty(),
                     originalUserId = p.userId.orEmpty(),
-                    originalDisplayName = p.displayName.orEmpty(),
                     avatarUrl = p.avatarUrl
                 )
             } else {
                 s.copy(
                     originalUserId = p.userId.orEmpty(),
-                    originalDisplayName = p.displayName.orEmpty(),
                     avatarUrl = pendingAvatarUrl ?: p.avatarUrl
                 )
             }

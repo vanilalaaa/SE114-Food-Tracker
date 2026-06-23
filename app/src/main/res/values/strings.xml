@@ -91,6 +91,7 @@
     <string name="auth_change_pw_submit">Đổi mật khẩu</string>
     <string name="auth_change_pw_success">Đổi mật khẩu thành công</string>
     <string name="auth_change_pw_wrong_current">Mật khẩu hiện tại không đúng</string>
+    <string name="auth_change_pw_same">Mật khẩu mới phải khác mật khẩu hiện tại</string>
     <string name="auth_change_pw_back">Quay lại</string>
 
     <!-- Verify email (signup OTP activation) -->
@@ -164,4 +165,5 @@
     <string name="profile_user_id_check_error">Không kiểm tra được, vui lòng thử lại</string>
     <string name="profile_user_id_cooldown">Có thể đổi sau %1$d ngày</string>
     <string name="profile_save">Lưu</string>
+    <string name="profile_edit_title">Chỉnh sửa hồ sơ</string>
 </resources>
