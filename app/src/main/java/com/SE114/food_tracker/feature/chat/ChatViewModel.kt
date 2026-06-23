@@ -46,7 +46,6 @@ class ChatViewModel @Inject constructor(
 
     init {
         fetchConversationsFromServer()
-        // 🔥 ĐÃ KÍCH HOẠT REALTIME TOÀN CỤC: Đảm bảo khi mở app lên là hệ thống tự động nghe ngóng sự kiện Tạo nhóm / Mời ra theo thời gian thực
         chatRepository.subscribeToGlobalConversationsRealtime()
     }
 
@@ -60,16 +59,13 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // Biến StateFlow quản lý tập trung danh sách thành viên nhóm
     private val _groupMembers = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val groupMembers: StateFlow<List<Pair<String, String>>> = _groupMembers.asStateFlow()
     private val _isCurrentAdmin = MutableStateFlow(false)
     val isCurrentAdmin: StateFlow<Boolean> = _isCurrentAdmin.asStateFlow()
 
-    // Hàm gọi bốc dữ liệu một lần duy nhất khi vào phòng chat
     fun loadGroupMembers(conversationId: String) {
         viewModelScope.launch {
-            chatRepository.syncMessagesFromServer(conversationId)
             val isAdmin = chatRepository.isCurrentUserAdminOf(conversationId)
             _isCurrentAdmin.value = isAdmin
             val actualMembers = chatRepository.fetchGroupMembersFromServer(conversationId)
@@ -77,36 +73,28 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // Hàm chuyên dụng phục vụ cho tính năng Kéo xuống để reload (Pull-to-Refresh)
     fun refreshChatData(conversationId: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             try {
-                // Đồng bộ và tải tin nhắn mới nhất từ server về Room cục bộ
                 chatRepository.syncMessagesFromServer(conversationId)
-
-                // Tải lại danh sách thành viên mới nhất
                 val actualMembers = chatRepository.fetchGroupMembersFromServer(conversationId)
                 _groupMembers.value = actualMembers
-
-                // Cập nhật lại trạng thái quyền Admin
                 val isAdmin = chatRepository.isCurrentUserAdminOf(conversationId)
                 _isCurrentAdmin.value = isAdmin
             } catch (e: Exception) {
                 println("Lỗi khi kéo reload phòng chat: ${e.localizedMessage}")
             } finally {
-                onComplete() // Báo cho UI tắt hiệu ứng vòng xoay nhe Vy!
+                onComplete()
             }
         }
     }
 
-    // KÍCH HOẠT LẮNG NGHE REALTIME ĐỘNG
     fun connectToConversation(conversationId: String) {
         viewModelScope.launch {
             chatRepository.subscribeToChatRealtime(conversationId)
         }
     }
 
-    // Tự động làm mới danh sách cục bộ sau khi bấm nút + tạo nhóm thành công trên Server
     fun createGroup(name: String, members: List<String>) {
         viewModelScope.launch {
             chatRepository.createGroupChat(name, members)
@@ -122,19 +110,35 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
     }
 
-    // Lấy luồng thông tin một phòng chat cụ thể từ Room DB để lấy Tên và ID ví
     fun getConversationState(conversationId: String): Flow<Conversation?> {
         return chatRepository.getLocalConversation(conversationId)
     }
 
-    // Lấy tin nhắn từ Room và tự động định dạng Ngày/Giờ thật sang dữ liệu UI
-    fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
-        connectToConversation(conversationId)
 
-        return chatRepository.getMessagesStream(conversationId).map { entities ->
-            entities.map { entity ->
+    fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
+
+        connectToConversation(conversationId)
+        viewModelScope.launch {
+            try {
+                // Kéo tin nhắn cũ về trước để Room có dữ liệu gốc
+                chatRepository.syncMessagesFromServer(conversationId)
+                // Kéo tiếp profile thành viên về để map đè lên
+                chatRepository.fetchGroupMembersFromServer(conversationId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        return chatRepository.getMessagesWithProfileStream(conversationId).map { joinEntities ->
+            joinEntities.map { entity ->
+                val finalName = when {
+                    entity.isSystem || entity.senderId == "system" -> "Hệ thống"
+                    !entity.cacheName.isNullOrBlank() -> entity.cacheName
+                    else -> "Thành viên"
+                }
+
                 MessageUiModel(
-                    localId = entity.localId,
+                    localId = entity.id,
                     senderId = entity.senderId,
                     body = entity.body,
                     imageUrl = entity.imageUrl,
@@ -142,18 +146,17 @@ class ChatViewModel @Inject constructor(
                     syncStatus = entity.syncStatus,
                     timeLabel = formatToTime(entity.createdAt),
                     dateLabel = formatToDate(entity.createdAt),
-                    rawEntity = entity
+                    senderName = finalName,
+                    senderAvatarUrl = entity.cacheAvatar ?: ""
                 )
             }
         }
     }
-
     fun sendTextMessage(conversationId: String, text: String) {
         viewModelScope.launch {
             chatRepository.sendMessage(conversationId, currentUserId, body = text, imageUrl = null)
         }
     }
-
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
             chatRepository.sendMessage(
@@ -172,25 +175,19 @@ class ChatViewModel @Inject constructor(
         return chatDAO.getAllConversations()
     }
 
-    // Chuyển số dư về StateFlow để UI lắng nghe live biến động 100%
     private val _walletBalanceFlow = MutableStateFlow(0.0)
     val walletBalanceFlow: StateFlow<Double> = _walletBalanceFlow.asStateFlow()
 
-    // Hàm bốc dữ liệu Quỹ
     fun loadWalletData(conversationId: String) {
         viewModelScope.launch {
-            // Lấy số dư thật
             val balance = chatRepository.getWalletBalance(conversationId)
             _walletBalanceFlow.value = balance
-            walletBalance = balance // Giữ lại biến cũ để tránh lỗi compile nếu nơi khác xài
-
-            // Lấy lịch sử giao dịch thật
+            walletBalance = balance
             _walletTransactions.value =
                 chatRepository.fetchWalletTransactionsFromServer(conversationId)
         }
     }
 
-    // Lấy đúng walletId từ Conversation local trước khi gọi hàm RPC giao dịch!
     fun executeWalletTransaction(
         conversationId: String,
         amount: Double,
@@ -200,19 +197,13 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val transactionType = if (isDeposit) "deposit" else "withdrawal"
-
-                // Bốc thông tin phòng chat từ Room DB để lấy walletId thật
                 val conversation = chatDAO.getConversationById(conversationId).first()
                 val actualWalletId = conversation?.walletId
 
-                if (actualWalletId.isNullOrBlank() || actualWalletId == "wallet_default") {
-                    println("Lỗi giao dịch: Phòng chat này chưa được gắn WalletId thật!")
-                    return@launch
-                }
+                if (actualWalletId.isNullOrBlank() || actualWalletId == "wallet_default") return@launch
 
-                // Truyền đúng actualWalletId vào lòng Repository nhe Vy!
                 val success = chatRepository.executeWalletTransaction(
-                    conversationId = conversationId, // Truyền để bắn tin nhắn hệ thống
+                    conversationId = conversationId,
                     amount = amount,
                     txType = transactionType,
                     note = note,
@@ -220,12 +211,11 @@ class ChatViewModel @Inject constructor(
                 )
 
                 if (success) {
-                    loadWalletData(conversationId) // Làm mới số dư và lịch sử live liền
+                    loadWalletData(conversationId)
                 }
                 isTransactionSuccess = success
             } catch (e: Exception) {
                 e.printStackTrace()
-                println("Lỗi thực thi giao dịch RPC: ${e.localizedMessage}")
             }
         }
     }
@@ -234,14 +224,10 @@ class ChatViewModel @Inject constructor(
         isTransactionSuccess = null
     }
 
-    // ── PHÂN QUYỀN ADMIN & KHỞI TẠO QUỸ ──
-
-    // Kiểm tra bất đồng bộ quyền Admin thật của người dùng trong phòng chat dựa trên Repository
     suspend fun isCurrentUserAdmin(conversationId: String): Boolean {
         return try {
             chatRepository.isCurrentUserAdminOf(conversationId)
         } catch (e: Exception) {
-            println("Lỗi kiểm tra quyền Admin thật: ${e.localizedMessage}")
             false
         }
     }
@@ -258,7 +244,6 @@ class ChatViewModel @Inject constructor(
                 }
                 onResult(success)
             } catch (e: Exception) {
-                println("Lỗi luồng xử lý đúc ví trên server: ${e.localizedMessage}")
                 onResult(false)
             }
         }

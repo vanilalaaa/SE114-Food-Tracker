@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage // 🔥 ĐÃ ĐỔI: Dùng Subcompose để bắt trạng thái Error/Loading gài avatar mặc định
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.MessageSyncStatus
 import java.util.UUID
@@ -34,7 +35,9 @@ data class MessageUiModel(
     val syncStatus: MessageSyncStatus = MessageSyncStatus.SENT,
     val timeLabel: String = "10:15 PM",
     val dateLabel: String = "Hôm nay",
-    val rawEntity: com.SE114.food_tracker.data.local.entities.Message? = null
+    val rawEntity: com.SE114.food_tracker.data.local.entities.Message? = null,
+    val senderName: String = "Thành viên",
+    val senderAvatarUrl: String = ""
 )
 
 @Composable
@@ -45,7 +48,6 @@ fun MessageBubble(
     modifier: Modifier = Modifier,
     senderName: String = "Thành viên"
 ) {
-    // 1. Trường hợp đặc biệt: Tin nhắn hệ thống (System Message)
     if (message.isSystem) {
         Box(
             modifier = modifier
@@ -69,28 +71,47 @@ fun MessageBubble(
         return
     }
 
-    // 2. Trường hợp thông thường: Tin nhắn Chat giữa các thành viên
     Row(
         modifier = modifier,
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMine) {
-            val avatarChar = senderName.trim().take(1).uppercase()
+            // Khối vẽ Avatar mặc định (Chữ cái đầu tiên trên nền pastel)
+            val displayAvatarName = if (message.senderName.isNotBlank()) message.senderName else senderName
+            val avatarChar = displayAvatarName.trim().take(1).uppercase()
+            val defaultAvatarModifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(LightGreenStat)
 
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(LightGreenStat),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = avatarChar,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = Color.Black
+            val defaultAvatar = @Composable {
+                Box(
+                    modifier = defaultAvatarModifier,
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = avatarChar,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = TextPrimaryStat
+                    )
+                }
+            }
+
+            // 🔥 ĐÃ FIX LUỒNG AVATAR MẶC ĐỊNH: Nếu có link ảnh thì load, nếu link rỗng hoặc load lỗi (mạng yếu/link sai) tự động hiện Avatar chữ cái pastel ngay lập tức!
+            if (message.senderAvatarUrl.isNotBlank()) {
+                SubcomposeAsyncImage(
+                    model = message.senderAvatarUrl,
+                    contentDescription = "User Avatar",
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape),
+                    loading = { defaultAvatar() },
+                    error = { defaultAvatar() }
                 )
+            } else {
+                defaultAvatar()
             }
             Spacer(modifier = Modifier.width(6.dp))
         }
@@ -142,7 +163,6 @@ fun MessageBubble(
                         MessageSyncStatus.PENDING -> {
                             Text(text = "🕒", fontSize = 10.sp)
                         }
-
                         MessageSyncStatus.SENT -> {
                             Text(
                                 text = "✓",
@@ -151,7 +171,6 @@ fun MessageBubble(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-
                         MessageSyncStatus.FAILED -> {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -193,106 +212,11 @@ fun MessageBubblePeerPreview() {
                 message = MessageUiModel(
                     senderId = "azun_id",
                     body = "Ăn bún bò Huế đi zz",
-                    imageUrl = null
+                    imageUrl = null,
+                    senderName = "AnhZun"
                 ),
                 isMine = false,
                 senderName = "AnhZun",
-                onRetryClick = {}
-            )
-        }
-    }
-}
-
-@Preview(name = "Tin nhắn của mình - Đã gửi", showBackground = true)
-@Composable
-fun MessageBubbleMineSentPreview() {
-    FoodTrackerTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MainBackground)
-                .padding(16.dp)
-        ) {
-            MessageBubble(
-                message = MessageUiModel(
-                    senderId = "vy_id",
-                    body = "Oki lên kèo. Ăn quán này đi",
-                    imageUrl = null,
-                    syncStatus = MessageSyncStatus.SENT
-                ),
-                isMine = true,
-                onRetryClick = {}
-            )
-        }
-    }
-}
-
-@Preview(name = "Tin nhắn của mình - Đang chờ (Pending)", showBackground = true)
-@Composable
-fun MessageBubbleMinePendingPreview() {
-    FoodTrackerTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MainBackground)
-                .padding(16.dp)
-        ) {
-            MessageBubble(
-                message = MessageUiModel(
-                    senderId = "vy_id",
-                    body = "Ủa cái ảnh này gửi lên chưa ta?",
-                    imageUrl = null,
-                    syncStatus = MessageSyncStatus.PENDING
-                ),
-                isMine = true,
-                onRetryClick = {}
-            )
-        }
-    }
-}
-
-@Preview(name = "Tin nhắn của mình - Lỗi (Failed)", showBackground = true)
-@Composable
-fun MessageBubbleMineFailedPreview() {
-    FoodTrackerTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MainBackground)
-                .padding(16.dp)
-        ) {
-            MessageBubble(
-                message = MessageUiModel(
-                    senderId = "vy_id",
-                    body = "Mạng yếu quá tin nhắn này bị lỗi rồi",
-                    imageUrl = null,
-                    syncStatus = MessageSyncStatus.FAILED
-                ),
-                isMine = true,
-                onRetryClick = {}
-            )
-        }
-    }
-}
-
-@Preview(name = "Tin nhắn hệ thống (System)", showBackground = true)
-@Composable
-fun MessageBubbleSystemPreview() {
-    FoodTrackerTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MainBackground)
-                .padding(16.dp)
-        ) {
-            MessageBubble(
-                message = MessageUiModel(
-                    senderId = "system",
-                    body = "Hệ thống: Vy đã nộp 100k vào quỹ nhóm",
-                    imageUrl = null,
-                    isSystem = true
-                ),
-                isMine = false,
                 onRetryClick = {}
             )
         }

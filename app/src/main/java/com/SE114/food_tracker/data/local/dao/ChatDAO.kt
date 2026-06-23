@@ -4,11 +4,35 @@ import androidx.room.*
 import com.SE114.food_tracker.data.local.entities.Conversation
 import com.SE114.food_tracker.data.local.entities.ConversationParticipant
 import com.SE114.food_tracker.data.local.entities.Message
+import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
 import kotlinx.coroutines.flow.Flow
 
+// LỚP ĐẠI DIỆN TRUNG GIAN ĐỂ ROOM MAP DATA SAU KHI JOIN
+data class MessageWithProfile(
+    val id: String,
+    @ColumnInfo(name = "conversation_id") val conversationId: String,
+    @ColumnInfo(name = "sender_id") val senderId: String,
+    val body: String?,
+    @ColumnInfo(name = "image_url") val imageUrl: String?,
+    @ColumnInfo(name = "is_system") val isSystem: Boolean,
+    @ColumnInfo(name = "sync_status") val syncStatus: com.SE114.food_tracker.data.local.entities.MessageSyncStatus,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+
+    // Gộp dữ liệu từ bảng user_profile_cache:
+    @ColumnInfo(name = "cache_name") val cacheName: String?,
+    @ColumnInfo(name = "cache_avatar") val cacheAvatar: String?
+)
 @Dao
 interface ChatDAO {
-
+    // Xử lý độ trễ
+    @Query("""
+        SELECT m.*, p.display_name AS cache_name, p.avatar_url AS cache_avatar 
+        FROM messages m 
+        LEFT JOIN user_profile_cache p ON m.sender_id = p.user_id 
+        WHERE m.conversation_id = :conversationId 
+        ORDER BY m.created_at ASC
+    """)
+    fun getMessagesWithProfileStream(conversationId: String): Flow<List<MessageWithProfile>>
     // 1. Truy vấn tin nhắn trong cuộc hội thoại (Flow tự động cập nhật realtime lên UI)
     @Query("SELECT * FROM messages WHERE conversation_id = :conversationId ORDER BY created_at ASC")
     fun getMessagesByConversation(conversationId: String): Flow<List<Message>>
@@ -32,6 +56,8 @@ interface ChatDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertParticipants(participants: List<ConversationParticipant>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProfilesToCache(profiles: List<UserProfileCacheEntity>)
     @Query("SELECT * FROM conversations ORDER BY id DESC")
     fun getAllConversations(): Flow<List<Conversation>>
 

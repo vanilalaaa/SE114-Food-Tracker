@@ -46,7 +46,6 @@ fun ChatScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Lấy dữ liệu Realtime sống từ Room DB cục bộ
     val conversationState by viewModel.getConversationState(conversationId).collectAsState(initial = null)
     val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
     val currentUserId = viewModel.currentUserId
@@ -60,13 +59,8 @@ fun ChatScreen(
         viewModel.loadGroupMembers(conversationId)
     }
 
-    // Hứng dữ liệu an toàn từ StateFlow tập trung của ViewModel
     val memberList by viewModel.groupMembers.collectAsState()
     val isAdmin by viewModel.isCurrentAdmin.collectAsState()
-
-    // State điều khiển Dialog nhập tên tạo Quỹ nhóm mới
-    var showCreateWalletDialog by remember { mutableStateOf(false) }
-    var walletNameInput by remember { mutableStateOf("") }
 
     ChatScreenContent(
         conversationId = conversationId,
@@ -76,7 +70,7 @@ fun ChatScreen(
         isGroup = isGroup,
         hasWallet = hasWallet,
         isAdmin = isAdmin,
-        memberList = memberList,
+        memberList = memberList.map { Pair(it.first, it.second) }, // Map Triple sang Pair cho khớp signature cũ nhe Vy
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {
@@ -147,11 +141,7 @@ fun ChatScreenContent(
     var textInput by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    // Quản lý thành viên đang chờ xác nhận kích ra khỏi nhóm
     var memberToKick by remember { mutableStateOf<Pair<String, String>?>(null) }
-
-    // Ánh xạ danh sách mảng sang Map để tra cứu tên hiển thị động theo ID thần tốc
-    val memberMap = remember(memberList) { memberList.toMap() }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -159,7 +149,6 @@ fun ChatScreenContent(
         uri?.let { onSendImage(it.toString()) }
     }
 
-    // Dialog chặn Xác nhận Mời ra (Yes/No) tránh bấm nhầm UX
     if (memberToKick != null) {
         AlertDialog(
             onDismissRequest = { memberToKick = null },
@@ -298,20 +287,13 @@ fun ChatScreenContent(
                                 message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
                                 message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED
 
-                        val senderName = remember(message.senderId, memberMap) {
-                            if (message.isSystem || message.senderId == "system") {
-                                "Hệ thống"
-                            } else {
-                                memberMap[message.senderId] ?: "Thành viên"
-                            }
-                        }
-
                         Column(
                             modifier = Modifier.fillMaxWidth()
                         ) {
+                            // 🔥 ĐA FIX TRIỆT ĐỂ LUỒNG TRỄ: UI lấy thẳng tên thật đã map hoàn chỉnh trong object tin nhắn truyền xuống
                             if (!isMine && isGroup && !message.isSystem && message.senderId != "system") {
                                 Text(
-                                    text = senderName,
+                                    text = message.senderName,
                                     fontSize = 11.sp,
                                     color = Color.Gray,
                                     fontWeight = FontWeight.Medium,
@@ -331,7 +313,7 @@ fun ChatScreenContent(
                                 MessageBubble(
                                     message = message,
                                     isMine = isMine,
-                                    senderName = senderName,
+                                    senderName = message.senderName, // Truyền trực tiếp dữ liệu realtime
                                     onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
                                 )
                             }
@@ -412,7 +394,6 @@ fun ChatScreenContent(
         }
     }
 }
-
 @Preview(showSystemUi = true)
 @Composable
 fun ChatScreenPreview() {
