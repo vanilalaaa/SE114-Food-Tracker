@@ -22,7 +22,8 @@ import com.SE114.food_tracker.feature.friend.components.*
 @Composable
 fun FriendScreen(
     viewModel: FriendViewModel = hiltViewModel(),
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToProfile: (String) -> Unit
 ) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResult by viewModel.searchResult.collectAsStateWithLifecycle()
@@ -68,6 +69,7 @@ fun FriendScreen(
             onDeclineRequest = viewModel::declineRequest,
             onCancelOutgoingRequest = viewModel::cancelOutgoingRequest,
             onUnfriend = { friend -> friendPendingDelete = friend },
+            onOpenFriendProfile = { friend -> onNavigateToProfile(friend.userId) },
             onNavigateBack = onNavigateBack
         )
         friendPendingDelete?.let { friend ->
@@ -108,6 +110,7 @@ fun FriendScreenContent(
     onDeclineRequest: (String) -> Unit,
     onCancelOutgoingRequest: (String) -> Unit,
     onUnfriend: (FriendItemDto) -> Unit,
+    onOpenFriendProfile: (FriendItemDto) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     LazyColumn(
@@ -123,7 +126,7 @@ fun FriendScreenContent(
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(onClick = onNavigateBack) {
-                    Text("Xong", color = OrangeMain, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Quay lại", color = OrangeMain, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
@@ -206,10 +209,9 @@ fun FriendScreenContent(
             item { EmptyFriendState() }
         } else {
             items(acceptedFriends, key = { it.friendshipId }) { friend ->
-                val hasStory = friend.displayName.length % 2 == 0
                 FriendListItem(
                     friend = friend,
-                    hasStory = hasStory,
+                    onOpenProfile = { onOpenFriendProfile(friend) },
                     onUnfriend = { onUnfriend(friend) }
                 )
             }
@@ -237,6 +239,7 @@ fun Preview_EmptyFriendScreen() {
             onDeclineRequest = {},
             onCancelOutgoingRequest = {},
             onUnfriend = {},
+            onOpenFriendProfile = {},
             onNavigateBack = {}
         )
     }
@@ -268,6 +271,7 @@ fun Preview_FilledFriendScreen() {
             onDeclineRequest = {},
             onCancelOutgoingRequest = {},
             onUnfriend = {},
+            onOpenFriendProfile = {},
             onNavigateBack = {}
         )
     }

@@ -1,7 +1,6 @@
 package com.SE114.food_tracker.feature.friend.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -19,17 +18,12 @@ import coil.request.ImageRequest
 import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
-fun ProfileAvatar(avatarUrl: String?, hasStory: Boolean = false, modifier: Modifier = Modifier) {
+fun ProfileAvatar(avatarUrl: String?, modifier: Modifier = Modifier) {
     val imageSize = Modifier.size(50.dp).clip(CircleShape)
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.then(
-            if (hasStory) Modifier
-                .border(2.dp, StoryBorderYellow, CircleShape)
-                .padding(4.dp)
-            else Modifier.padding(6.dp)
-        )
+        modifier = modifier.padding(6.dp)
     ) {
         if (avatarUrl.isNullOrEmpty()) {
             Box(modifier = imageSize.background(HintGrayStat), contentAlignment = Alignment.Center) {

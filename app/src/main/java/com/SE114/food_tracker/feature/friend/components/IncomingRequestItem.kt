@@ -24,7 +24,7 @@ fun IncomingRequestItem(request: FriendItemDto, onAccept: (String) -> Unit, onDe
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProfileAvatar(avatarUrl = request.avatarUrl, hasStory = false)
+        ProfileAvatar(avatarUrl = request.avatarUrl)
         Spacer(modifier = Modifier.width(12.dp))
 
         Text(request.displayName, color = TextPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))

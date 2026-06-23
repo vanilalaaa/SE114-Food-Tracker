@@ -99,6 +99,7 @@ interface FeedDAO {
             COALESCE(u.display_name, c.display_name) AS displayName,
             u.avatar_url AS avatarUrl,
             c.body AS body,
+            c.parent_comment_id AS parentCommentId,
             c.created_at AS createdAt
         FROM feed_comment c
         LEFT JOIN user_profile_cache u ON u.user_id = c.user_id

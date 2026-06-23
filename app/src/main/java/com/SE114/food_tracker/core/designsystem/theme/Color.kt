@@ -30,7 +30,6 @@ val HintGray = Color(0xFFB7B6B6)
 val TextPrimaryStat = Color(0xFF1A1C1C)
 val TextLabelGray = Color(0xFF777777)
 val HintGrayStat = Color(0xFFB8B3B3)
-val StoryBorderYellow = Color(0xFFFFC107)
 val SearchBarBg = Color(0xFFFFFFFF)
 val TextWarning = Color(0xFF9B1C1C)
 
