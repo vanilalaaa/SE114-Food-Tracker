@@ -262,8 +262,10 @@ fun StatisticsScreen(
                     }
                 )
 
-                val insightText = buildInsightText(uiState, currency)
-                InsightCard(insightText = insightText)
+                val dynamicInsights = uiState.getDynamicInsights(currency.displayCurrency, currency.rates)
+                val finalInsights = dynamicInsights.ifEmpty { listOf(buildInsightText(uiState, currency)) }
+
+                InsightCard(insights = finalInsights)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
