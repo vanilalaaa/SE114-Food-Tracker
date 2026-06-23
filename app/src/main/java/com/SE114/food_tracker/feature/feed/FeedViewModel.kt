@@ -167,6 +167,7 @@ class FeedViewModel @Inject constructor(
         _pickedImageUri.value = uri
         if (uri != null) {
             _selectedSourceItem.value = null
+            _draftCaption.value = ""
             if (_draftFreeImageTitle.value.isBlank()) {
                 _draftFreeImageTitle.value = "Ảnh của tôi"
             }
@@ -182,7 +183,10 @@ class FeedViewModel @Inject constructor(
     }
 
     fun updateDraftVisibility(visibility: FeedVisibility) {
-        _draftVisibility.value = visibility.value
+        _draftVisibility.value = when (visibility) {
+            FeedVisibility.PUBLIC -> FeedVisibility.FRIENDS.value
+            else -> visibility.value
+        }
     }
 
     fun openPostDetail(postId: String) {
@@ -213,6 +217,8 @@ class FeedViewModel @Inject constructor(
                 val freeImageTitle = _draftFreeImageTitle.value
                 val caption = _draftCaption.value
                 val visibility = _draftVisibility.value
+                    .takeUnless { it == FeedVisibility.PUBLIC.value }
+                    ?: FeedVisibility.FRIENDS.value
 
                 when {
                     sourceItem != null -> feedRepository.createPostFromItem(
@@ -223,7 +229,7 @@ class FeedViewModel @Inject constructor(
 
                     pickedImageUri != null -> {
                         if (freeImageTitle.isBlank()) {
-                            _error.value = "Nhập tên loại ảnh trước khi đăng nha"
+                            _error.value = "Nhập tên loại ảnh trước khi đăng"
                         } else {
                             feedRepository.createPostFromImage(
                                 imageUrl = copyPickedImageToFeedStorage(pickedImageUri),
@@ -261,10 +267,14 @@ class FeedViewModel @Inject constructor(
         }
     }
 
-    fun addComment(postId: String, body: String) {
+    fun addComment(
+        postId: String,
+        body: String,
+        parentCommentId: String? = null
+    ) {
         if (body.isBlank()) return
         viewModelScope.launch {
-            runCatching { feedRepository.addComment(postId, body) }
+            runCatching { feedRepository.addComment(postId, body, parentCommentId) }
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Add comment failed")

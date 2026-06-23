@@ -124,7 +124,10 @@ fun AppNavGraph(
 
             composable(AppDestinations.Friend.route) {
                 FriendScreen(
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToProfile = { profileId ->
+                        navController.navigate(AppDestinations.Profile.createRoute(profileId))
+                    }
                 )
             }
 

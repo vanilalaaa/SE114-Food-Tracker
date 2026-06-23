@@ -25,7 +25,7 @@ fun OutgoingRequestItem(request: FriendItemDto, onCancel: (String) -> Unit) {
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProfileAvatar(avatarUrl = request.avatarUrl, hasStory = false)
+        ProfileAvatar(avatarUrl = request.avatarUrl)
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {

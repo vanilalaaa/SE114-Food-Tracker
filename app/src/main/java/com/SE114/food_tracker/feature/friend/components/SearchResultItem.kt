@@ -45,7 +45,7 @@ fun SearchResultItem(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProfileAvatar(avatarUrl = profile.avatarUrl, hasStory = false)
+        ProfileAvatar(avatarUrl = profile.avatarUrl)
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(displayName, color = TextPrimary, fontWeight = FontWeight.Bold)

@@ -10,6 +10,7 @@ import java.util.UUID
     tableName = "feed_comment",
     indices = [
         Index("post_id"),
+        Index("parent_comment_id"),
         Index("user_id"),
         Index("sync_status")
     ]
@@ -29,6 +30,9 @@ data class FeedComment(
     val displayName: String,
 
     val body: String,
+
+    @ColumnInfo(name = "parent_comment_id")
+    val parentCommentId: String? = null,
 
     @ColumnInfo(name = "sync_status")
     val syncStatus: String = "PENDING",
