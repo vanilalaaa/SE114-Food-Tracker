@@ -16,10 +16,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
+import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.model.ProfileSharedItem
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import com.SE114.food_tracker.feature.profile.components.ProfileDiaryTab
 import com.SE114.food_tracker.feature.profile.components.ProfileHeader
+import com.SE114.food_tracker.feature.profile.components.ProfilePostsTab
+import com.SE114.food_tracker.feature.profile.components.ProfileTabRow
 
 @Composable
 fun ProfileScreen(
@@ -33,7 +36,9 @@ fun ProfileScreen(
         uiState = uiState,
         onNavigateBack = onNavigateBack,
         onRetry = viewModel::loadProfile,
-        onRetryDiary = viewModel::loadSharedDiary
+        onRetryDiary = viewModel::loadSharedDiary,
+        onTabSelected = viewModel::selectTab,
+        onPostClick = {}
     )
 }
 
@@ -42,7 +47,9 @@ fun ProfileScreenContent(
     uiState: ProfileUiState,
     onNavigateBack: () -> Unit,
     onRetry: () -> Unit,
-    onRetryDiary: () -> Unit
+    onRetryDiary: () -> Unit,
+    onTabSelected: (ProfileTab) -> Unit,
+    onPostClick: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -58,21 +65,36 @@ fun ProfileScreenContent(
         )
 
         if (!uiState.isLoading && uiState.error == null) {
-            Spacer(Modifier.height(24.dp))
-            ProfileDiaryTab(
-                items = uiState.sharedItems,
-                isLoading = uiState.isDiaryLoading,
-                error = uiState.diaryError,
-                onRetry = onRetryDiary,
-                modifier = Modifier.weight(1f)
+            Spacer(Modifier.height(20.dp))
+            ProfileTabRow(
+                selectedTab = uiState.selectedTab,
+                onTabSelected = onTabSelected
             )
+            Spacer(Modifier.height(16.dp))
+
+            when (uiState.selectedTab) {
+                ProfileTab.DIARY -> ProfileDiaryTab(
+                    items = uiState.sharedItems,
+                    isLoading = uiState.isDiaryLoading,
+                    error = uiState.diaryError,
+                    onRetry = onRetryDiary,
+                    modifier = Modifier.weight(1f)
+                )
+
+                ProfileTab.POSTS -> ProfilePostsTab(
+                    posts = uiState.posts,
+                    isLoading = uiState.isPostsLoading,
+                    onPostClick = onPostClick,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-private fun ProfileScreenContentPreview() {
+private fun ProfileScreenDiaryPreview() {
     FoodTrackerTheme {
         ProfileScreenContent(
             uiState = ProfileUiState(
@@ -98,7 +120,50 @@ private fun ProfileScreenContentPreview() {
             ),
             onNavigateBack = {},
             onRetry = {},
-            onRetryDiary = {}
+            onRetryDiary = {},
+            onTabSelected = {},
+            onPostClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ProfileScreenPostsPreview() {
+    FoodTrackerTheme {
+        ProfileScreenContent(
+            uiState = ProfileUiState(
+                profile = ProfileDTO(
+                    id = "preview-id",
+                    displayName = "Thảo Uyên",
+                    userId = "uyen_123",
+                    avatarUrl = null
+                ),
+                selectedTab = ProfileTab.POSTS,
+                posts = listOf(
+                    FeedPostDto(
+                        postId = "post-1",
+                        ownerId = "preview-id",
+                        ownerName = "Thảo Uyên",
+                        ownerAvatarUrl = null,
+                        itemId = null,
+                        itemName = "Phở bò",
+                        categoryIconUrl = "🍜",
+                        imageUrl = "",
+                        caption = "Bữa sáng",
+                        visibility = "public",
+                        likeCount = 3,
+                        commentCount = 1,
+                        isLikedByMe = false,
+                        createdAt = 0L
+                    )
+                )
+            ),
+            onNavigateBack = {},
+            onRetry = {},
+            onRetryDiary = {},
+            onTabSelected = {},
+            onPostClick = {}
         )
     }
 }
@@ -111,7 +176,9 @@ private fun ProfileScreenLoadingPreview() {
             uiState = ProfileUiState(isLoading = true),
             onNavigateBack = {},
             onRetry = {},
-            onRetryDiary = {}
+            onRetryDiary = {},
+            onTabSelected = {},
+            onPostClick = {}
         )
     }
 }
@@ -126,7 +193,9 @@ private fun ProfileScreenErrorPreview() {
             ),
             onNavigateBack = {},
             onRetry = {},
-            onRetryDiary = {}
+            onRetryDiary = {},
+            onTabSelected = {},
+            onPostClick = {}
         )
     }
 }
