@@ -53,7 +53,6 @@ fun AddFoodSourceScreen(
     onManualSelected: () -> Unit = {}
 ) {
     var showPresetSheet by remember { mutableStateOf(false) }
-    var showRecentSheet by remember { mutableStateOf(false) }
 
     // Trạng thái lưu Uri ảnh sau khi chụp hoặc chọn từ Gallery để kích hoạt chế độ Preview
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -177,14 +176,6 @@ fun AddFoodSourceScreen(
                     iconBgColor = Color(0xFFF7C7BB),
                     onClick = { showPresetSheet = true }
                 )
-                Spacer(Modifier.height(16.dp))
-                QuickActionItem(
-                    title = "Gần đây",
-                    subtitle = "2 giờ trước",
-                    icon = Icons.Outlined.History,
-                    iconBgColor = Color(0xFFFCE0BA),
-                    onClick = { showRecentSheet = true }
-                )
             }
         }
     }
@@ -255,37 +246,6 @@ fun AddFoodSourceScreen(
             }
         }
     }
-
-    // ── BOTTOM SHEET LỊCH SỬ GẦN ĐÂY ───────────────────────────
-    if (showRecentSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showRecentSheet = false },
-            containerColor = Color(0xFFFFF9F5),
-            dragHandle = { BottomSheetDefaults.DragHandle() },
-            modifier = Modifier.fillMaxHeight(0.85f)
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🕒", fontSize = 24.sp)
-                        Spacer(Modifier.width(12.dp))
-                        Text("Lịch sử gần đây", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    }
-                    IconButton(onClick = { showRecentSheet = false }, modifier = Modifier.background(Color(0xFFF0F0F0), CircleShape).size(36.dp)) {
-                        Icon(Icons.Default.Close, null, modifier = Modifier.size(20.dp))
-                    }
-                }
-
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                    Text("Tính năng đang chờ kết nối Database...", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(top = 32.dp))
-                }
-            }
-        }
-    }
 }
 
 // ── COMPOSABLE PHẦN XEM TRƯỚC ẢNH CHỤP ─────────────────────────────────────
@@ -341,7 +301,7 @@ private fun ImagePreviewSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE27B58)), // Màu cam cam ấm phù hợp chủ đề
+                colors = ButtonDefaults.buttonColors(containerColor = SettingActionOrange), // Màu cam cam ấm phù hợp chủ đề
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp), tint = Color.White)
