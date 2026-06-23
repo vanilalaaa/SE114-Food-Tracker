@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.SE114.food_tracker.feature.auth.ChangePasswordScreen
 import com.SE114.food_tracker.feature.auth.CompleteProfileScreen
 import com.SE114.food_tracker.feature.auth.ForgotPasswordScreen
 import com.SE114.food_tracker.feature.auth.LoginScreen
@@ -177,8 +178,12 @@ fun AppNavGraph(
                 SettingsScreen(
                     onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) },
                     onNavigateToCategories = { navController.navigate(AppDestinations.CategoryManagement.route) },
-                    onChangePassword = { navController.navigate(AppDestinations.Forgot.route) }
+                    onChangePassword = { navController.navigate(AppDestinations.ChangePassword.route) }
                 )
+            }
+
+            composable(AppDestinations.ChangePassword.route) {
+                ChangePasswordScreen(onBack = { navController.popBackStack() })
             }
 
             composable(AppDestinations.MyProfile.route) {

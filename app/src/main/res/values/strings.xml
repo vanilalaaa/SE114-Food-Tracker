@@ -83,6 +83,16 @@
     <string name="auth_complete_submit">Hoàn tất</string>
     <string name="auth_complete_back">Quay lại</string>
 
+    <!-- Change password (in-session: current + new + confirm) -->
+    <string name="auth_change_pw_title">Đổi mật khẩu</string>
+    <string name="auth_change_pw_current">Mật khẩu hiện tại</string>
+    <string name="auth_change_pw_new">Mật khẩu mới</string>
+    <string name="auth_change_pw_confirm">Nhập lại mật khẩu mới</string>
+    <string name="auth_change_pw_submit">Đổi mật khẩu</string>
+    <string name="auth_change_pw_success">Đổi mật khẩu thành công</string>
+    <string name="auth_change_pw_wrong_current">Mật khẩu hiện tại không đúng</string>
+    <string name="auth_change_pw_back">Quay lại</string>
+
     <!-- Verify email (signup OTP activation) -->
     <string name="auth_verify_email_title">Xác nhận email</string>
     <string name="auth_verify_email_subtitle">Nhập mã gồm 6 chữ số đã gửi tới %1$s</string>
