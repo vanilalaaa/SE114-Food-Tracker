@@ -167,7 +167,7 @@ fun StatisticsScreen(
                             TimeFrame.YEAR  -> "Chi tiêu theo tháng"
                         },
                         data = uiState.barChartData.map { bar ->
-                            bar.label to bar.value   // Double — no lossy toInt()
+                            bar.label to bar.value
                         }
                     )
                 }
@@ -223,12 +223,12 @@ fun StatisticsScreen(
                 // PHÂN TÍCH tab
                 // ════════════════════════════════════════════════════════════
 
-                if (uiState.trendForecast.points.size >= 3) {
-                    LocalLineTrendChartCard(
-                        title    = "Dự báo xu hướng kỳ tới",
-                        forecast = uiState.trendForecast
-                    )
-                }
+                ForecastCard(
+                    forecast    = uiState.trendForecast,
+                    budgetLimit = uiState.budget.limit,
+                    timeFrame   = uiState.timeFrame,
+                    anchorDate  = uiState.anchorDate ?: com.SE114.food_tracker.core.util.TimeRangeProvider.today()
+                )
 
                 // ── Wallet Destroyer ──────────────────────────────────────────
                 WalletDestroyerCard(item = uiState.walletDestroyer)
@@ -340,7 +340,6 @@ fun StatisticsScreen(
 
 // ─── Mappers & helpers ────────────────────────────────────────────────────────
 
-/** Convert tab index (0..3) → [TimeFrame] */
 private fun Int.toTimeFrame(): TimeFrame = when (this) {
     0    -> TimeFrame.DAY
     1    -> TimeFrame.WEEK
@@ -348,7 +347,6 @@ private fun Int.toTimeFrame(): TimeFrame = when (this) {
     else -> TimeFrame.YEAR
 }
 
-/** Convert [TimeFrame] → tab index for [TimeRangeSelector] */
 private fun TimeFrame.toTabIndex(): Int = when (this) {
     TimeFrame.DAY   -> 0
     TimeFrame.WEEK  -> 1
@@ -356,12 +354,6 @@ private fun TimeFrame.toTabIndex(): Int = when (this) {
     TimeFrame.YEAR  -> 3
 }
 
-/**
- * Groups a flat [DetailItem] list into [DayGroup]s ready for [DetailCardSection].
- *
- * - DAY mode   : single group, no date header
- * - other modes: one group per unique [DetailItem.dateLabel], ordered by date DESC
- */
 private fun List<DetailItem>.toDetailDayGroups(isWeeklyMode: Boolean, currency: CurrencyDisplay): List<DayGroup> {
     if (isEmpty()) return emptyList()
 
@@ -395,7 +387,6 @@ private fun DetailItem.toMealRecord(currency: CurrencyDisplay): MealRecord = Mea
     imageUrl  = imageUrl
 )
 
-/** Generate a simple insight sentence from the current UiState. */
 private fun buildInsightText(state: StatisticsUiState, currency: CurrencyDisplay): String {
     val destroyer = state.walletDestroyer
     val topCat    = state.topCategories.firstOrNull()
