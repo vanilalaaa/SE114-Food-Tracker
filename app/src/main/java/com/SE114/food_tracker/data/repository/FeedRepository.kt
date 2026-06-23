@@ -99,7 +99,11 @@ class FeedRepository @Inject constructor(
         feedDao.toggleLike(postId, currentUserId())
     }
 
-    suspend fun addComment(postId: String, body: String) {
+    suspend fun addComment(
+        postId: String,
+        body: String,
+        parentCommentId: String? = null
+    ) {
         val now = System.currentTimeMillis()
         feedDao.insertComment(
             FeedComment(
@@ -107,6 +111,7 @@ class FeedRepository @Inject constructor(
                 userId = currentUserId(),
                 displayName = currentDisplayName(),
                 body = body.trim(),
+                parentCommentId = parentCommentId,
                 createdAt = now,
                 updatedAt = now
             )
@@ -396,6 +401,7 @@ class FeedRepository @Inject constructor(
             postId = postId,
             authorId = ownerId,
             body = body,
+            parentCommentId = parentCommentId,
             createdAt = Instant.fromEpochMilliseconds(createdAt).toString()
         )
 
@@ -432,6 +438,7 @@ class FeedRepository @Inject constructor(
             userId = authorId,
             displayName = displayName,
             body = body,
+            parentCommentId = parentCommentId,
             syncStatus = SyncStatus.SYNCED.name,
             isDeleted = false,
             createdAt = Instant.parse(createdAt).toEpochMilliseconds(),

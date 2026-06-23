@@ -23,7 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -132,11 +132,17 @@ private fun FeedHeader(
             )
         }
 
-        IconButton(onClick = onNavigateToFriend) {
+        IconButton(
+            onClick = onNavigateToFriend,
+            modifier = Modifier
+                .size(52.dp)
+                .background(MintGreen.copy(alpha = 0.18f), CircleShape)
+        ) {
             Icon(
-                imageVector = Icons.Outlined.People,
+                imageVector = Icons.Outlined.Groups,
                 contentDescription = "Bạn bè",
-                tint = TextPrimary
+                tint = TextPrimary,
+                modifier = Modifier.size(30.dp)
             )
         }
     }
