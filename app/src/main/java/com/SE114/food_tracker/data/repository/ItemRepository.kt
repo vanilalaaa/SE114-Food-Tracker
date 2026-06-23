@@ -28,6 +28,9 @@ class ItemRepository @Inject constructor(
     fun getItemsByDay(start: Long, end: Long): Flow<List<Item>> =
         itemDAO.getItemsByDay(owner(), start, end)
 
+    suspend fun getDistinctEntryDates(ownerId: String): List<Long> =
+        itemDAO.getDistinctEntryDates(ownerId)
+
     fun getDiaryItemsByDay(start: Long, end: Long): Flow<List<DiaryItem>> =
         combine(
             itemDAO.getItemsByDay(owner(), start, end),
