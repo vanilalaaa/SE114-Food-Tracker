@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -27,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +38,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 import timber.log.Timber
 import java.io.File
@@ -44,32 +48,35 @@ import java.io.File
 fun AddFoodSourceScreen(
     categories: List<DiaryCategory> = emptyList(),
     onBack: () -> Unit,
-    onImageCaptured: (Uri) -> Unit, // Callback truyền Uri hình ảnh vừa chụp/chọn lên cho màn hình cha
+    onImageCaptured: (Uri) -> Unit, // Callback truyền Uri hình ảnh lên cho màn hình cha
     onPresetSelected: (DiaryCategory) -> Unit = {},
     onManualSelected: () -> Unit = {}
 ) {
     var showPresetSheet by remember { mutableStateOf(false) }
     var showRecentSheet by remember { mutableStateOf(false) }
 
+    // Trạng thái lưu Uri ảnh sau khi chụp hoặc chọn từ Gallery để kích hoạt chế độ Preview
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+
     val context = LocalContext.current
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
 
-    // ── XỬ LÝ PICK GALLERY TẠI ĐÂY ──────────────────────────────────────────
+    // ── XỬ LÝ PICK GALLERY ──────────────────────────────────────────────────
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            onImageCaptured(uri)
+            selectedImageUri = uri // Thay vì gọi thẳng callback, chuyển sang chế độ Preview
         }
     }
 
-    // ── XỬ LÝ CHỤP CAMERA TẠI ĐÂY ──────────────────────────────────────────
+    // ── XỬ LÝ CHỤP CAMERA ──────────────────────────────────────────────────
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { isSuccess: Boolean ->
         if (isSuccess) {
             tempCameraUri?.let { uri ->
-                onImageCaptured(uri)
+                selectedImageUri = uri // Thay vì gọi thẳng callback, chuyển sang chế độ Preview
             }
         }
     }
@@ -85,75 +92,104 @@ fun AddFoodSourceScreen(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.Top
         ) {
+            // Header bar chung cho cả 2 chế độ
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Thêm món ăn", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                IconButton(onClick = onBack, modifier = Modifier.background(Color.Transparent, CircleShape)) {
+                Text(
+                    text = if (selectedImageUri != null) "Xem trước ảnh" else "Thêm món ăn",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                IconButton(
+                    onClick = {
+                        if (selectedImageUri != null) {
+                            selectedImageUri = null // Nếu đang preview thì nhấn Đóng sẽ quay lại chọn nguồn
+                        } else {
+                            onBack()
+                        }
+                    },
+                    modifier = Modifier.background(Color.Transparent, CircleShape)
+                ) {
                     Icon(Icons.Default.Close, contentDescription = "Đóng", modifier = Modifier.size(28.dp))
                 }
             }
 
             Spacer(Modifier.height(32.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                SourceCard(
-                    label = "Chụp ảnh",
-                    icon = Icons.Outlined.PhotoCamera,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        runCatching { createTempImageUri(context) }
-                            .onSuccess { uri ->
-                                tempCameraUri = uri
-                                cameraLauncher.launch(uri)
-                            }
-                            .onFailure { e ->
-                                Timber.e(e, "Không tạo được file tạm để chụp ảnh")
-                            }
+            // RẼ NHÁNH GIAO DIỆN CHÍNH
+            if (selectedImageUri != null) {
+                // 1. GIAO DIỆN XEM TRƯỚC ẢNH (IMAGE PREVIEW)
+                ImagePreviewSection(
+                    imageUri = selectedImageUri!!,
+                    onRetry = { selectedImageUri = null },
+                    onConfirm = {
+                        onImageCaptured(selectedImageUri!!)
                     }
                 )
-                SourceCard(
-                    label = "Thư viện",
-                    icon = Icons.Outlined.Image,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        galleryLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    }
+            } else {
+                // 2. GIAO DIỆN CHỌN NGUỒN BAN ĐẦU
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    SourceCard(
+                        label = "Chụp ảnh",
+                        icon = Icons.Outlined.PhotoCamera,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            runCatching { createTempImageUri(context) }
+                                .onSuccess { uri ->
+                                    tempCameraUri = uri
+                                    cameraLauncher.launch(uri)
+                                }
+                                .onFailure { e ->
+                                    Timber.e(e, "Không tạo được file tạm để chụp ảnh")
+                                }
+                        }
+                    )
+                    SourceCard(
+                        label = "Thư viện",
+                        icon = Icons.Outlined.Image,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
+                    )
+                }
+
+                Spacer(Modifier.height(40.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f))
+                    Text("HOẶC CHỌN NHANH", modifier = Modifier.padding(horizontal = 16.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f))
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                QuickActionItem(
+                    title = "Món ăn có sẵn",
+                    subtitle = "Chọn từ danh sách đã lưu",
+                    icon = Icons.Outlined.RestaurantMenu,
+                    iconBgColor = Color(0xFFF7C7BB),
+                    onClick = { showPresetSheet = true }
+                )
+                Spacer(Modifier.height(16.dp))
+                QuickActionItem(
+                    title = "Gần đây",
+                    subtitle = "2 giờ trước",
+                    icon = Icons.Outlined.History,
+                    iconBgColor = Color(0xFFFCE0BA),
+                    onClick = { showRecentSheet = true }
                 )
             }
-
-            Spacer(Modifier.height(40.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f))
-                Text("HOẶC CHỌN NHANH", modifier = Modifier.padding(horizontal = 16.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f))
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            QuickActionItem(
-                title = "Món ăn có sẵn",
-                subtitle = "Chọn từ danh sách đã lưu",
-                icon = Icons.Outlined.RestaurantMenu,
-                iconBgColor = Color(0xFFF7C7BB),
-                onClick = { showPresetSheet = true }
-            )
-            Spacer(Modifier.height(16.dp))
-            QuickActionItem(
-                title = "Gần đây",
-                subtitle = "2 giờ trước",
-                icon = Icons.Outlined.History,
-                iconBgColor = Color(0xFFFCE0BA),
-                onClick = { showRecentSheet = true }
-            )
         }
     }
 
+    // ── BOTTOM SHEET MÓN ĂN CÓ SẴN ──────────────────────────────
     if (showPresetSheet) {
         ModalBottomSheet(
             onDismissRequest = { showPresetSheet = false },
@@ -220,6 +256,7 @@ fun AddFoodSourceScreen(
         }
     }
 
+    // ── BOTTOM SHEET LỊCH SỬ GẦN ĐÂY ───────────────────────────
     if (showRecentSheet) {
         ModalBottomSheet(
             onDismissRequest = { showRecentSheet = false },
@@ -246,6 +283,84 @@ fun AddFoodSourceScreen(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                     Text("Tính năng đang chờ kết nối Database...", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(top = 32.dp))
                 }
+            }
+        }
+    }
+}
+
+// ── COMPOSABLE PHẦN XEM TRƯỚC ẢNH CHỤP ─────────────────────────────────────
+@Composable
+private fun ImagePreviewSection(
+    imageUri: Uri,
+    onRetry: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Khung hình vuông chứa ảnh Center Crop
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .aspectRatio(1f) // Đảm bảo tỉ lệ khung là hình vuông tuyệt đối 1:1
+                    .fillMaxWidth(0.85f), // Chiếm 85% chiều ngang màn hình
+                color = Color.White,
+                shape = RoundedCornerShape(24.dp),
+                shadowElevation = 4.dp
+            ) {
+                AsyncImage(
+                    model = imageUri,
+                    contentDescription = "Ảnh xem trước món ăn",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(24.dp)),
+                    contentScale = ContentScale.Crop // Cắt góc dạng Center Crop
+                )
+            }
+        }
+
+        // Cụm nút chức năng ở dưới đáy màn hình
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE27B58)), // Màu cam cam ấm phù hợp chủ đề
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp), tint = Color.White)
+                Spacer(Modifier.width(8.dp))
+                Text("Xác nhận & Tiếp tục", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+
+            OutlinedButton(
+                onClick = onRetry,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Chụp lại / Chọn ảnh khác", fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
