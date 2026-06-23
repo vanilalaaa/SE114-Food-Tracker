@@ -173,6 +173,8 @@ class ChatRepository @Inject constructor(
         }
     }
 
+    // ── CHỨC NĂNG REALTIME CHANNEL ──
+
     fun subscribeToChatRealtime(conversationId: String) {
         repositoryScope.launch {
             if (activeChannels.containsKey(conversationId)) return@launch
@@ -180,44 +182,47 @@ class ChatRepository @Inject constructor(
             try {
                 val channel = supabaseClient.channel("chat_channel_$conversationId")
 
-                val changeFlow =
-                    channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-                        table = "message"
-                    }
+                val changeFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    table = "message"
+                }
 
-                val conversationUpdateFlow =
-                    channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
-                        table = "conversation"
-                    }
+                val conversationUpdateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                    table = "conversation"
+                }
 
+                // Nhận tin nhắn mới từ cổng phát sóng (Tin nhắn Chat + Tin nhắn Hệ thống)
                 repositoryScope.launch {
                     changeFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
-                        val currentUserId = getAuthenticatedUserId()
 
-                        if (dto.conversationId == conversationId && dto.senderId != currentUserId) {
-                            val incomingMessage = Message(
-                                localId = dto.id ?: UUID.randomUUID().toString(),
-                                serverId = dto.id,
-                                conversationId = dto.conversationId,
-                                senderId = dto.senderId.lowercase(),
-                                body = dto.body,
-                                imageUrl = dto.imageUrl,
-                                isSystem = dto.isSystem,
-                                syncStatus = MessageSyncStatus.SENT,
-                                createdAt = parseServerTimeToLong(dto.createdAt)
-                            )
-                            chatDAO.insertMessage(incomingMessage)
+                        // Đã sửa đổi: Bỏ chặn ID máy gửi để cả tin nhắn thường lẫn tin nhắn hệ thống đồng bộ mượt mà sang các máy khác nhau lập tức
+                        if (dto.conversationId == conversationId) {
+                            val exist = chatDAO.getMessageByServerId(dto.id ?: "")
+                            if (exist == null) {
+                                val incomingMessage = Message(
+                                    localId = dto.id ?: UUID.randomUUID().toString(),
+                                    serverId = dto.id,
+                                    conversationId = dto.conversationId,
+                                    senderId = dto.senderId.lowercase(),
+                                    body = dto.body,
+                                    imageUrl = dto.imageUrl,
+                                    isSystem = dto.isSystem,
+                                    syncStatus = MessageSyncStatus.SENT,
+                                    createdAt = parseServerTimeToLong(dto.createdAt)
+                                )
+                                chatDAO.insertMessage(incomingMessage)
+                                println("Realtime: Đã nhận live tin nhắn mới (Chat/System) thành công!")
+                            }
                         }
                     }
                 }
 
+                // Nhận cập nhật phòng chat
                 repositoryScope.launch {
                     conversationUpdateFlow.collect { action ->
                         val updatedDto = action.decodeRecord<SupabaseConversationDto>()
                         if (updatedDto.id == conversationId) {
-                            val currentConv =
-                                chatDAO.getConversationById(conversationId).firstOrNull()
+                            val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
                             currentConv?.let {
                                 chatDAO.insertConversation(
                                     it.copy(
@@ -225,7 +230,6 @@ class ChatRepository @Inject constructor(
                                         walletId = updatedDto.walletId ?: it.walletId
                                     )
                                 )
-                                println("Realtime: Đã cập nhật live tên nhóm mới: ${updatedDto.name}")
                             }
                         }
                     }
@@ -233,10 +237,38 @@ class ChatRepository @Inject constructor(
 
                 channel.subscribe()
                 activeChannels[conversationId] = channel
-                println("Supabase Realtime: Đã mở kênh nghe động độc quyền cho phòng $conversationId")
+                println("Supabase Realtime: Đã mở cổng đồng bộ cho phòng $conversationId")
             } catch (e: Exception) {
                 println("Supabase Realtime Lỗi kết nối ban đầu: ${e.localizedMessage}")
                 handleRealtimeReconnect(conversationId)
+            }
+        }
+    }
+
+    // 🔥 ĐÃ THÊM: Đồng bộ luồng tạo nhóm và mời thành viên ra khỏi nhóm thời gian thực toàn cục
+    fun subscribeToGlobalConversationsRealtime() {
+        val currentUserId = getAuthenticatedUserId()
+        if (currentUserId.isBlank()) return
+
+        repositoryScope.launch {
+            try {
+                val globalChannel = supabaseClient.channel("global_conv_channel_$currentUserId")
+
+                val participantChangeFlow = globalChannel.postgresChangeFlow<PostgresAction>(schema = "public") {
+                    table = "conversation_participant"
+                }
+
+                repositoryScope.launch {
+                    participantChangeFlow.collect { action ->
+                        println("Realtime Global: Phát hiện thay đổi thành viên nhóm (Tạo nhóm / Mời ra). Đang làm mới danh sách...")
+                        fetchAndSaveConversationsToLocal()
+                    }
+                }
+
+                globalChannel.subscribe()
+                println("Supabase Realtime: Đã kích hoạt lắng nghe biến động nhóm toàn cục thành công!")
+            } catch (e: Exception) {
+                println("Lỗi kích hoạt kênh toàn cục: ${e.localizedMessage}")
             }
         }
     }
@@ -259,6 +291,8 @@ class ChatRepository @Inject constructor(
             }
         }
     }
+
+    // ── CHỨC NĂNG CHAT NHÓM & QUẢN TRỊ VIÊN ──
 
     suspend fun sendMessage(
         conversationId: String,
@@ -433,19 +467,30 @@ class ChatRepository @Inject constructor(
 
     suspend fun updateGroupName(conversationId: String, newName: String) {
         try {
+            // 1. Cập nhật tên mới cho nhóm chat trên bảng conversation của Server
             supabaseClient.from("conversation").update(mapOf("name" to newName)) {
                 filter { eq("id", conversationId) }
             }
 
             val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
+
+            val actualWalletId = currentConv?.walletId
+            if (!actualWalletId.isNullOrBlank() && actualWalletId != "wallet_default") {
+                supabaseClient.from("group_wallet").update(mapOf("name" to newName)) {
+                    filter { eq("id", actualWalletId) }
+                }
+                println("Đồng bộ: Tên Quỹ nhóm đã được tự động đổi thành '$newName' theo tên nhóm chat!")
+            }
+
             currentConv?.let {
                 chatDAO.insertConversation(it.copy(name = newName))
             }
 
             sendSystemMessage(conversationId, "Tên nhóm đã được đổi thành '$newName'")
             println("Đổi tên nhóm thành công!")
+
         } catch (e: Exception) {
-            println("Lỗi đổi tên nhóm: ${e.localizedMessage}")
+            println("Lỗi đổi tên nhóm và đồng bộ tên ví: ${e.localizedMessage}")
         }
     }
 
@@ -483,7 +528,6 @@ class ChatRepository @Inject constructor(
 
     suspend fun createGroupWalletForExistingChat(
         conversationId: String,
-        walletName: String,
         memberUserIds: List<String>
     ): Boolean {
         return try {
@@ -494,6 +538,9 @@ class ChatRepository @Inject constructor(
                 println("Lỗi tạo ví: Không tìm thấy ID User hợp lệ")
                 return false
             }
+
+            val currentConv = chatDAO.getConversationById(conversationId).first()
+            val walletName = currentConv?.name ?: "Quỹ nhóm"
 
             val walletDto = SupabaseGroupWalletDto(
                 id = walletUuid,
@@ -518,7 +565,6 @@ class ChatRepository @Inject constructor(
                 filter { eq("id", conversationId) }
             }
 
-            val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
             currentConv?.let {
                 chatDAO.insertConversation(it.copy(walletId = walletUuid))
             }

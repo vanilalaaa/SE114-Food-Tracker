@@ -68,73 +68,6 @@ fun ChatScreen(
     var showCreateWalletDialog by remember { mutableStateOf(false) }
     var walletNameInput by remember { mutableStateOf("") }
 
-    if (showCreateWalletDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateWalletDialog = false },
-            title = {
-                Text(
-                    "Khởi tạo Quỹ Nhóm Mới",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        "Nhập tên cho ví gắn liền với phòng chat này:",
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = walletNameInput,
-                        onValueChange = { walletNameInput = it },
-                        placeholder = { Text("Ví dụ: Quỹ Ăn Trưa $conversationName") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (walletNameInput.isNotBlank()) {
-                            viewModel.createGroupWallet(
-                                conversationId,
-                                walletNameInput
-                            ) { success ->
-                                if (success) {
-                                    Toast.makeText(
-                                        context,
-                                        "Khởi tạo Quỹ Nhóm thành công! 💰",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Lỗi tạo ví, vui lòng thử lại!",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                showCreateWalletDialog = false
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark)
-                ) {
-                    Text("Tạo Quỹ", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateWalletDialog = false }) {
-                    Text("Hủy", color = TextLabelGray)
-                }
-            },
-            containerColor = CardWhite,
-            shape = RoundedCornerShape(24.dp)
-        )
-    }
-
     ChatScreenContent(
         conversationId = conversationId,
         conversationName = conversationState?.name ?: conversationName,
@@ -147,8 +80,21 @@ fun ChatScreen(
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {
-            walletNameInput = "Quỹ của ${conversationState?.name ?: conversationName}"
-            showCreateWalletDialog = true
+            viewModel.createGroupWallet(conversationId) { success ->
+                if (success) {
+                    Toast.makeText(
+                        context,
+                        "Khởi tạo Quỹ Nhóm thành công! 💰",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Lỗi tạo ví, vui lòng thử lại!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         },
         onSendMessage = { text ->
             viewModel.sendTextMessage(conversationId, text)

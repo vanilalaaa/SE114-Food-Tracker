@@ -46,6 +46,8 @@ class ChatViewModel @Inject constructor(
 
     init {
         fetchConversationsFromServer()
+        // 🔥 ĐÃ KÍCH HOẠT REALTIME TOÀN CỤC: Đảm bảo khi mở app lên là hệ thống tự động nghe ngóng sự kiện Tạo nhóm / Mời ra theo thời gian thực
+        chatRepository.subscribeToGlobalConversationsRealtime()
     }
 
     fun fetchConversationsFromServer() {
@@ -75,7 +77,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // 🔥 ĐÃ THÊM: Hàm chuyên dụng phục vụ cho tính năng Kéo xuống để reload (Pull-to-Refresh)
+    // Hàm chuyên dụng phục vụ cho tính năng Kéo xuống để reload (Pull-to-Refresh)
     fun refreshChatData(conversationId: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             try {
@@ -244,17 +246,15 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // Khởi tạo Quỹ thật từ giao diện và đồng bộ lại danh sách hội thoại cục bộ
-    fun createGroupWallet(conversationId: String, walletName: String, onResult: (Boolean) -> Unit) {
+    fun createGroupWallet(conversationId: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
                 val success = chatRepository.createGroupWalletForExistingChat(
                     conversationId = conversationId,
-                    walletName = walletName,
                     memberUserIds = emptyList()
                 )
                 if (success) {
-                    fetchConversationsFromServer() // Refresh dữ liệu local Room DB để cập nhật wallet_id mới
+                    fetchConversationsFromServer()
                 }
                 onResult(success)
             } catch (e: Exception) {
