@@ -30,6 +30,30 @@ class ImageRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    suspend fun uploadAvatar(userId: String, bytes: ByteArray): Result<String> {
+        return try {
+            val path = "$userId/avatar.jpg"
+            try {
+                supabaseClient.storage.from("avatars").upload(path, bytes) {
+                    upsert = false
+                }
+            } catch (uploadException: Exception) {
+                val msg = uploadException.message.orEmpty()
+                if (msg.contains("409") || msg.contains("already exists", ignoreCase = true)
+                    || msg.contains("Duplicate", ignoreCase = true)) {
+                    supabaseClient.storage.from("avatars").update(path, bytes)
+                } else {
+                    throw uploadException
+                }
+            }
+            // Cache-bust: the path is stable, so vary the URL to force Coil to reload.
+            val publicUrl = supabaseClient.storage.from("avatars").publicUrl(path)
+            Result.success("$publicUrl?v=${System.currentTimeMillis()}")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // Xóa ảnh món ăn trên Supabase Storage thông qua đường dẫn cấu trúc <user_id>/<item_id>.jpg
     suspend fun deleteItemImage(userId: String, itemId: String): Result<Unit> {
         return try {

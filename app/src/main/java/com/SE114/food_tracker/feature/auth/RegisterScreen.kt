@@ -6,21 +6,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,42 +30,64 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
+import com.SE114.food_tracker.core.designsystem.components.AppScaffold
 import com.SE114.food_tracker.core.designsystem.components.AppTextField
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
+    onAuthenticated: (PostAuthDestination) -> Unit,
+    onNavigateToVerifyEmail: (email: String, displayName: String, userId: String) -> Unit,
     onNavigateLogin: () -> Unit,
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.registered) {
-        if (state.registered) onRegisterSuccess()
+    LaunchedEffect(state.navTarget) {
+        state.navTarget?.let(onAuthenticated)
     }
 
-    val userIdIsError = state.userIdStatus == UserIdStatus.Invalid ||
-        state.userIdStatus == UserIdStatus.Taken ||
-        state.userIdStatus == UserIdStatus.Error
-
-    val userIdHelper = when (state.userIdStatus) {
-        UserIdStatus.Idle -> stringResource(R.string.auth_register_user_id_helper)
-        UserIdStatus.Checking -> stringResource(R.string.auth_register_user_id_checking)
-        UserIdStatus.Available -> stringResource(R.string.auth_register_user_id_available)
-        else -> null
-    }
-    val userIdError = when (state.userIdStatus) {
-        UserIdStatus.Invalid -> stringResource(R.string.auth_register_user_id_invalid)
-        UserIdStatus.Taken -> stringResource(R.string.auth_register_user_id_taken)
-        UserIdStatus.Error -> stringResource(R.string.auth_register_user_id_error)
-        else -> null
+    LaunchedEffect(state.pendingVerification) {
+        state.pendingVerification?.let { onNavigateToVerifyEmail(it.email, it.displayName, it.userId) }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    RegisterContent(
+        state = state,
+        onDisplayNameChange = viewModel::onDisplayNameChange,
+        onUserIdChange = viewModel::onUserIdChange,
+        onEmailChange = viewModel::onEmailChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
+        onSubmit = viewModel::submit,
+        onNavigateLogin = onNavigateLogin,
+        googleButton = {
+            GoogleSignInButton(
+                enabled = !state.isLoading,
+                onIdToken = viewModel::signInWithGoogle,
+                onError = viewModel::onGoogleError,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    )
+}
+
+@Composable
+private fun RegisterContent(
+    state: RegisterUiState,
+    onDisplayNameChange: (String) -> Unit,
+    onUserIdChange: (String) -> Unit,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onNavigateLogin: () -> Unit,
+    googleButton: @Composable () -> Unit
+) {
+    AppScaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -84,42 +100,54 @@ fun RegisterScreen(
 
             AppTextField(
                 value = state.displayName,
-                onValueChange = viewModel::onDisplayNameChange,
+                onValueChange = onDisplayNameChange,
                 label = stringResource(R.string.auth_register_display_name),
                 leadingIcon = Icons.Outlined.Person
             )
 
             AppTextField(
+                value = state.userId,
+                onValueChange = onUserIdChange,
+                label = stringResource(R.string.auth_complete_user_id),
+                leadingIcon = Icons.Outlined.AlternateEmail,
+                isError = state.userIdStatus.isError(),
+                errorText = userIdErrorText(state.userIdStatus),
+                supportingText = userIdSupportingText(state.userIdStatus),
+                trailing = { UserIdStatusIcon(state.userIdStatus) }
+            )
+
+            AppTextField(
                 value = state.email,
-                onValueChange = viewModel::onEmailChange,
+                onValueChange = onEmailChange,
                 label = stringResource(R.string.auth_register_email),
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
             AppTextField(
-                value = state.userId,
-                onValueChange = viewModel::onUserIdChange,
-                label = stringResource(R.string.auth_register_user_id),
-                leadingIcon = Icons.Outlined.AlternateEmail,
-                isError = userIdIsError,
-                errorText = userIdError,
-                supportingText = userIdHelper,
-                trailing = { UserIdStatusIcon(state.userIdStatus) }
-            )
-
-            AppTextField(
                 value = state.password,
-                onValueChange = viewModel::onPasswordChange,
+                onValueChange = onPasswordChange,
                 label = stringResource(R.string.auth_register_password),
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                supportingText = stringResource(R.string.auth_password_hint)
             )
 
-            if (state.errorRes != null) {
+            AppTextField(
+                value = state.confirmPassword,
+                onValueChange = onConfirmPasswordChange,
+                label = stringResource(R.string.auth_register_confirm_password),
+                leadingIcon = Icons.Outlined.Lock,
+                isPassword = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                isError = state.passwordMismatch,
+                errorText = stringResource(R.string.auth_err_password_mismatch)
+            )
+
+            state.error?.let { error ->
                 Text(
-                    text = stringResource(state.errorRes!!),
+                    text = error.asMessage(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -127,11 +155,13 @@ fun RegisterScreen(
 
             AppButton(
                 text = stringResource(R.string.auth_register_submit),
-                onClick = viewModel::submit,
+                onClick = onSubmit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.canSubmit,
                 loading = state.isLoading
             )
+
+            googleButton()
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -148,31 +178,32 @@ fun RegisterScreen(
     }
 }
 
-@Composable
-private fun UserIdStatusIcon(status: UserIdStatus) {
-    when (status) {
-        UserIdStatus.Checking -> CircularProgressIndicator(
-            modifier = Modifier.size(18.dp),
-            strokeWidth = 2.dp
-        )
-        UserIdStatus.Available -> Icon(
-            imageVector = Icons.Filled.Check,
-            contentDescription = stringResource(R.string.auth_register_user_id_available_desc),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        UserIdStatus.Taken, UserIdStatus.Invalid, UserIdStatus.Error -> Icon(
-            imageVector = Icons.Filled.Close,
-            contentDescription = stringResource(R.string.auth_register_user_id_taken_desc),
-            tint = MaterialTheme.colorScheme.error
-        )
-        UserIdStatus.Idle -> Unit
-    }
-}
-
 @Preview(showBackground = true)
 @Composable
-private fun RegisterScreenPreview() {
+private fun RegisterContentPreview() {
     FoodTrackerTheme {
-        RegisterScreen(onRegisterSuccess = {}, onNavigateLogin = {})
+        RegisterContent(
+            state = RegisterUiState(
+                displayName = "An Nguyễn",
+                userId = "an.nguyen",
+                userIdStatus = UserIdStatus.Available,
+                email = "an@example.com"
+            ),
+            onDisplayNameChange = {},
+            onUserIdChange = {},
+            onEmailChange = {},
+            onPasswordChange = {},
+            onConfirmPasswordChange = {},
+            onSubmit = {},
+            onNavigateLogin = {},
+            googleButton = {
+                AppButton(
+                    text = stringResource(R.string.auth_google_signin),
+                    onClick = {},
+                    variant = AppButtonVariant.Secondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        )
     }
 }

@@ -1,7 +1,9 @@
 package com.SE114.food_tracker.feature.feed.components
 
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,10 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,12 +44,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.SE114.food_tracker.core.designsystem.theme.CalendarHighlight
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.DarkPink
 import com.SE114.food_tracker.core.designsystem.theme.LightPeach
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.core.designsystem.theme.MintGreen
-import com.SE114.food_tracker.core.designsystem.theme.StatPinkLight
 import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
 import com.SE114.food_tracker.core.designsystem.theme.TextPrimary
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
@@ -72,27 +73,33 @@ fun FeedComposerSheet(
         (uiState.pickedImageUri != null && uiState.draftFreeImageTitle.isNotBlank())
     val canCreate = !uiState.isCreatingPost && hasRequiredContent
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxHeight(0.90f)
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 20.dp)
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         FeedComposerHeader(onCancel = onCancel)
 
         FeedPickedSourcePreview(
             selectedSourceItem = uiState.selectedSourceItem,
             pickedImageUri = uiState.pickedImageUri,
             freeImageTitle = uiState.draftFreeImageTitle,
+            onPickImage = onPickImage,
             onFreeImageTitleChange = onFreeImageTitleChange
         )
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            color = CardWhite.copy(alpha = 0.96f),
-            shadowElevation = 5.dp
+            shape = RoundedCornerShape(22.dp),
+            color = CardWhite.copy(alpha = 0.98f),
+            shadowElevation = 7.dp,
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.72f))
         ) {
             OutlinedTextField(
                 value = uiState.draftCaption,
@@ -101,7 +108,7 @@ fun FeedComposerSheet(
                 placeholder = { Text("Chú thích", color = TextLabelGray) },
                 minLines = 2,
                 maxLines = 4,
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = composerTextFieldColors()
             )
         }
@@ -117,7 +124,7 @@ fun FeedComposerSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(bottom = 8.dp),
+            contentPadding = PaddingValues(bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (uiState.sourceItems.isEmpty()) {
@@ -149,16 +156,18 @@ fun FeedComposerSheet(
                 onClearError = onClearError
             )
         }
+        }
 
         FeedComposerActionBar(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp),
             showCreate = hasRequiredContent,
             isCreatingPost = uiState.isCreatingPost,
             onPickImage = onPickImage,
             onTakePhoto = onTakePhoto,
             onCreatePost = { if (canCreate) onCreatePost() }
         )
-
-        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -193,6 +202,7 @@ private fun FeedPickedSourcePreview(
     selectedSourceItem: FeedSourceItemDto?,
     pickedImageUri: Uri?,
     freeImageTitle: String,
+    onPickImage: () -> Unit,
     onFreeImageTitleChange: (String) -> Unit
 ) {
     val previewModel = pickedImageUri ?: selectedSourceItem?.imageUrl
@@ -200,9 +210,10 @@ private fun FeedPickedSourcePreview(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(24.dp),
         color = CardWhite.copy(alpha = 0.98f),
-        shadowElevation = 6.dp
+        shadowElevation = 9.dp,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.72f))
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -210,9 +221,10 @@ private fun FeedPickedSourcePreview(
         ) {
             Box(
                 modifier = Modifier
-                    .size(74.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(LightPeach),
+                    .size(82.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(LightPeach)
+                    .clickable(enabled = isFreeImage, onClick = onPickImage),
                 contentAlignment = Alignment.Center
             ) {
                 if (previewModel != null && previewModel.toString().isNotBlank()) {
@@ -244,7 +256,10 @@ private fun FeedPickedSourcePreview(
                     OutlinedTextField(
                         value = freeImageTitle,
                         onValueChange = onFreeImageTitleChange,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = pickedImageUri == null, onClick = onPickImage),
+                        enabled = pickedImageUri != null,
                         placeholder = { Text("Tên loại ảnh", color = TextLabelGray) },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -254,7 +269,9 @@ private fun FeedPickedSourcePreview(
                         text = if (pickedImageUri == null) "Chưa chọn nguồn" else "Ảnh tự do",
                         color = TextLabelGray,
                         fontSize = 12.sp,
-                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                        modifier = Modifier
+                            .padding(start = 4.dp, top = 4.dp)
+                            .clickable(enabled = pickedImageUri == null, onClick = onPickImage)
                     )
                 } else {
                     Text(
@@ -293,6 +310,7 @@ private fun FeedSourceHeader() {
 
 @Composable
 private fun FeedComposerActionBar(
+    modifier: Modifier = Modifier,
     showCreate: Boolean,
     isCreatingPost: Boolean,
     onPickImage: () -> Unit,
@@ -300,7 +318,7 @@ private fun FeedComposerActionBar(
     onCreatePost: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -332,7 +350,7 @@ private fun FeedComposerActionBar(
         ) {
             if (showCreate) {
                 FeedRoundIconButton(
-                    icon = Icons.Outlined.Send,
+                    icon = Icons.AutoMirrored.Outlined.Send,
                     contentDescription = "Đăng bài",
                     size = 52,
                     containerColor = DarkPink,
@@ -388,6 +406,10 @@ private fun FeedVisibilityPicker(
     selectedValue: String,
     onVisibilityChange: (FeedVisibility) -> Unit
 ) {
+    val effectiveSelectedValue = selectedValue
+        .takeUnless { it == FeedVisibility.PUBLIC.value }
+        ?: FeedVisibility.FRIENDS.value
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = "Quyền riêng tư",
@@ -395,20 +417,25 @@ private fun FeedVisibilityPicker(
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FeedVisibility.values().forEach { visibility ->
-                val selected = selectedValue == visibility.value
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf(FeedVisibility.FRIENDS, FeedVisibility.PRIVATE).forEach { visibility ->
+                val selected = effectiveSelectedValue == visibility.value
                 Surface(
+                    modifier = Modifier.weight(1f),
                     onClick = { onVisibilityChange(visibility) },
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (selected) StatPinkLight else CardWhite.copy(alpha = 0.94f),
-                    shadowElevation = if (selected) 5.dp else 3.dp
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (selected) CalendarHighlight else CardWhite.copy(alpha = 0.98f),
+                    shadowElevation = if (selected) 5.dp else 3.dp,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (selected) Color.Transparent else Color.White.copy(alpha = 0.7f)
+                    )
                 ) {
                     Text(
                         text = visibility.label,
-                        color = if (selected) DarkPink else TextPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 17.dp, vertical = 10.dp)
+                        color = if (selected) DarkPink else TextLabelGray,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 17.dp, vertical = 12.dp)
                     )
                 }
             }
@@ -452,9 +479,13 @@ private fun FeedSourceItemRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = if (selected) StatPinkLight else CardWhite.copy(alpha = 0.98f),
-        shadowElevation = if (selected) 6.dp else 3.dp
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) CalendarHighlight else CardWhite.copy(alpha = 0.98f),
+        shadowElevation = if (selected) 6.dp else 4.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (selected) Color.Transparent else Color.White.copy(alpha = 0.72f)
+        )
     ) {
         Row(
             modifier = Modifier.padding(10.dp),
@@ -463,7 +494,7 @@ private fun FeedSourceItemRow(
             Box(
                 modifier = Modifier
                     .size(52.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(14.dp))
                     .background(MainBackground),
                 contentAlignment = Alignment.Center
             ) {

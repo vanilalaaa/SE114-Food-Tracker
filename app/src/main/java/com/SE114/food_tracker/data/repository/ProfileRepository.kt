@@ -1,112 +1,53 @@
 package com.SE114.food_tracker.data.repository
 
-import com.SE114.food_tracker.data.local.dao.FriendDAO
-import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
-import com.SE114.food_tracker.data.model.ProfileSharedItem
-import com.SE114.food_tracker.data.remote.dto.CategoryDTO
-import com.SE114.food_tracker.data.remote.dto.ItemDTO
-import com.SE114.food_tracker.data.remote.dto.ProfileDTO
-import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.postgrest
-import javax.inject.Inject
-import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
 
-@Singleton
-class ProfileRepository @Inject constructor(
-    private val friendDao: FriendDAO,
-    private val supabaseClient: SupabaseClient
-) {
-    suspend fun fetchProfile(profileId: String): Result<ProfileDTO> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val profile = supabaseClient.postgrest["profile"]
-                    .select { filter { eq("id", profileId) } }
-                    .decodeSingleOrNull<ProfileDTO>()
-                    ?: error("Không tìm thấy người dùng.")
+/** Own-profile fields readable under the `authenticated` column grant. */
+data class Profile(
+    val id: String,
+    val displayName: String?,
+    val userId: String?,
+    val avatarUrl: String?
+)
 
-                if (profile.isBanned) {
-                    error("Người dùng này không khả dụng.")
-                }
+sealed interface ProfileStatus {
+    data object Complete : ProfileStatus
+    data object Incomplete : ProfileStatus
+}
 
-                friendDao.insertUserCache(profile.toCacheEntity())
-                profile
-            }
-        }
+interface ProfileRepository {
+    /** Cached current-user profile; refreshed by [refreshMyProfile]. */
+    fun observeMyProfile(): Flow<Profile?>
 
-    suspend fun fetchSharedItems(ownerId: String): Result<List<ProfileSharedItem>> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                if (supabaseClient.auth.currentUserOrNull() == null) {
-                    error("Chưa đăng nhập")
-                }
+    /** Re-fetches the current user's row into the [observeMyProfile] cache. */
+    suspend fun refreshMyProfile(): AuthOutcome<Unit>
 
-                val items = supabaseClient.postgrest.from("item")
-                    .select {
-                        filter {
-                            eq("owner_id", ownerId)
-                            eq("is_shared", true)
-                            eq("is_deleted", false)
-                        }
-                    }
-                    .decodeList<ItemDTO>()
-                    .sortedWith(
-                        compareByDescending<ItemDTO> { it.entryDate }
-                            .thenByDescending { it.createdAt }
-                    )
+    /** Onboarding is complete when `onboarding_completed = true AND user_id IS NOT NULL`. */
+    suspend fun getProfileStatus(): AuthOutcome<ProfileStatus>
 
-                val categories = supabaseClient.postgrest.from("category")
-                    .select {
-                        filter {
-                            eq("is_deleted", false)
-                            or {
-                                eq("owner_id", ownerId)
-                                eq("is_system", true)
-                            }
-                        }
-                    }
-                    .decodeList<CategoryDTO>()
-                    .associateBy { it.id }
+    /**
+     * UPDATEs display_name + user_id (+ avatar when non-null) and sets
+     * onboarding_completed; idempotent for the same already-onboarded [userId].
+     */
+    suspend fun completeOnboarding(displayName: String, userId: String, avatarUrl: String?): AuthOutcome<Unit>
 
-                items.map { dto ->
-                    dto.toProfileSharedItem(categories[dto.categoryId])
-                }
-            }
-        }
+    /**
+     * UX-only availability hint via the `user_id_available` security-definer RPC, so it
+     * works before authentication (register) as well as after (onboarding). The DB unique
+     * index is the final authority.
+     */
+    suspend fun isUserIdAvailable(userId: String): AuthOutcome<Boolean>
 
-    suspend fun currentAuthUserId(): String? =
-        withContext(Dispatchers.IO) {
-            supabaseClient.auth.currentUserOrNull()?.id
-        }
+    /**
+     * Resolves the email registered for [userId] (case-insensitive) via the
+     * `email_for_user_id` security-definer RPC so a user can log in by handle.
+     * Returns null when no profile matches; callers map that to InvalidCredentials.
+     */
+    suspend fun getEmailByUserId(userId: String): AuthOutcome<String?>
 
-    private fun ProfileDTO.toCacheEntity(): UserProfileCacheEntity =
-        UserProfileCacheEntity(
-            userId = id,
-            displayName = displayName?.takeIf { it.isNotBlank() }
-                ?: userId?.takeIf { it.isNotBlank() }
-                ?: "Người dùng",
-            avatarUrl = avatarUrl.orEmpty()
-        )
+    /** Own-row UPDATE; [userId]/[avatarUrl] are written only when non-null. */
+    suspend fun updateProfile(displayName: String, userId: String?, avatarUrl: String?): AuthOutcome<Unit>
 
-    private fun ItemDTO.toProfileSharedItem(category: CategoryDTO?): ProfileSharedItem =
-        ProfileSharedItem(
-            itemId = id,
-            name = name,
-            categoryName = category?.name ?: "Khác",
-            categoryIcon = category?.iconUrl.orEmpty(),
-            price = price,
-            timeLabel = timeType.toProfileTimeLabel(),
-            imageUrl = imageUrl,
-            entryDate = entryDate
-        )
-
-    private fun Int.toProfileTimeLabel(): String =
-        when (this) {
-            0 -> "Sáng"
-            1 -> "Trưa/Chiều"
-            2 -> "Tối"
-            else -> "Khác"
-        }
+    /** Remaining whole days before user_id can change again; 0 = changeable now. */
+    suspend fun userIdCooldownRemaining(): AuthOutcome<Int>
 }

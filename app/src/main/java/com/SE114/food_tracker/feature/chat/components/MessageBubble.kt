@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.MessageSyncStatus
 import java.util.UUID
@@ -42,7 +43,8 @@ fun MessageBubble(
     message: MessageUiModel,
     isMine: Boolean,
     onRetryClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    senderName: String = "Thành viên nhóm" // 🔥 ĐÃ BỔ SUNG: Tham số nhận tên để sinh Avatar động
 ) {
     // 1. Trường hợp đặc biệt: Tin nhắn hệ thống (System Message)
     if (message.isSystem) {
@@ -70,20 +72,28 @@ fun MessageBubble(
 
     // 2. Trường hợp thông thường: Tin nhắn Chat giữa các thành viên
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMine) {
-            // Avatar đối phương (Tone xanh pastel)
+            // 🔥 ĐÃ NÂNG CẤP: Kiểm tra xem có Link ảnh Url hay không để đổi thành Avatar thật
+            // (Nếu sau này Vy có thêm trường avatarUrl trong MessageUiModel thì truyền vào đây, hiện tại lấy tạm hình mặc định sinh theo Tên)
+            val avatarChar = senderName.trim().take(1).uppercase()
+
             Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFAED9E0)),
+                    .background(LightGreenStat), // Màu nền xanh dương nhạt chuẩn Messenger
                 contentAlignment = Alignment.Center
             ) {
-                Text("A", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = TextPrimaryStat)
+                Text(
+                    text = avatarChar, // 🔥 ĐÃ ĐỒNG BỘ: Chữ cái đầu lấy theo đúng tên thật (H cho Thảo Uyên, A cho AnhZun)
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = Color.Black
+                )
             }
             Spacer(modifier = Modifier.width(6.dp))
         }
@@ -103,34 +113,39 @@ fun MessageBubble(
                 )
             ) {
                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    // Render văn bản chữ
-                    if (message.body != null) {
-                        Text(text = message.body, fontSize = 14.sp)
-                    }
-
-                    // Render hình ảnh đính kèm giả lập cục bộ
                     if (message.imageUrl != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 160.dp, height = 120.dp)
-                                .background(Color.LightGray, RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🖼️ Image Attachment", fontSize = 12.sp, color = Color.DarkGray)
+                        Column {
+                            // Dùng AsyncImage của thư viện Coil để hiển thị ảnh từ Supabase Storage
+                            AsyncImage(
+                                model = message.imageUrl,
+                                contentDescription = "Hình ảnh gửi kèm",
+                                modifier = Modifier
+                                    .size(150.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                            // Nếu có text caption kèm theo ảnh thì vẽ thêm ở dưới cách 4dp
+                            if (!message.body.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(text = message.body, fontSize = 14.sp)
+                            }
+                        }
+                    } else {
+                        // Tin nhắn chỉ chứa ký tự chữ thuần túy
+                        if (message.body != null) {
+                            Text(text = message.body, fontSize = 14.sp)
                         }
                     }
                 }
             }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp)
+            ) {
+                Text(text = message.timeLabel, fontSize = 10.sp, color = TextLabelGray)
 
-            // Hiển thị mốc thời gian và cờ trạng thái đồng bộ hàng đợi offline (Chỉ dành cho chính mình)
-            if (isMine) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp, end = 2.dp)
-                ) {
-                    Text(text = message.timeLabel, fontSize = 10.sp, color = TextLabelGray)
+                // Cờ trạng thái đồng bộ hàng đợi offline (Chỉ hiển thị cho chính mình gửi)
+                if (isMine) {
                     Spacer(modifier = Modifier.width(4.dp))
-
                     when (message.syncStatus) {
                         MessageSyncStatus.PENDING -> {
                             Text(text = "🕒", fontSize = 10.sp) // Đồng hồ chờ gửi
@@ -142,7 +157,7 @@ fun MessageBubble(
                                 color = Color(0xFF4CAF50),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
-                            ) // Dấu tích thành công
+                            )
                         }
 
                         MessageSyncStatus.FAILED -> {
@@ -176,10 +191,12 @@ fun MessageBubble(
 @Composable
 fun MessageBubblePeerPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "azun_id",
@@ -187,6 +204,7 @@ fun MessageBubblePeerPreview() {
                     imageUrl = null
                 ),
                 isMine = false,
+                senderName = "AnhZun",
                 onRetryClick = {}
             )
         }
@@ -197,10 +215,12 @@ fun MessageBubblePeerPreview() {
 @Composable
 fun MessageBubbleMineSentPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
@@ -219,10 +239,12 @@ fun MessageBubbleMineSentPreview() {
 @Composable
 fun MessageBubbleMinePendingPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
@@ -241,10 +263,12 @@ fun MessageBubbleMinePendingPreview() {
 @Composable
 fun MessageBubbleMineFailedPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "vy_id",
@@ -263,10 +287,12 @@ fun MessageBubbleMineFailedPreview() {
 @Composable
 fun MessageBubbleSystemPreview() {
     FoodTrackerTheme {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .background(MainBackground)
-            .padding(16.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MainBackground)
+                .padding(16.dp)
+        ) {
             MessageBubble(
                 message = MessageUiModel(
                     senderId = "system",

@@ -11,6 +11,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,6 +34,10 @@ class FriendRepository @Inject constructor(
 ) {
     private val _currentProfile = MutableStateFlow<ProfileDTO?>(null)
     val currentProfile: StateFlow<ProfileDTO?> = _currentProfile
+
+    // Only the columns `authenticated` may read (migration 0001); `select *` would hit the
+    // ungranted sensitive columns (is_banned, …) and fail with a permission error.
+    private val profileColumns = Columns.list("id", "display_name", "user_id", "avatar_url")
 
     fun getAcceptedFriends(): Flow<List<FriendItemDto>> =
         currentProfileScoped { profile -> friendDao.getAcceptedFriends(profile.id) }
@@ -68,6 +73,13 @@ class FriendRepository @Inject constructor(
             fetchProfileById(otherProfileId)?.let { friendDao.insertUserCache(it.toCacheEntity()) }
             friendDao.insertFriendship(dto.toEntity())
         }
+
+        val remoteIds = remoteFriendships.map { it.id }
+        if (remoteIds.isEmpty()) {
+            friendDao.softDeleteAllFriendshipsForUser(me.id)
+        } else {
+            friendDao.softDeleteFriendshipsMissingFromRemote(me.id, remoteIds)
+        }
     }
 
     suspend fun acceptRequest(friendshipId: String): Result<Unit> =
@@ -89,15 +101,22 @@ class FriendRepository @Inject constructor(
         }
 
         val profile = supabaseClient.postgrest["profile"]
-            .select { filter { eq("user_id", searchUserId) } }
+            .select(profileColumns) { filter { eq("user_id", searchUserId) } }
             .decodeSingleOrNull<ProfileDTO>()
 
-        if (profile == null || profile.isBanned) {
+        // Ban status is server-hidden (not selectable by clients); exclusion of banned
+        // accounts is enforced server-side, not here.
+        if (profile == null) {
             error("Không tìm thấy người dùng này!")
         }
 
         friendDao.insertUserCache(profile.toCacheEntity())
         profile
+    }
+
+    suspend fun friendshipStatusWith(profileId: String): String? {
+        val me = requireCurrentProfile()
+        return friendDao.getFriendshipBetween(me.id, profileId)?.status
     }
 
     suspend fun sendFriendRequest(targetProfileId: String): Result<Unit> = runCatching {
@@ -165,13 +184,18 @@ class FriendRepository @Inject constructor(
 
     private suspend fun fetchProfileById(profileId: String): ProfileDTO? =
         supabaseClient.postgrest["profile"]
-            .select { filter { eq("id", profileId) } }
+            .select(profileColumns) { filter { eq("id", profileId) } }
             .decodeSingleOrNull<ProfileDTO>()
 
     private suspend fun updateRemoteStatus(friendshipId: String, status: String): Result<Unit> =
         runCatching {
             val friendship = friendDao.getFriendshipById(friendshipId)
                 ?: error("Không tìm thấy lời mời kết bạn.")
+
+            val me = requireCurrentProfile()
+            if (friendship.senderId != me.id && friendship.receiverId != me.id) {
+                error("Không thể cập nhật lời mời này.")
+            }
 
             supabaseClient.postgrest.from("friendship").update(
                 {
@@ -185,8 +209,24 @@ class FriendRepository @Inject constructor(
 
     private suspend fun deleteRemoteFriendship(friendshipId: String): Result<Unit> =
         runCatching {
+            val friendship = friendDao.getFriendshipById(friendshipId)
+                ?: error("Không tìm thấy kết bạn.")
+            val me = requireCurrentProfile()
+            if (friendship.senderId != me.id && friendship.receiverId != me.id) {
+                error("Không thể xóa kết bạn này.")
+            }
+
             supabaseClient.postgrest.from("friendship").delete {
                 filter { eq("id", friendshipId) }
+            }
+            val stillExists = supabaseClient.postgrest.from("friendship")
+                .select {
+                    filter { eq("id", friendshipId) }
+                }
+                .decodeList<FriendshipDTO>()
+                .isNotEmpty()
+            if (stillExists) {
+                error("Chưa xóa được kết bạn trên server.")
             }
             friendDao.softDeleteFriendship(friendshipId, syncStatus = "SYNCED")
         }

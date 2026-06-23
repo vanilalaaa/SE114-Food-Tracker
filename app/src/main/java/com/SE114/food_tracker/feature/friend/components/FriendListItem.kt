@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.friend.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
@@ -16,12 +17,20 @@ import com.SE114.food_tracker.data.local.dao.FriendItemDto
 import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
-fun FriendListItem(friend: FriendItemDto, hasStory: Boolean, onUnfriend: (String) -> Unit) {
+fun FriendListItem(
+    friend: FriendItemDto,
+    onOpenProfile: () -> Unit,
+    isBusy: Boolean,
+    onUnfriend: (String) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProfileAvatar(avatarUrl = friend.avatarUrl, hasStory = hasStory)
+        ProfileAvatar(
+            avatarUrl = friend.avatarUrl,
+            modifier = Modifier.clickable(onClick = onOpenProfile)
+        )
         Spacer(modifier = Modifier.width(16.dp))
 
         Text(
@@ -32,7 +41,10 @@ fun FriendListItem(friend: FriendItemDto, hasStory: Boolean, onUnfriend: (String
             modifier = Modifier.weight(1f)
         )
 
-        IconButton(onClick = { onUnfriend(friend.friendshipId) }) {
+        IconButton(
+            onClick = { onUnfriend(friend.friendshipId) },
+            enabled = !isBusy
+        ) {
             Icon(Icons.Default.Clear, contentDescription = "Xóa", tint = HintGray)
         }
     }

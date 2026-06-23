@@ -9,21 +9,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -31,10 +32,12 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
+import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
-import com.SE114.food_tracker.core.designsystem.theme.MintGreen
+import com.SE114.food_tracker.core.designsystem.theme.TextPrimary
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
+import com.SE114.food_tracker.feature.diary.components.AddActionButton
 import com.SE114.food_tracker.feature.feed.components.FeedComposerSheet
 import com.SE114.food_tracker.feature.feed.components.FeedGridContent
 import com.SE114.food_tracker.feature.feed.components.FeedPagingEffect
@@ -50,6 +53,11 @@ fun FeedScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
+
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -74,6 +82,7 @@ fun FeedScreen(
         onNavigateToFriend = onNavigateToFriend,
         onNavigateToProfile = onNavigateToProfile,
         onPostClick = viewModel::openPostDetail,
+        onRefresh = viewModel::refresh,
         onLoadNextPage = viewModel::loadNextPage,
         onOpenComposer = viewModel::openCreateSheet,
         onCloseComposer = viewModel::closeCreateSheet,
@@ -107,6 +116,7 @@ fun FeedScreenContent(
     onNavigateToFriend: () -> Unit,
     onNavigateToProfile: (String) -> Unit,
     onPostClick: (String) -> Unit,
+    onRefresh: () -> Unit,
     onLoadNextPage: () -> Unit,
     onOpenComposer: () -> Unit,
     onCloseComposer: () -> Unit,
@@ -122,10 +132,20 @@ fun FeedScreenContent(
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
     onDeletePost: (String) -> Unit,
-    onAddComment: (String, String) -> Unit,
+    onAddComment: (String, String, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val gridState = rememberLazyGridState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    LaunchedEffect(uiState.error, uiState.selectedPostId) {
+        val error = uiState.error
+        if (error != null && uiState.selectedPostId == null) {
+            snackbarHostState.showSnackbar(error)
+            onClearError()
+        }
+    }
 
     FeedPagingEffect(
         gridState = gridState,
@@ -138,26 +158,46 @@ fun FeedScreenContent(
             .fillMaxSize()
             .background(MainBackground)
     ) {
-        FeedGridContent(
-            uiState = uiState,
-            gridState = gridState,
-            onNavigateToFriend = onNavigateToFriend,
-            onPostClick = onPostClick
-        )
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize(),
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    isRefreshing = uiState.isLoading,
+                    state = pullToRefreshState,
+                    containerColor = CardWhite,
+                    color = TextPrimary
+                )
+            }
+        ) {
+            FeedGridContent(
+                uiState = uiState,
+                gridState = gridState,
+                onNavigateToFriend = onNavigateToFriend,
+                onPostClick = onPostClick
+            )
+        }
 
-        FloatingActionButton(
-            onClick = onOpenComposer,
-            containerColor = MintGreen,
-            contentColor = Color.White,
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
+            AddActionButton(
+                onClick = onOpenComposer,
                 contentDescription = "Tạo bài viết"
             )
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+        )
 
         if (uiState.isCreateSheetOpen) {
             ModalBottomSheet(
@@ -187,7 +227,8 @@ fun FeedScreenContent(
             onSelectPostAt = onSelectPostAt,
             onToggleLike = onToggleLike,
             onDeletePost = onDeletePost,
-            onAddComment = onAddComment
+            onAddComment = onAddComment,
+            onClearError = onClearError
         )
     }
 }
@@ -201,6 +242,7 @@ private fun FeedScreenPreview() {
             onNavigateToFriend = {},
             onNavigateToProfile = {},
             onPostClick = {},
+            onRefresh = {},
             onLoadNextPage = {},
             onOpenComposer = {},
             onCloseComposer = {},
@@ -216,7 +258,7 @@ private fun FeedScreenPreview() {
             onSelectPostAt = {},
             onToggleLike = {},
             onDeletePost = {},
-            onAddComment = { _, _ -> }
+            onAddComment = { _, _, _ -> }
         )
     }
 }
@@ -230,6 +272,7 @@ private fun FeedScreenEmptyPreview() {
             onNavigateToFriend = {},
             onNavigateToProfile = {},
             onPostClick = {},
+            onRefresh = {},
             onLoadNextPage = {},
             onOpenComposer = {},
             onCloseComposer = {},
@@ -245,7 +288,7 @@ private fun FeedScreenEmptyPreview() {
             onSelectPostAt = {},
             onToggleLike = {},
             onDeletePost = {},
-            onAddComment = { _, _ -> }
+            onAddComment = { _, _, _ -> }
         )
     }
 }

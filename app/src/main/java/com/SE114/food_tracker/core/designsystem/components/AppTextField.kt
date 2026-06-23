@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -25,8 +26,13 @@ import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 /**
  * App-wide outlined text field. Set [isPassword] for an obscured value with a
  * built-in visibility toggle, or supply [trailing] for a custom status slot
- * (e.g. an availability spinner/check). [errorText] overrides [supportingText]
- * when [isError] is true.
+ * (e.g. an availability spinner/check).
+ *
+ * Supporting line behaviour:
+ * - [errorText] (when [isError]) is shown ALWAYS — errors must never hide.
+ * - [supportingText] (a hint/helper) is shown only while the field is focused, or while it is
+ *   disabled (so persistent info like a cooldown notice stays visible). The line height is
+ *   reserved whenever the field can show either, so the form does not jump as focus toggles.
  */
 @Composable
 fun AppTextField(
@@ -45,12 +51,19 @@ fun AppTextField(
     enabled: Boolean = true
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
 
     val visualTransformation =
         if (isPassword && !passwordVisible) PasswordVisualTransformation()
         else VisualTransformation.None
 
-    val helper = if (isError) errorText else supportingText
+    val supportLine = when {
+        isError && errorText != null -> errorText
+        supportingText != null && (focused || !enabled) -> supportingText
+        else -> null
+    }
+    // Reserve the line whenever this field is capable of showing supporting/error text.
+    val reservesSupportingLine = errorText != null || supportingText != null
 
     Column(modifier = modifier) {
         OutlinedTextField(
@@ -77,35 +90,46 @@ fun AppTextField(
                 trailing != null -> trailing
                 else -> null
             },
-            supportingText = helper?.let { { Text(it) } },
-            modifier = Modifier.fillMaxWidth()
+            // A blank space keeps the slot one line tall when there is nothing to show.
+            supportingText = if (reservesSupportingLine) {
+                { Text(supportLine ?: " ") }
+            } else null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focused = it.isFocused }
         )
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, name = "Helper visible (focused/disabled) + error always")
 @Composable
 private fun AppTextFieldPreview() {
     FoodTrackerTheme {
         Column {
+            // Helper line: shown while focused. Rendered here through the disabled path, which
+            // shares the same supporting-line logic, so the helper is visible in a static preview.
             AppTextField(
                 value = "an.nguyen",
                 onValueChange = {},
-                label = "Tên đăng nhập",
-                supportingText = "4–20 ký tự"
+                label = "User ID",
+                enabled = false,
+                supportingText = "4–20 ký tự: chữ thường, số, dấu chấm hoặc gạch dưới"
             )
-            AppTextField(
-                value = "secret",
-                onValueChange = {},
-                label = "Mật khẩu",
-                isPassword = true
-            )
+            // Error line: always visible, regardless of focus.
             AppTextField(
                 value = "bad",
                 onValueChange = {},
                 label = "Email",
                 isError = true,
                 errorText = "Email không hợp lệ"
+            )
+            // Plain field with a helper: unfocused → helper hidden, only the reserved blank line.
+            AppTextField(
+                value = "secret",
+                onValueChange = {},
+                label = "Mật khẩu",
+                isPassword = true,
+                supportingText = "Tối thiểu 6 ký tự"
             )
         }
     }

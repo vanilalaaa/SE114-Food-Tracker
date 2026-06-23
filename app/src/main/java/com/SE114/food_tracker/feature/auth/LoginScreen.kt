@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,26 +29,57 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
+import com.SE114.food_tracker.core.designsystem.components.AppScaffold
 import com.SE114.food_tracker.core.designsystem.components.AppTextField
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
+import com.SE114.food_tracker.data.repository.AuthError
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onAuthenticated: (PostAuthDestination) -> Unit,
     onNavigateRegister: () -> Unit,
     onNavigateForgot: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.loggedIn) {
-        if (state.loggedIn) onLoginSuccess()
+    LaunchedEffect(state.navTarget) {
+        state.navTarget?.let(onAuthenticated)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    LoginContent(
+        state = state,
+        onIdentifierChange = viewModel::onIdentifierChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onSubmit = viewModel::submit,
+        onNavigateRegister = onNavigateRegister,
+        onNavigateForgot = onNavigateForgot,
+        googleButton = {
+            GoogleSignInButton(
+                enabled = !state.isLoading,
+                onIdToken = viewModel::signInWithGoogle,
+                onError = viewModel::onGoogleError,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    )
+}
+
+@Composable
+private fun LoginContent(
+    state: LoginUiState,
+    onIdentifierChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onNavigateRegister: () -> Unit,
+    onNavigateForgot: () -> Unit,
+    googleButton: @Composable () -> Unit
+) {
+    AppScaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -61,27 +91,28 @@ fun LoginScreen(
             )
 
             AppTextField(
-                value = state.email,
-                onValueChange = viewModel::onEmailChange,
-                label = stringResource(R.string.auth_login_email),
+                value = state.identifier,
+                onValueChange = onIdentifierChange,
+                label = stringResource(R.string.auth_login_identifier),
                 leadingIcon = Icons.Outlined.Email,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                isError = state.errorRes != null
+                supportingText = stringResource(R.string.auth_login_identifier_helper),
+                isError = state.error != null
             )
 
             AppTextField(
                 value = state.password,
-                onValueChange = viewModel::onPasswordChange,
+                onValueChange = onPasswordChange,
                 label = stringResource(R.string.auth_login_password),
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                isError = state.errorRes != null
+                isError = state.error != null
             )
 
-            if (state.errorRes != null) {
+            state.error?.let { error ->
                 Text(
-                    text = stringResource(state.errorRes!!),
+                    text = error.asMessage(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -89,11 +120,13 @@ fun LoginScreen(
 
             AppButton(
                 text = stringResource(R.string.auth_login_submit),
-                onClick = viewModel::submit,
+                onClick = onSubmit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.canSubmit,
                 loading = state.isLoading
             )
+
+            googleButton()
 
             TextButton(
                 onClick = onNavigateForgot,
@@ -119,8 +152,23 @@ fun LoginScreen(
 
 @Preview(showBackground = true)
 @Composable
-private fun LoginScreenPreview() {
+private fun LoginContentPreview() {
     FoodTrackerTheme {
-        LoginScreen(onLoginSuccess = {}, onNavigateRegister = {}, onNavigateForgot = {})
+        LoginContent(
+            state = LoginUiState(identifier = "an@example.com", error = AuthError.InvalidCredentials),
+            onIdentifierChange = {},
+            onPasswordChange = {},
+            onSubmit = {},
+            onNavigateRegister = {},
+            onNavigateForgot = {},
+            googleButton = {
+                AppButton(
+                    text = stringResource(R.string.auth_google_signin),
+                    onClick = {},
+                    variant = AppButtonVariant.Secondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        )
     }
 }
