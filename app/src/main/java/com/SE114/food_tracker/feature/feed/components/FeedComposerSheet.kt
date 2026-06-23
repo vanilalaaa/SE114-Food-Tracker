@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -108,6 +111,8 @@ fun FeedComposerSheet(
                 placeholder = { Text("Chú thích", color = TextLabelGray) },
                 minLines = 2,
                 maxLines = 4,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                keyboardActions = KeyboardActions.Default,
                 shape = RoundedCornerShape(22.dp),
                 colors = composerTextFieldColors()
             )
@@ -262,6 +267,8 @@ private fun FeedPickedSourcePreview(
                         enabled = pickedImageUri != null,
                         placeholder = { Text("Tên loại ảnh", color = TextLabelGray) },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.None),
+                        keyboardActions = KeyboardActions(),
                         shape = RoundedCornerShape(14.dp),
                         colors = composerTextFieldColors()
                     )
