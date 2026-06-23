@@ -47,6 +47,16 @@ class ChatViewModel @Inject constructor(
     init {
         fetchConversationsFromServer()
         chatRepository.subscribeToGlobalConversationsRealtime()
+        viewModelScope.launch {
+            chatRepository.memberUpdateSignal.collect { convId: String ->
+                // Tự động load lại danh sách thành viên vào StateFlow
+                loadGroupMembers(convId)
+            }
+            chatRepository.walletUpdateSignal.collect { convId ->
+                // Nạp lại data ví tĩnh thành data động
+                loadWalletData(convId)
+            }
+        }
     }
 
     fun fetchConversationsFromServer() {
@@ -138,8 +148,8 @@ class ChatViewModel @Inject constructor(
                 }
 
                 MessageUiModel(
-                    localId = entity.id,
-                    senderId = entity.senderId,
+                    localId = entity.id ?: java.util.UUID.randomUUID().toString(),
+                    senderId = entity.senderId ?: "",
                     body = entity.body,
                     imageUrl = entity.imageUrl,
                     isSystem = entity.isSystem,

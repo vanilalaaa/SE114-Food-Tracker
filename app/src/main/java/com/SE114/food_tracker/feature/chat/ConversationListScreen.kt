@@ -38,6 +38,7 @@ fun ConversationListScreen(
     onConversationClick: (id: String, name: String) -> Unit = { _, _ -> },
     onBackClick: (() -> Unit)? = null
 ) {
+    // Luồng dữ liệu hứng Flow liên tục từ Room Local DB -> Tự động recompose vẽ lại UI lập tức khi có biến động Realtime!
     val conversationList by viewModel.getConversationsFlow().collectAsState(initial = emptyList())
 
     // Lắng nghe danh sách bạn bè thật (dạng List<ProfileDTO>) từ StateFlow
@@ -238,19 +239,8 @@ fun ConversationListScreen(
         },
         onRefreshData = { onComplete ->
             try {
-                val refreshMethod = viewModel::class.members.find {
-                    it.name == "refreshConversations" || it.name == "refreshChatData" || it.name == "loadConversations"
-                }
-                if (refreshMethod != null) {
-                    if (refreshMethod.parameters.size > 1) {
-                        refreshMethod.call(viewModel, onComplete)
-                    } else {
-                        refreshMethod.call(viewModel)
-                        onComplete()
-                    }
-                } else {
-                    onComplete()
-                }
+                viewModel.fetchConversationsFromServer()
+                onComplete()
             } catch (e: Exception) {
                 onComplete()
             }
@@ -273,7 +263,7 @@ fun ConversationListScreenContent(
     var searchQuery by remember { mutableStateOf("") }
     var isRefreshing by remember { mutableStateOf(false) }
 
-    // 1. Lọc phòng chat cũ đã từng nhắn tin
+    // Lọc phòng chat cũ đã từng nhắn tin
     val filteredConversations = remember(searchQuery, conversationList) {
         if (searchQuery.isBlank()) {
             conversationList
@@ -284,12 +274,11 @@ fun ConversationListScreenContent(
         }
     }
 
-    // 2. Lọc danh sách bạn bè mới CHƯA CÓ phòng chat để làm gợi ý Chat 1-1
+    // Lọc danh sách bạn bè mới CHƯA CÓ phòng chat để làm gợi ý Chat 1-1
     val filteredNewFriends = remember(searchQuery, friendList, conversationList) {
         if (searchQuery.isBlank()) {
             emptyList()
         } else {
-            // Lấy danh sách ID của những cuộc hội thoại 1-1 đã có sẵn
             val existingIds = conversationList.map { it.id }
             friendList.filter { friend ->
                 friend.second.contains(searchQuery, ignoreCase = true) && !existingIds.contains(
@@ -332,7 +321,6 @@ fun ConversationListScreenContent(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Thanh Tìm kiếm thông minh pastel
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },

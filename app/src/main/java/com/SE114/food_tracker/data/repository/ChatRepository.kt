@@ -36,6 +36,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.channels.BufferOverflow
 
 @Singleton
 class ChatRepository @Inject constructor(
@@ -112,6 +115,17 @@ class ChatRepository @Inject constructor(
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
     private val activeChannels = mutableMapOf<String, RealtimeChannel>()
+    private val reconnectingChannels = mutableSetOf<String>()
+    private val _memberUpdateSignal = kotlinx.coroutines.flow.MutableSharedFlow<String>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
+    )
+    val memberUpdateSignal = _memberUpdateSignal.asSharedFlow()
+    private val _walletUpdateSignal = kotlinx.coroutines.flow.MutableSharedFlow<String>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
+    )
+    val walletUpdateSignal = _walletUpdateSignal.asSharedFlow()
 
     private fun parseServerTimeToLong(serverTimeStr: String?): Long {
         if (serverTimeStr.isNullOrBlank()) return System.currentTimeMillis()
@@ -196,9 +210,22 @@ class ChatRepository @Inject constructor(
                     table = "conversation"
                 }
 
+                val walletUpdateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                    table = "group_wallet"
+                }
+
+                val transactionInsertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    table = "wallet_transaction"
+                }
+
+                val participantFlow = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+                    table = "conversation_participant"
+                }
+
                 repositoryScope.launch {
                     changeFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
+
                         if (dto.conversationId == conversationId) {
                             val exist = chatDAO.getMessageByServerId(dto.id ?: "")
                             if (exist == null) {
@@ -209,11 +236,12 @@ class ChatRepository @Inject constructor(
                                     senderId = dto.senderId.lowercase(),
                                     body = dto.body,
                                     imageUrl = dto.imageUrl,
-                                    isSystem = dto.isSystem,
+                                    isSystem = dto.isSystem, // Giữ cờ system để UI nhận diện tin nhắn ví/quỹ
                                     syncStatus = MessageSyncStatus.SENT,
                                     createdAt = parseServerTimeToLong(dto.createdAt)
                                 )
                                 chatDAO.insertMessage(incomingMessage)
+                                println("Realtime: Nhận live thành công tin nhắn mới: ${dto.body}")
                             }
                         }
                     }
@@ -236,14 +264,35 @@ class ChatRepository @Inject constructor(
                     }
                 }
 
+                repositoryScope.launch {
+                    walletUpdateFlow.collect {
+
+                        _walletUpdateSignal.tryEmit(conversationId)
+                    }
+                }
+
+                repositoryScope.launch {
+                    transactionInsertFlow.collect {
+
+                        _walletUpdateSignal.tryEmit(conversationId)
+                    }
+                }
+
+                repositoryScope.launch {
+                    participantFlow.collect {
+                        _memberUpdateSignal.tryEmit(conversationId)
+                    }
+                }
+
                 channel.subscribe()
                 activeChannels[conversationId] = channel
+                println("Supabase Realtime: Đã mở cổng đồng bộ cho phòng $conversationId")
             } catch (e: Exception) {
+                println("Supabase Realtime Lỗi kết nối ban đầu: ${e.localizedMessage}")
                 handleRealtimeReconnect(conversationId)
             }
         }
     }
-
     fun subscribeToGlobalConversationsRealtime() {
         val currentUserId = getAuthenticatedUserId()
         if (currentUserId.isBlank()) return
@@ -252,42 +301,31 @@ class ChatRepository @Inject constructor(
             try {
                 val globalChannel = supabaseClient.channel("global_conv_channel_$currentUserId")
 
+                // Lắng nghe TẤT CẢ biến động (Insert thành viên mới, Delete thành viên cũ) trên bảng conversation_participant
                 val participantChangeFlow = globalChannel.postgresChangeFlow<PostgresAction>(schema = "public") {
                     table = "conversation_participant"
                 }
 
-                // 🔥 ĐÃ THÊM: Kênh lắng nghe Realtime thay đổi Profile trên Supabase web
-                val profileChangeFlow = globalChannel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
-                    table = "profiles"
-                }
-
                 repositoryScope.launch {
                     participantChangeFlow.collect { action ->
+                        println("Realtime Global: Nhận thấy thay đổi cơ cấu nhóm (Tạo nhóm mới / Bị mời ra). Tiến hành nạp lại vào Room...")
                         fetchAndSaveConversationsToLocal()
                     }
                 }
 
-                // Khi có ai đó đổi tên hiển thị hoặc đổi avatar thật trên máy họ, Room Local nhận diện thay đổi tức thì
-                repositoryScope.launch {
-                    profileChangeFlow.collect { action ->
-                        val updated = action.decodeRecord<SupabaseProfileDto>()
-                        val cacheEntity = UserProfileCacheEntity(
-                            userId = updated.id.lowercase(),
-                            displayName = updated.displayName,
-                            avatarUrl = updated.avatarUrl
-                        )
-                        chatDAO.insertProfilesToCache(listOf(cacheEntity))
-                    }
-                }
-
                 globalChannel.subscribe()
+                println("Supabase Realtime: Kích hoạt lắng nghe biến động nhóm toàn cục hoàn tất!")
             } catch (e: Exception) {
-                e.printStackTrace()
+                println("Lỗi kích hoạt kênh toàn cục: ${e.localizedMessage}")
             }
         }
     }
 
     private suspend fun handleRealtimeReconnect(conversationId: String) {
+        // Tránh tạo ra nhiều vòng lặp reconnect chồng chéo cho cùng 1 phòng chat
+        if (reconnectingChannels.contains(conversationId)) return
+        reconnectingChannels.add(conversationId)
+
         var isConnected = false
         var retryDelay = 2000L
 
@@ -299,6 +337,8 @@ class ChatRepository @Inject constructor(
                 channel.subscribe()
                 activeChannels[conversationId] = channel
                 isConnected = true
+                reconnectingChannels.remove(conversationId)
+                println("Supabase Realtime: Đã kết nối lại thành công phòng $conversationId")
             } catch (e: Exception) {
                 retryDelay = (retryDelay * 2).coerceAtMost(60000L)
             }

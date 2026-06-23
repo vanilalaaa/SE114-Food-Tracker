@@ -9,9 +9,12 @@ import kotlinx.coroutines.flow.Flow
 
 // LỚP ĐẠI DIỆN TRUNG GIAN ĐỂ ROOM MAP DATA SAU KHI JOIN
 data class MessageWithProfile(
-    val id: String,
-    @ColumnInfo(name = "conversation_id") val conversationId: String,
-    @ColumnInfo(name = "sender_id") val senderId: String,
+
+    @ColumnInfo(name = "localId") val id: String?,
+
+    @ColumnInfo(name = "conversation_id") val conversationId: String?,
+    @ColumnInfo(name = "sender_id") val senderId: String?,
+
     val body: String?,
     @ColumnInfo(name = "image_url") val imageUrl: String?,
     @ColumnInfo(name = "is_system") val isSystem: Boolean,
