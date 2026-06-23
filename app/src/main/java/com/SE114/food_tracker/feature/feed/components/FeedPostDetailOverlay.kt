@@ -39,6 +39,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -82,7 +84,8 @@ fun FeedPostDetailOverlay(
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
     onDeletePost: (String) -> Unit,
-    onAddComment: (String, String) -> Unit
+    onAddComment: (String, String) -> Unit,
+    onClearError: () -> Unit
 ) {
     val posts = uiState.posts
     val selectedIndex = uiState.selectedPostIndex
@@ -102,6 +105,15 @@ fun FeedPostDetailOverlay(
         )
         var commentText by rememberSaveable { mutableStateOf("") }
         var isCommentsSheetOpen by rememberSaveable { mutableStateOf(false) }
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        LaunchedEffect(uiState.error) {
+            val error = uiState.error
+            if (error != null) {
+                snackbarHostState.showSnackbar(error)
+                onClearError()
+            }
+        }
 
         LaunchedEffect(selectedIndex, posts.size) {
             val targetPage = selectedIndex.coerceIn(posts.indices)
@@ -157,6 +169,14 @@ fun FeedPostDetailOverlay(
                         tint = Color.White
                     )
                 }
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                )
 
                 if (isCommentsSheetOpen) {
                     FeedCommentsBottomSheet(

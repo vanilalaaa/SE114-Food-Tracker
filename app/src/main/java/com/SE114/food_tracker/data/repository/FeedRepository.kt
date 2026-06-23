@@ -21,6 +21,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +29,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Instant
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import timber.log.Timber
 import java.io.File
 import java.util.UUID
@@ -117,14 +120,25 @@ class FeedRepository @Inject constructor(
             error("Cannot delete this post with the current account.")
         }
 
-        val deletedPost = feedDao.getPostById(postId) ?: return false
+        val deletedPost = feedDao.getPostById(postId)
+            ?: throw FeedPostDeleteSyncException(
+                "Đã ẩn bài viết trên máy, nhưng không tìm thấy bài viết local để đồng bộ lên Supabase."
+            )
+
         return runCatching { pushPost(deletedPost, ownerId) }
             .onSuccess { feedDao.markPostSynced(postId) }
             .onFailure { throwable ->
                 Timber.e(throwable, "[FeedSync] immediate post delete failed id=$postId")
                 feedDao.markPostFailed(postId)
             }
-            .isSuccess
+            .getOrElse { throwable ->
+                val reason = throwable.message ?: throwable::class.java.simpleName
+                throw FeedPostDeleteSyncException(
+                    message = "Đã ẩn bài viết trên máy, nhưng Supabase chưa cập nhật xóa: $reason",
+                    cause = throwable
+                )
+            }
+            .let { true }
     }
 
     suspend fun pushPendingToSupabase(ownerId: String): Boolean {
@@ -277,7 +291,10 @@ class FeedRepository @Inject constructor(
     }
 
     private suspend fun softDeleteRemotePost(post: FeedPost, ownerId: String) {
-        supabaseClient.postgrest.from("post").upsert(post.toDeletedRemoteDTO(ownerId))
+        supabaseClient.postgrest.rpc(
+            function = "soft_delete_post",
+            parameters = SoftDeletePostRpcArgs(postId = post.postId)
+        )
     }
 
     private suspend fun pushLike(like: FeedLike, ownerId: String) {
@@ -364,19 +381,6 @@ class FeedRepository @Inject constructor(
             isDeleted = false,
             createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
             deletedAt = null
-        )
-
-    private fun FeedPost.toDeletedRemoteDTO(ownerId: String): FeedPostRemoteDTO =
-        FeedPostRemoteDTO(
-            id = postId,
-            authorId = ownerId,
-            itemId = itemId,
-            caption = caption.ifBlank { null },
-            imageUrl = imageUrl.ifBlank { null },
-            visibility = visibility,
-            isDeleted = true,
-            createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
-            deletedAt = Instant.fromEpochMilliseconds(updatedAt).toString()
         )
 
     private fun FeedLike.toRemoteDTO(ownerId: String): FeedLikeRemoteDTO =
@@ -471,3 +475,13 @@ class FeedRepository @Inject constructor(
         private const val AUTH_SESSION_WAIT_MS = 2_000L
     }
 }
+
+@Serializable
+private data class SoftDeletePostRpcArgs(
+    @SerialName("p_post_id") val postId: String
+)
+
+class FeedPostDeleteSyncException(
+    message: String,
+    cause: Throwable? = null
+) : Exception(message, cause)

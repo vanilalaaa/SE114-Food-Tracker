@@ -15,6 +15,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -135,6 +137,15 @@ fun FeedScreenContent(
     modifier: Modifier = Modifier
 ) {
     val gridState = rememberLazyGridState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.error, uiState.selectedPostId) {
+        val error = uiState.error
+        if (error != null && uiState.selectedPostId == null) {
+            snackbarHostState.showSnackbar(error)
+            onClearError()
+        }
+    }
 
     FeedPagingEffect(
         gridState = gridState,
@@ -174,6 +185,13 @@ fun FeedScreenContent(
             )
         }
 
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+        )
+
         if (uiState.isCreateSheetOpen) {
             ModalBottomSheet(
                 onDismissRequest = onCloseComposer,
@@ -202,7 +220,8 @@ fun FeedScreenContent(
             onSelectPostAt = onSelectPostAt,
             onToggleLike = onToggleLike,
             onDeletePost = onDeletePost,
-            onAddComment = onAddComment
+            onAddComment = onAddComment,
+            onClearError = onClearError
         )
     }
 }

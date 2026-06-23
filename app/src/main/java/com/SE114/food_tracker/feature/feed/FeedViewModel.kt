@@ -9,6 +9,7 @@ import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
+import com.SE114.food_tracker.data.repository.FeedPostDeleteSyncException
 import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -284,6 +285,10 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Delete post failed")
+                    if (throwable is FeedPostDeleteSyncException) {
+                        closePostDetail()
+                        SyncScheduler.triggerImmediateSync(context)
+                    }
                     _error.value = throwable.message ?: "Không xóa được bài viết"
                 }
         }
