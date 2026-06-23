@@ -95,30 +95,34 @@ private fun ProfileHeaderTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .offset(x = (-12).dp)
             .padding(top = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = onNavigateBack,
-            modifier = Modifier.size(34.dp)
+        Row(
+            modifier = Modifier.offset(x = (-8).dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.ArrowBack,
-                contentDescription = stringResource(R.string.profile_back),
-                tint = TextPrimary,
-                modifier = Modifier.size(28.dp)
+            IconButton(
+                onClick = onNavigateBack,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = stringResource(R.string.profile_back),
+                    tint = TextPrimary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Text(
+                text = stringResource(R.string.profile_viewer_title),
+                color = TextPrimary,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
             )
         }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Text(
-            text = stringResource(R.string.profile_viewer_title),
-            color = TextPrimary,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold
-        )
 
         Spacer(modifier = Modifier.weight(1f))
 
