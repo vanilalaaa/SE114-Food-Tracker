@@ -607,11 +607,7 @@ class ChatRepository @Inject constructor(
 
     suspend fun kickMember(conversationId: String, userIdToKick: String, memberName: String) {
         try {
-            val currentAdminId = getAuthenticatedUserId()
-            val actualGroupMembers = fetchGroupMembersFromServer(conversationId)
-            val adminName =
-                actualGroupMembers.find { it.first == currentAdminId }?.second ?: "Admin"
-
+            // 1. Xóa ở server
             supabaseClient.from("conversation_participant").delete {
                 filter {
                     eq("conversation_id", conversationId)
@@ -619,10 +615,14 @@ class ChatRepository @Inject constructor(
                 }
             }
 
-            fetchAndSaveConversationsToLocal()
-            sendSystemMessage(conversationId, "$adminName đã mời $memberName rời khỏi nhóm.")
-        } catch (e: Exception) {
-        }
+            // 2. Xóa ở local
+            if (userIdToKick.lowercase() == getAuthenticatedUserId()) {
+                chatDAO.deleteConversationById(conversationId)
+            }
+
+            // 3. Gửi tin hệ thống để các máy khác cập nhật
+            sendSystemMessage(conversationId, "Đã mời $memberName rời khỏi nhóm.")
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     suspend fun sendSystemMessage(conversationId: String, content: String) {
@@ -674,7 +674,7 @@ class ChatRepository @Inject constructor(
             currentConv?.let {
                 chatDAO.insertConversation(it.copy(walletId = walletUuid))
             }
-
+            _walletUpdateSignal.tryEmit(conversationId)
             sendSystemMessage(
                 conversationId,
                 "Quỹ nhóm '$walletName' đã được thiết lập thành công."
