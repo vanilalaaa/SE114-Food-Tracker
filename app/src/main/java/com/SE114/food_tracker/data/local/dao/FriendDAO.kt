@@ -27,6 +27,7 @@ interface FriendDAO {
             (sender_id = :firstUserId AND receiver_id = :secondUserId)
             OR (sender_id = :secondUserId AND receiver_id = :firstUserId)
         )
+        ORDER BY created_at DESC, updated_at DESC
         LIMIT 1
     """)
     suspend fun getFriendshipBetween(firstUserId: String, secondUserId: String): FriendshipEntity?
@@ -94,6 +95,40 @@ interface FriendDAO {
     suspend fun softDeleteFriendship(
         friendshipId: String,
         syncStatus: String = "PENDING",
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("""
+        UPDATE friendship
+        SET is_deleted = 1, sync_status = :syncStatus, updated_at = :updatedAt
+        WHERE is_deleted = 0
+        AND friendship_id != :keepFriendshipId
+        AND (
+            (sender_id = :firstUserId AND receiver_id = :secondUserId)
+            OR (sender_id = :secondUserId AND receiver_id = :firstUserId)
+        )
+    """)
+    suspend fun softDeleteOtherFriendshipsBetween(
+        firstUserId: String,
+        secondUserId: String,
+        keepFriendshipId: String,
+        syncStatus: String = "SYNCED",
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("""
+        UPDATE friendship
+        SET is_deleted = 1, sync_status = :syncStatus, updated_at = :updatedAt
+        WHERE is_deleted = 0
+        AND (
+            (sender_id = :firstUserId AND receiver_id = :secondUserId)
+            OR (sender_id = :secondUserId AND receiver_id = :firstUserId)
+        )
+    """)
+    suspend fun softDeleteFriendshipsBetween(
+        firstUserId: String,
+        secondUserId: String,
+        syncStatus: String = "SYNCED",
         updatedAt: Long = System.currentTimeMillis()
     )
 
