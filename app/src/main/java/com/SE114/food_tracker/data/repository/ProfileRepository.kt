@@ -57,4 +57,11 @@ interface ProfileRepository {
      * re-checks server-side.
      */
     suspend fun amIAdmin(): AuthOutcome<Boolean>
+
+    /**
+     * True when the current user is neither banned nor soft-deleted, via the
+     * `am_i_active` security-definer RPC (those flags are off the column SELECT grant).
+     * The session guard signs out a user for whom this is false.
+     */
+    suspend fun amIActive(): AuthOutcome<Boolean>
 }

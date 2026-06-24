@@ -197,6 +197,15 @@ class SupabaseProfileRepository @Inject constructor(
         )
     }
 
+    override suspend fun amIActive(): AuthOutcome<Boolean> = withContext(Dispatchers.IO) {
+        runCatching {
+            db.rpc("am_i_active").decodeAs<Boolean>()
+        }.fold(
+            onSuccess = { AuthOutcome.Success(it) },
+            onFailure = { AuthOutcome.Failure(it.toAuthError()) }
+        )
+    }
+
     private fun requireUid(): String =
         auth.currentUserOrNull()?.id ?: error("No authenticated session")
 }

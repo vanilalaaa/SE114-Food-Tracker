@@ -4,7 +4,14 @@ import android.net.Uri
 
 sealed class AppDestinations(val route: String) {
     data object Splash : AppDestinations("splash")
-    data object Login : AppDestinations("login")
+    data object Login : AppDestinations("login?reason={reason}") {
+        const val ARG_REASON = "reason"
+
+        // Optional reason shown on arrival (e.g. signed out for being banned). Navigating to
+        // "login" still matches this pattern with reason = null.
+        fun createRoute(reason: String? = null): String =
+            if (reason.isNullOrBlank()) "login" else "login?reason=${Uri.encode(reason)}"
+    }
     data object Register : AppDestinations("register")
     data object Forgot : AppDestinations("forgot")
     data object VerifyEmail : AppDestinations("verify_email/{email}/{displayName}/{userId}") {

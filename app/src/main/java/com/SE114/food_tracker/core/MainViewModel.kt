@@ -2,19 +2,72 @@ package com.SE114.food_tracker.core
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.sync.LocalDataCleaner
+import com.SE114.food_tracker.data.repository.AuthOutcome
 import com.SE114.food_tracker.data.repository.AuthRepository
+import com.SE114.food_tracker.data.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val profileRepository: ProfileRepository,
+    private val localDataCleaner: LocalDataCleaner
 ) : ViewModel() {
 
     val sessionStatus: StateFlow<SessionStatus?> = authRepository.currentSessionFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    // Non-null once a banned/soft-deleted account is signed out; carried to Login as the reason.
+    private val _blockedReason = MutableStateFlow<String?>(null)
+    val blockedReason: StateFlow<String?> = _blockedReason.asStateFlow()
+
+    private var guardJob: Job? = null
+
+    init {
+        // Check on every session resolve (app launch with a restored session, or right after login).
+        viewModelScope.launch {
+            authRepository.currentSessionFlow()
+                .filterIsInstance<SessionStatus.Authenticated>()
+                .collect { enforceActive() }
+        }
+    }
+
+    /** Re-checks the account on app resume; admin actions on another device take effect here. */
+    fun recheckActive() {
+        if (authRepository.hasSession()) enforceActive()
+    }
+
+    private fun enforceActive() {
+        guardJob?.cancel()
+        guardJob = viewModelScope.launch {
+            when (val outcome = profileRepository.amIActive()) {
+                is AuthOutcome.Success ->
+                    if (outcome.data) _blockedReason.value = null else blockAndSignOut()
+                // Network/lookup failure: keep the user signed in; re-checked on the next resume.
+                is AuthOutcome.Failure -> Unit
+            }
+        }
+    }
+
+    private suspend fun blockAndSignOut() {
+        // Set the reason before sign-out so the session guard navigates to Login with it.
+        _blockedReason.value = REASON_BLOCKED
+        localDataCleaner.clearUserOwnedData()
+        authRepository.signOut()
+    }
+
+    companion object {
+        const val REASON_BLOCKED = "blocked"
+    }
 }

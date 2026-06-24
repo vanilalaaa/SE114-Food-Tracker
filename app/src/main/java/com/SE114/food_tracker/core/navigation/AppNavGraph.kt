@@ -5,9 +5,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import androidx.navigation.navArgument
 import com.SE114.food_tracker.feature.auth.ChangePasswordScreen
 import com.SE114.food_tracker.feature.auth.CompleteProfileScreen
 import com.SE114.food_tracker.feature.auth.ForgotPasswordScreen
@@ -79,13 +81,22 @@ fun AppNavGraph(
                 SplashScreen(
                     onResolved = ::navigatePostAuth,
                     onUnauthenticated = {
-                        navController.navigate(AppDestinations.Login.route) {
+                        navController.navigate(AppDestinations.Login.createRoute()) {
                             popUpTo(AppDestinations.Splash.route) { inclusive = true }
                         }
                     }
                 )
             }
-            composable(AppDestinations.Login.route) {
+            composable(
+                route = AppDestinations.Login.route,
+                arguments = listOf(
+                    navArgument(AppDestinations.Login.ARG_REASON) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) {
                 LoginScreen(
                     onAuthenticated = ::navigatePostAuth,
                     onNavigateRegister = { navController.navigate(AppDestinations.Register.route) },

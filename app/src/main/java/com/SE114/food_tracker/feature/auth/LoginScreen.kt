@@ -90,6 +90,14 @@ private fun LoginContent(
                 modifier = Modifier.padding(vertical = 24.dp)
             )
 
+            if (state.accountBlocked) {
+                Text(
+                    text = stringResource(R.string.auth_account_blocked),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
             if (state.adminMode) {
                 Text(
                     text = stringResource(R.string.admin_login_hint),

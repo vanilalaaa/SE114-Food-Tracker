@@ -1,8 +1,10 @@
 package com.SE114.food_tracker.feature.auth
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.BuildConfig
+import com.SE114.food_tracker.core.navigation.AppDestinations
 import com.SE114.food_tracker.core.sync.SyncManager
 import com.SE114.food_tracker.data.repository.AuthError
 import com.SE114.food_tracker.data.repository.AuthOutcome
@@ -25,7 +27,9 @@ data class LoginUiState(
     // Secret code submitted with no session: collect real credentials, then route by is_admin.
     val adminMode: Boolean = false,
     // Session present but is_admin = false: stay on login with a notice.
-    val adminAccessDenied: Boolean = false
+    val adminAccessDenied: Boolean = false,
+    // Arrived here because the account was banned/soft-deleted and signed out.
+    val accountBlocked: Boolean = false
 ) {
     /** The identifier holds the build-time admin unlock code (blank code disables the gate). */
     val isUnlockCode: Boolean
@@ -42,14 +46,19 @@ class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
     private val postAuthNavigator: PostAuthNavigator,
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(LoginUiState())
+    private val _state = MutableStateFlow(
+        LoginUiState(
+            accountBlocked = savedStateHandle.get<String>(AppDestinations.Login.ARG_REASON) != null
+        )
+    )
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
     fun onIdentifierChange(value: String) =
-        _state.update { it.copy(identifier = value, error = null, adminAccessDenied = false) }
+        _state.update { it.copy(identifier = value, error = null, adminAccessDenied = false, accountBlocked = false) }
     fun onPasswordChange(value: String) = _state.update { it.copy(password = value, error = null) }
 
     fun submit() {

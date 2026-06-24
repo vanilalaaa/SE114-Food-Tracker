@@ -57,6 +57,7 @@
     <string name="auth_err_no_network">Không có kết nối mạng. Vui lòng kiểm tra Internet và thử lại.</string>
     <string name="auth_err_unknown">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
     <string name="auth_err_password_mismatch">Mật khẩu nhập lại không khớp</string>
+    <string name="auth_account_blocked">Tài khoản đã bị khóa</string>
 
     <!-- Register confirm password -->
     <string name="auth_register_confirm_password">Nhập lại mật khẩu</string>
