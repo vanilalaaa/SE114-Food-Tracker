@@ -101,29 +101,65 @@ class FeedRepository @Inject constructor(
             runCatching {
                 val channel = supabaseClient.channel("feed_posts_realtime")
 
-                val insertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                val postInsertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
                     table = "post"
                 }
-                val updateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                val postUpdateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
                     table = "post"
                 }
-                val deleteFlow = channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+                val postDeleteFlow = channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
                     table = "post"
+                }
+                val commentInsertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    table = "post_comment"
+                }
+                val commentUpdateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                    table = "post_comment"
+                }
+                val commentDeleteFlow = channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+                    table = "post_comment"
+                }
+                val likeInsertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    table = "post_like"
+                }
+                val likeUpdateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                    table = "post_like"
+                }
+                val likeDeleteFlow = channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+                    table = "post_like"
                 }
 
                 repositoryScope.launch {
-                    insertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                    postInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
                 repositoryScope.launch {
-                    updateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                    postUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
                 repositoryScope.launch {
-                    deleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                    postDeleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    commentInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    commentUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    commentDeleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    likeInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    likeUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    likeDeleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
 
                 channel.subscribe()
                 feedRealtimeChannel = channel
-                Timber.d("[FeedRealtime] subscribed to post changes")
+                Timber.d("[FeedRealtime] subscribed to post, comment, and like changes")
             }.onFailure { throwable ->
                 Timber.e(throwable, "[FeedRealtime] subscribe failed")
             }

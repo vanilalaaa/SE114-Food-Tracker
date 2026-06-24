@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -55,6 +56,7 @@ class FeedViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     private val _currentUserId = MutableStateFlow(feedRepository.currentUserId())
     private var realtimeRefreshJob: Job? = null
+    private var autoRefreshJob: Job? = null
 
     private val posts = combine(_page, _currentUserId) { page, currentUserId -> page to currentUserId }
         .flatMapLatest { (page, currentUserId) ->
@@ -121,6 +123,7 @@ class FeedViewModel @Inject constructor(
 
     init {
         subscribeToRealtimePosts()
+        startAutoRefresh()
     }
 
     fun loadNextPage() {
@@ -310,6 +313,24 @@ class FeedViewModel @Inject constructor(
         }
     }
 
+    private fun startAutoRefresh() {
+        if (autoRefreshJob != null) return
+
+        autoRefreshJob = viewModelScope.launch {
+            while (isActive) {
+                delay(AUTO_REFRESH_INTERVAL_MS)
+                if (canAutoRefreshFeed()) {
+                    refreshVisibleFeedSilently("[FeedVM] Auto feed refresh failed")
+                }
+            }
+        }
+    }
+
+    private fun canAutoRefreshFeed(): Boolean =
+        !_isLoading.value &&
+            !_isCreatingPost.value &&
+            !_isCreateSheetOpen.value
+
     private suspend fun refreshVisibleFeedSilently(errorLogMessage: String) {
         runCatching {
             friendRepository.refreshCurrentProfile().getOrThrow()
@@ -399,4 +420,8 @@ class FeedViewModel @Inject constructor(
 
             Uri.fromFile(target).toString()
         }
+
+    private companion object {
+        const val AUTO_REFRESH_INTERVAL_MS = 5_000L
+    }
 }

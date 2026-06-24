@@ -12,16 +12,27 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.RealtimeChannel
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -32,6 +43,11 @@ class FriendRepository @Inject constructor(
     private val friendDao: FriendDAO,
     private val supabaseClient: SupabaseClient
 ) {
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var friendshipRealtimeChannel: RealtimeChannel? = null
+    private val _friendshipRealtimeEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val friendshipRealtimeEvents: SharedFlow<Unit> = _friendshipRealtimeEvents.asSharedFlow()
+
     private val _currentProfile = MutableStateFlow<ProfileDTO?>(null)
     val currentProfile: StateFlow<ProfileDTO?> = _currentProfile
 
@@ -47,6 +63,39 @@ class FriendRepository @Inject constructor(
 
     fun getOutgoingRequests(): Flow<List<FriendItemDto>> =
         currentProfileScoped { profile -> friendDao.getOutgoingRequests(profile.id) }
+
+    fun subscribeToFriendshipRealtime() {
+        repositoryScope.launch {
+            if (friendshipRealtimeChannel != null) return@launch
+
+            runCatching {
+                val channel = supabaseClient.channel("friendship_realtime")
+
+                val insertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    table = "friendship"
+                }
+                val updateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                    table = "friendship"
+                }
+                val deleteFlow = channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+                    table = "friendship"
+                }
+
+                repositoryScope.launch {
+                    insertFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    updateFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    deleteFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
+                }
+
+                channel.subscribe()
+                friendshipRealtimeChannel = channel
+            }
+        }
+    }
 
     suspend fun refreshCurrentProfile(): Result<ProfileDTO> = runCatching {
         val profile = fetchCurrentProfile()

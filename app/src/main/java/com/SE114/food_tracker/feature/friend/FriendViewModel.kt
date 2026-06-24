@@ -63,9 +63,11 @@ class FriendViewModel @Inject constructor(
 
     private var loadFriendDataJob: Job? = null
     private var searchJob: Job? = null
+    private var realtimeFriendshipRefreshJob: Job? = null
 
     init {
         loadFriendData()
+        subscribeToFriendshipRealtime()
 
         viewModelScope.launch {
             authRepository.currentSessionFlow()
@@ -74,6 +76,39 @@ class FriendViewModel @Inject constructor(
                     loadFriendData()
                 }
         }
+    }
+
+    private fun subscribeToFriendshipRealtime() {
+        repository.subscribeToFriendshipRealtime()
+        viewModelScope.launch {
+            repository.friendshipRealtimeEvents.collect {
+                scheduleRealtimeFriendshipRefresh()
+            }
+        }
+    }
+
+    private fun scheduleRealtimeFriendshipRefresh() {
+        realtimeFriendshipRefreshJob?.cancel()
+        realtimeFriendshipRefreshJob = viewModelScope.launch {
+            delay(500)
+            refreshFriendDataFromRealtime()
+        }
+    }
+
+    private suspend fun refreshFriendDataFromRealtime() {
+        _profileLoadError.value = null
+        repository.refreshCurrentProfile()
+            .onSuccess {
+                repository.refreshFriendships()
+                    .onSuccess {
+                        runCatching { feedRepository.refreshVisibleFromSupabase() }
+                            .onFailure { reportActionError(it) }
+                    }
+                    .onFailure { reportActionError(it) }
+            }
+            .onFailure { e ->
+                _profileLoadError.value = e.message ?: "Không lấy được ID"
+            }
     }
 
     fun retryLoadProfile() = loadFriendData()
