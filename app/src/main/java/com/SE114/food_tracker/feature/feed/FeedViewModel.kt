@@ -67,8 +67,10 @@ class FeedViewModel @Inject constructor(
             )
         }
 
-    private val selectedComments = _selectedPostId.flatMapLatest { postId ->
-        if (postId == null) flowOf(emptyList()) else feedRepository.observeComments(postId)
+    private val selectedComments = combine(_selectedPostId, _currentUserId) { postId, currentUserId ->
+        postId to currentUserId
+    }.flatMapLatest { (postId, currentUserId) ->
+        if (postId == null) flowOf(emptyList()) else feedRepository.observeComments(postId, currentUserId)
     }
 
     val uiState: StateFlow<FeedUiState> =
@@ -365,6 +367,49 @@ class FeedViewModel @Inject constructor(
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Add comment failed")
                     _error.value = throwable.message ?: "Không gửi được bình luận"
+                }
+        }
+    }
+
+    fun editComment(commentId: String, body: String) {
+        if (body.isBlank()) return
+        viewModelScope.launch {
+            runCatching { feedRepository.editComment(commentId, body) }
+                .onSuccess {
+                    SyncScheduler.triggerImmediateSync(context)
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after comment edit failed")
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Edit comment failed")
+                    _error.value = throwable.message ?: "Không sửa được bình luận"
+                }
+        }
+    }
+
+    fun deleteComment(commentId: String) {
+        viewModelScope.launch {
+            runCatching { feedRepository.deleteComment(commentId) }
+                .onSuccess {
+                    SyncScheduler.triggerImmediateSync(context)
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after comment delete failed")
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Delete comment failed")
+                    _error.value = throwable.message ?: "Không xóa được bình luận"
+                }
+        }
+    }
+
+    fun setCommentHidden(commentId: String, isHidden: Boolean) {
+        viewModelScope.launch {
+            runCatching { feedRepository.setCommentHidden(commentId, isHidden) }
+                .onSuccess {
+                    SyncScheduler.triggerImmediateSync(context)
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after comment visibility failed")
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Toggle comment visibility failed")
+                    _error.value = throwable.message ?: "KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c bÃ¬nh luáº­n"
                 }
         }
     }

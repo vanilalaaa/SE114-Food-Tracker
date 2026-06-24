@@ -36,7 +36,7 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         FeedLike::class,
         FeedComment::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -86,6 +86,14 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE user_profile_cache ADD COLUMN profile_user_id TEXT NOT NULL DEFAULT ''")
             }
         }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE feed_comment ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE feed_comment ADD COLUMN hidden_at INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
+            }
+        }
     }
 }
 
@@ -102,6 +110,8 @@ private fun SupportSQLiteDatabase.createFeedTables() {
             visibility TEXT NOT NULL DEFAULT 'friends',
             sync_status TEXT NOT NULL DEFAULT 'PENDING',
             is_deleted INTEGER NOT NULL DEFAULT 0,
+            is_hidden INTEGER NOT NULL DEFAULT 0,
+            hidden_at INTEGER,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         )
@@ -148,4 +158,5 @@ private fun SupportSQLiteDatabase.createFeedTables() {
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_user_id ON feed_comment(user_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_sync_status ON feed_comment(sync_status)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
 }

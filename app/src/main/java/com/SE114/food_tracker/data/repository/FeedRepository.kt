@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -88,8 +89,8 @@ class FeedRepository @Inject constructor(
             offset = 0
         )
 
-    fun observeComments(postId: String): Flow<List<FeedCommentDto>> =
-        feedDao.observeComments(postId)
+    fun observeComments(postId: String, currentUserId: String = currentUserId()): Flow<List<FeedCommentDto>> =
+        feedDao.observeComments(postId, currentUserId)
 
     fun observeSourceItems(): Flow<List<FeedSourceItemDto>> =
         feedDao.observeSourceItems(limit = PAGE_SIZE)
@@ -220,6 +221,70 @@ class FeedRepository @Inject constructor(
         )
     }
 
+    suspend fun editComment(commentId: String, body: String) {
+        val ownerId = currentAuthenticatedUserId()
+        val rowsUpdated = feedDao.updateCommentBody(
+            commentId = commentId,
+            userId = ownerId,
+            body = body.trim()
+        )
+        if (rowsUpdated == 0) {
+            error("Không thể sửa bình luận này.")
+        }
+
+        val comment = feedDao.getCommentById(commentId)
+            ?: error("Không tìm thấy bình luận.")
+        runCatching { pushComment(comment, ownerId) }
+            .onSuccess { feedDao.markCommentSynced(commentId) }
+            .onFailure { throwable ->
+                Timber.e(throwable, "[FeedSync] immediate comment edit failed id=$commentId")
+                feedDao.markCommentFailed(commentId)
+                throw throwable
+            }
+    }
+
+    suspend fun deleteComment(commentId: String) {
+        val currentUserId = currentAuthenticatedUserId()
+        val rowsUpdated = feedDao.softDeleteCommentThread(
+            commentId = commentId,
+            currentUserId = currentUserId
+        )
+        if (rowsUpdated == 0) {
+            error("Không thể xóa bình luận này.")
+        }
+
+        runCatching {
+            softDeleteRemoteCommentThread(commentId)
+        }
+            .onSuccess { feedDao.markCommentSynced(commentId) }
+            .onFailure { throwable ->
+                Timber.e(throwable, "[FeedSync] immediate comment delete failed id=$commentId")
+                feedDao.markCommentFailed(commentId)
+                throw throwable
+            }
+    }
+
+    suspend fun setCommentHidden(commentId: String, isHidden: Boolean) {
+        val currentUserId = currentAuthenticatedUserId()
+        runCatching {
+            setRemoteCommentHidden(commentId = commentId, isHidden = isHidden)
+        }
+            .onSuccess {
+                val rowsUpdated = feedDao.setCommentHidden(
+                    commentId = commentId,
+                    currentUserId = currentUserId,
+                    isHidden = isHidden
+                )
+                if (rowsUpdated == 0) {
+                    error("Không thể cập nhật trạng thái bình luận này.")
+                }
+            }
+            .onFailure { throwable ->
+                Timber.e(throwable, "[FeedSync] immediate comment visibility failed id=$commentId")
+                throw throwable
+            }
+    }
+
     suspend fun deletePost(postId: String): Boolean {
         val ownerId = currentAuthenticatedUserId()
         val rowsUpdated = feedDao.softDeletePost(postId, ownerId)
@@ -337,6 +402,13 @@ class FeedRepository @Inject constructor(
                 .select()
                 .decodeList<FeedCommentRemoteDTO>()
 
+            val remoteCommentIds = remoteComments.map { it.id }
+            if (remoteCommentIds.isEmpty()) {
+                feedDao.softDeleteAllSyncedComments()
+            } else {
+                feedDao.softDeleteSyncedCommentsMissingFromRemote(remoteCommentIds)
+            }
+
             val commentEntities = remoteComments.map { dto ->
                 dto.toEntity(
                     displayName = profiles[dto.authorId].displayNameOrFallback(dto.authorId)
@@ -430,15 +502,27 @@ class FeedRepository @Inject constructor(
         }
 
         if (comment.isDeleted) {
-            supabaseClient.postgrest.from("post_comment").delete {
-                filter {
-                    eq("id", comment.commentId)
-                    eq("author_id", ownerId)
-                }
-            }
+            softDeleteRemoteCommentThread(comment.commentId)
         } else {
             supabaseClient.postgrest.from("post_comment").upsert(comment.toRemoteDTO(ownerId))
         }
+    }
+
+    private suspend fun softDeleteRemoteCommentThread(commentId: String) {
+        supabaseClient.postgrest.rpc(
+            function = "soft_delete_post_comment_thread",
+            parameters = SoftDeleteCommentThreadRpcArgs(commentId = commentId)
+        )
+    }
+
+    private suspend fun setRemoteCommentHidden(commentId: String, isHidden: Boolean) {
+        supabaseClient.postgrest.rpc(
+            function = "set_post_comment_hidden",
+            parameters = SetCommentHiddenRpcArgs(
+                commentId = commentId,
+                isHidden = isHidden
+            )
+        )
     }
 
     private suspend fun uploadPostImageIfNeeded(post: FeedPost, ownerId: String): String {
@@ -507,7 +591,10 @@ class FeedRepository @Inject constructor(
             authorId = ownerId,
             body = body,
             parentCommentId = parentCommentId,
-            createdAt = Instant.fromEpochMilliseconds(createdAt).toString()
+            isDeleted = isDeleted,
+            isHidden = isHidden,
+            createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
+            hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it).toString() }
         )
 
     private fun FeedPostRemoteDTO.toEntity(ownerName: String): FeedPost =
@@ -545,9 +632,13 @@ class FeedRepository @Inject constructor(
             body = body,
             parentCommentId = parentCommentId,
             syncStatus = SyncStatus.SYNCED.name,
-            isDeleted = false,
+            isDeleted = isDeleted,
+            isHidden = isHidden,
+            hiddenAt = hiddenAt?.let { Instant.parse(it).toEpochMilliseconds() },
             createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
-            updatedAt = Instant.parse(createdAt).toEpochMilliseconds()
+            updatedAt = hiddenAt?.let { Instant.parse(it).toEpochMilliseconds() }
+                ?: deletedAt?.let { Instant.parse(it).toEpochMilliseconds() }
+                ?: Instant.parse(createdAt).toEpochMilliseconds()
         )
 
     private fun ProfileDTO?.displayNameOrFallback(profileId: String): String =
@@ -592,6 +683,17 @@ class FeedRepository @Inject constructor(
 @Serializable
 private data class SoftDeletePostRpcArgs(
     @SerialName("p_post_id") val postId: String
+)
+
+@Serializable
+private data class SoftDeleteCommentThreadRpcArgs(
+    @SerialName("_comment_id") val commentId: String
+)
+
+@Serializable
+private data class SetCommentHiddenRpcArgs(
+    @SerialName("_comment_id") val commentId: String,
+    @SerialName("_is_hidden") val isHidden: Boolean
 )
 
 class FeedPostDeleteSyncException(

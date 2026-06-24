@@ -105,7 +105,10 @@ fun FeedScreen(
         onSelectPostAt = viewModel::selectPostAt,
         onToggleLike = viewModel::toggleLike,
         onDeletePost = viewModel::deletePost,
-        onAddComment = viewModel::addComment
+        onAddComment = viewModel::addComment,
+        onEditComment = viewModel::editComment,
+        onDeleteComment = viewModel::deleteComment,
+        onSetCommentHidden = viewModel::setCommentHidden
     )
 
     pendingCropUri?.let { uri ->
@@ -149,6 +152,9 @@ fun FeedScreenContent(
     onToggleLike: (String) -> Unit,
     onDeletePost: (String) -> Unit,
     onAddComment: (String, String, String?) -> Unit,
+    onEditComment: (String, String) -> Unit,
+    onDeleteComment: (String) -> Unit,
+    onSetCommentHidden: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val gridState = rememberLazyGridState()
@@ -244,6 +250,9 @@ fun FeedScreenContent(
             onToggleLike = onToggleLike,
             onDeletePost = onDeletePost,
             onAddComment = onAddComment,
+            onEditComment = onEditComment,
+            onDeleteComment = onDeleteComment,
+            onSetCommentHidden = onSetCommentHidden,
             onClearError = onClearError
         )
     }
@@ -274,7 +283,10 @@ private fun FeedScreenPreview() {
             onSelectPostAt = {},
             onToggleLike = {},
             onDeletePost = {},
-            onAddComment = { _, _, _ -> }
+            onAddComment = { _, _, _ -> },
+            onEditComment = { _, _ -> },
+            onDeleteComment = {},
+            onSetCommentHidden = { _, _ -> }
         )
     }
 }
@@ -304,7 +316,10 @@ private fun FeedScreenEmptyPreview() {
             onSelectPostAt = {},
             onToggleLike = {},
             onDeletePost = {},
-            onAddComment = { _, _, _ -> }
+            onAddComment = { _, _, _ -> },
+            onEditComment = { _, _ -> },
+            onDeleteComment = {},
+            onSetCommentHidden = { _, _ -> }
         )
     }
 }

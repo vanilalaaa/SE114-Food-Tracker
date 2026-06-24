@@ -40,6 +40,12 @@ data class FeedComment(
     @ColumnInfo(name = "is_deleted")
     val isDeleted: Boolean = false,
 
+    @ColumnInfo(name = "is_hidden", defaultValue = "0")
+    val isHidden: Boolean = false,
+
+    @ColumnInfo(name = "hidden_at")
+    val hiddenAt: Long? = null,
+
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
 
