@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.data.repository.FeedRepository
+import com.SE114.food_tracker.data.repository.FriendRepository
 import com.SE114.food_tracker.data.repository.ProfileViewerRepository
 import com.SE114.food_tracker.data.repository.ReportRepository
 import com.SE114.food_tracker.feature.report.ReportReason
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 class ProfileViewModel @Inject constructor(
     private val profileRepository: ProfileViewerRepository,
     private val feedRepository: FeedRepository,
+    private val friendRepository: FriendRepository,
     private val reportRepository: ReportRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -63,6 +65,7 @@ class ProfileViewModel @Inject constructor(
                             error = null
                         )
                     }
+                    loadFriendship(profile.id, authId)
                     loadSharedDiary()
                     observeAuthorPosts()
                 }
@@ -157,8 +160,64 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    fun performFriendshipAction() {
+        val state = _uiState.value
+        val friendshipId = state.friendshipId ?: return
+        if (state.isFriendshipActionSubmitting) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isFriendshipActionSubmitting = true, reportMessage = null) }
+
+            val result = when (state.friendshipStatus) {
+                "accepted" -> friendRepository.unfriend(friendshipId)
+                "pending" -> {
+                    if (state.isFriendshipOutgoing) {
+                        friendRepository.cancelOutgoingRequest(friendshipId)
+                    } else {
+                        friendRepository.declineRequest(friendshipId)
+                    }
+                }
+                else -> Result.success(Unit)
+            }
+
+            result.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        friendshipId = null,
+                        friendshipStatus = null,
+                        isFriendshipOutgoing = false,
+                        isFriendshipActionSubmitting = false,
+                        reportMessage = "Đã cập nhật lời mời kết bạn"
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isFriendshipActionSubmitting = false,
+                        reportMessage = error.message ?: "Không cập nhật được lời mời kết bạn."
+                    )
+                }
+            }
+        }
+    }
+
     fun clearReportMessage() {
         _uiState.update { it.copy(reportMessage = null) }
+    }
+
+    private suspend fun loadFriendship(targetProfileId: String, currentProfileId: String?) {
+        if (currentProfileId == null || targetProfileId == currentProfileId) return
+
+        runCatching { friendRepository.friendshipWith(targetProfileId) }
+            .onSuccess { friendship ->
+                _uiState.update {
+                    it.copy(
+                        friendshipId = friendship?.friendshipId,
+                        friendshipStatus = friendship?.status,
+                        isFriendshipOutgoing = friendship?.senderId == currentProfileId
+                    )
+                }
+            }
     }
 
     private fun Throwable.toReportMessage(): String {

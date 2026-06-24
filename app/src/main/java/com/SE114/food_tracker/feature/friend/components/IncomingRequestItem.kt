@@ -26,13 +26,27 @@ fun IncomingRequestItem(
     onDecline: (String) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ProfileAvatar(avatarUrl = request.avatarUrl)
         Spacer(modifier = Modifier.width(12.dp))
 
-        Text(request.displayName, color = TextPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = request.displayName,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+            Text(
+                text = "@${request.searchUserId}",
+                color = TextLabelGray,
+                fontSize = 12.sp
+            )
+        }
 
         Row {
             Button(
