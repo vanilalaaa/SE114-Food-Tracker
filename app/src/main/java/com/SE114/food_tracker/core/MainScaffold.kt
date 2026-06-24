@@ -40,6 +40,7 @@ private fun bottomBarRouteFor(route: String?): String? =
         AppDestinations.Profile.route -> AppDestinations.Feed.route
         AppDestinations.MyProfile.route -> AppDestinations.Settings.route
         AppDestinations.CategoryManagement.route -> AppDestinations.Settings.route
+        AppDestinations.ChangePassword.route -> AppDestinations.Settings.route
         CHAT_DETAIL_ROUTE -> AppDestinations.Chat.route
         else -> route
     }

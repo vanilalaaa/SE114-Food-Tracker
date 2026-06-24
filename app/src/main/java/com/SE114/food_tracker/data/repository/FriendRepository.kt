@@ -117,13 +117,28 @@ class FriendRepository @Inject constructor(
             }
             .decodeList<FriendshipDTO>()
 
-        remoteFriendships.forEach { dto ->
+        val latestRemoteFriendships = remoteFriendships
+            .groupBy { friendshipPairKey(it.senderId, it.receiverId) }
+            .values
+            .mapNotNull { friendships ->
+                friendships.maxWithOrNull(
+                    compareBy<FriendshipDTO> { parseCreatedAt(it.createdAt) }
+                        .thenBy { it.id }
+                )
+            }
+
+        latestRemoteFriendships.forEach { dto ->
             val otherProfileId = if (dto.senderId == me.id) dto.receiverId else dto.senderId
             fetchProfileById(otherProfileId)?.let { friendDao.insertUserCache(it.toCacheEntity()) }
             friendDao.insertFriendship(dto.toEntity())
+            friendDao.softDeleteOtherFriendshipsBetween(
+                firstUserId = dto.senderId,
+                secondUserId = dto.receiverId,
+                keepFriendshipId = dto.id
+            )
         }
 
-        val remoteFriendshipIds = remoteFriendships.map { it.id }
+        val remoteFriendshipIds = latestRemoteFriendships.map { it.id }
         if (remoteFriendshipIds.isEmpty()) {
             friendDao.softDeleteAllFriendshipsForUser(myUserId = me.id)
         } else {
@@ -141,10 +156,10 @@ class FriendRepository @Inject constructor(
         updateRemoteStatus(friendshipId, "declined")
 
     suspend fun unfriend(friendshipId: String): Result<Unit> =
-        updateRemoteStatus(friendshipId, "declined")
+        deleteRemoteFriendship(friendshipId)
 
     suspend fun cancelOutgoingRequest(friendshipId: String): Result<Unit> =
-        updateRemoteStatus(friendshipId, "declined")
+        deleteRemoteFriendship(friendshipId)
 
     suspend fun searchUser(searchUserId: String): Result<ProfileDTO> = runCatching {
         val me = requireCurrentProfile()
@@ -247,6 +262,24 @@ class FriendRepository @Inject constructor(
             .select(profileColumns) { filter { eq("id", profileId) } }
             .decodeSingleOrNull<ProfileDTO>()
 
+    private suspend fun fetchFriendshipsBetween(firstUserId: String, secondUserId: String): List<FriendshipDTO> =
+        supabaseClient.postgrest.from("friendship")
+            .select {
+                filter {
+                    or {
+                        and {
+                            eq("sender_id", firstUserId)
+                            eq("receiver_id", secondUserId)
+                        }
+                        and {
+                            eq("sender_id", secondUserId)
+                            eq("receiver_id", firstUserId)
+                        }
+                    }
+                }
+            }
+            .decodeList<FriendshipDTO>()
+
     private suspend fun updateRemoteStatus(friendshipId: String, status: String): Result<Unit> =
         runCatching {
             val friendship = friendDao.getFriendshipById(friendshipId)
@@ -276,19 +309,21 @@ class FriendRepository @Inject constructor(
                 error("Không thể xóa kết bạn này.")
             }
 
-            supabaseClient.postgrest.from("friendship").delete {
-                filter { eq("id", friendshipId) }
-            }
-            val stillExists = supabaseClient.postgrest.from("friendship")
-                .select {
-                    filter { eq("id", friendshipId) }
+            val pairFriendships = fetchFriendshipsBetween(friendship.senderId, friendship.receiverId)
+            pairFriendships.forEach { remoteFriendship ->
+                supabaseClient.postgrest.from("friendship").delete {
+                    filter { eq("id", remoteFriendship.id) }
                 }
-                .decodeList<FriendshipDTO>()
-                .isNotEmpty()
+            }
+            val stillExists = fetchFriendshipsBetween(friendship.senderId, friendship.receiverId).isNotEmpty()
             if (stillExists) {
                 error("Chưa xóa được kết bạn trên server.")
             }
-            friendDao.softDeleteFriendship(friendshipId, syncStatus = "SYNCED")
+            friendDao.softDeleteFriendshipsBetween(
+                firstUserId = friendship.senderId,
+                secondUserId = friendship.receiverId,
+                syncStatus = "SYNCED"
+            )
         }
 
     private fun ProfileDTO.toCacheEntity(): UserProfileCacheEntity =
@@ -323,6 +358,13 @@ class FriendRepository @Inject constructor(
     private fun parseCreatedAt(value: String): Long =
         runCatching { Instant.parse(value).toEpochMilliseconds() }
             .getOrDefault(Clock.System.now().toEpochMilliseconds())
+
+    private fun friendshipPairKey(firstUserId: String, secondUserId: String): String =
+        if (firstUserId <= secondUserId) {
+            "$firstUserId:$secondUserId"
+        } else {
+            "$secondUserId:$firstUserId"
+        }
 
     private companion object {
         const val AUTH_SESSION_WAIT_MS = 3_000L

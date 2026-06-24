@@ -52,3 +52,11 @@ val DonutSegment5 = Color(0xFFD39292)
 val DonutSegment6 = Color(0xFFB5C4E3)
 val DonutSegment7 = Color(0xFFE8D3C7)
 val DonutSegment8 = Color(0xFFC9C0D3)
+
+val AlertRed = Color(0xFFC06361)
+val AlertRedBg = Color(0xFFFDF2F2)
+val AlertRedBorder = Color(0xFFF8BBD0)
+
+val AlertGreen = Color(0xFF5F9162)
+val AlertGreenBg = Color(0xFFEEF6EE)
+val AlertGreenBorder = Color(0xFFC8E6C9)

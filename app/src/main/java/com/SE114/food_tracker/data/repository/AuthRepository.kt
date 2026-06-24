@@ -24,5 +24,11 @@ interface AuthRepository {
     /** Updates the password of the currently (recovery-)authenticated user. */
     suspend fun updatePassword(newPassword: String): AuthOutcome<Unit>
 
+    /**
+     * In-session password change: verifies [currentPassword] (re-auth), then sets [newPassword].
+     * A wrong current password surfaces as [AuthError.InvalidCredentials].
+     */
+    suspend fun changePassword(currentPassword: String, newPassword: String): AuthOutcome<Unit>
+
     suspend fun signOut(): AuthOutcome<Unit>
 }

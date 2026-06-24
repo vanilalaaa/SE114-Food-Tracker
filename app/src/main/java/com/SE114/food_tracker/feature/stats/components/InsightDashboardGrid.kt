@@ -40,7 +40,7 @@ fun InsightDashboardGrid(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         "💥 Món chi nhiều nhất",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = TextLabelGray,
                         fontWeight = FontWeight.Bold
                     )
@@ -63,7 +63,7 @@ fun InsightDashboardGrid(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         "🗂️ Danh mục cao nhất",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = TextLabelGray,
                         fontWeight = FontWeight.Bold
                     )
@@ -94,14 +94,14 @@ fun InsightDashboardGrid(
                 Column {
                     Text(
                         "📈 So sánh với kỳ trước",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = TextLabelGray,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         "Tổng chi tiêu hệ thống biến động",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = TextLabelGray
                     )
                 }

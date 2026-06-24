@@ -296,7 +296,7 @@ fun FriendScreenContent(
         }
 
         item {
-            SectionHeader(title = "Bạn bè", count = acceptedFriends.size, maxCount = 10)
+            SectionHeader(title = "Bạn bè", count = acceptedFriends.size)
             Spacer(modifier = Modifier.height(16.dp))
         }
 

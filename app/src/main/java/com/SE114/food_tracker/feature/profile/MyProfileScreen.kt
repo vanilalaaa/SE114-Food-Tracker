@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +41,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,14 +71,22 @@ fun MyProfileScreen(
         }
     }
 
+    // A successful save returns to Settings, where the profile block reflects the change.
+    LaunchedEffect(state.saveSucceeded) {
+        if (state.saveSucceeded) {
+            viewModel.consumeSaveSuccess()
+            onBack()
+        }
+    }
+
     MyProfileContent(
         state = state,
         onBack = onBack,
-        onDisplayNameChange = viewModel::onDisplayNameChange,
-        onUserIdChange = viewModel::onUserIdChange,
         onPickAvatar = {
             avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },
+        onDisplayNameChange = viewModel::onDisplayNameChange,
+        onUserIdChange = viewModel::onUserIdChange,
         onSave = viewModel::save
     )
 }
@@ -83,9 +95,9 @@ fun MyProfileScreen(
 private fun MyProfileContent(
     state: MyProfileUiState,
     onBack: () -> Unit,
+    onPickAvatar: () -> Unit,
     onDisplayNameChange: (String) -> Unit,
     onUserIdChange: (String) -> Unit,
-    onPickAvatar: () -> Unit,
     onSave: () -> Unit
 ) {
     AppScaffold { innerPadding ->
@@ -105,14 +117,17 @@ private fun MyProfileContent(
                     )
                 }
                 Text(
-                    text = stringResource(R.string.profile_title),
+                    text = stringResource(R.string.profile_edit_title),
                     style = MaterialTheme.typography.titleLarge
                 )
             }
 
+            Spacer(Modifier.height(8.dp))
+
             EditableAvatar(
                 avatarUrl = state.avatarUrl,
                 uploading = state.isUploadingAvatar,
+                size = 120.dp,
                 onClick = onPickAvatar,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
@@ -210,48 +225,58 @@ private fun UserIdStatusIcon(status: UserIdCheckStatus) {
     }
 }
 
+/**
+ * Circular avatar with an edit-pencil badge. The circular clip is applied only to the image,
+ * so the badge sits at the edge and is never clipped by the circle.
+ */
 @Composable
 private fun EditableAvatar(
     avatarUrl: String?,
     uploading: Boolean,
+    size: Dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.size(96.dp).clip(CircleShape).clickable(onClick = onClick)) {
-        if (avatarUrl.isNullOrBlank()) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(HintGrayStat),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Outlined.Person, contentDescription = null, tint = CardWhite, modifier = Modifier.size(48.dp))
+    Box(modifier = modifier.size(size).clickable(onClick = onClick)) {
+        Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(HintGrayStat)) {
+            if (avatarUrl.isNullOrBlank()) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = null,
+                    tint = CardWhite,
+                    modifier = Modifier.align(Alignment.Center).size(size / 2)
+                )
+            } else {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(avatarUrl).crossfade(true).build(),
+                    contentDescription = stringResource(R.string.profile_avatar_desc),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
-        } else {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(avatarUrl).crossfade(true).build(),
-                contentDescription = stringResource(R.string.profile_avatar_desc),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+
+            if (uploading) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = CardWhite, modifier = Modifier.size(28.dp))
+                }
+            }
         }
 
-        if (uploading) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = CardWhite, modifier = Modifier.size(28.dp))
-            }
-        } else {
+        if (!uploading) {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.align(Alignment.BottomEnd).size(28.dp)
+                border = androidx.compose.foundation.BorderStroke(2.dp, CardWhite),
+                modifier = Modifier.align(Alignment.BottomEnd).size(34.dp)
             ) {
                 Icon(
                     Icons.Filled.Edit,
                     contentDescription = stringResource(R.string.profile_change_avatar),
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(6.dp)
+                    modifier = Modifier.padding(8.dp)
                 )
             }
         }
@@ -276,13 +301,12 @@ private fun MyProfileContentPreview() {
                 displayName = "An Nguyễn",
                 userId = "an.nguyen",
                 originalUserId = "an.nguyen",
-                userIdEditable = false,
-                cooldownDays = 12
+                userIdEditable = true
             ),
             onBack = {},
+            onPickAvatar = {},
             onDisplayNameChange = {},
             onUserIdChange = {},
-            onPickAvatar = {},
             onSave = {}
         )
     }
