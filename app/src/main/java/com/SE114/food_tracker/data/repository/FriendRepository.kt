@@ -116,6 +116,11 @@ class FriendRepository @Inject constructor(
         return friendDao.getFriendshipBetween(me.id, profileId)?.status
     }
 
+    suspend fun friendshipWith(profileId: String): FriendshipEntity? {
+        val me = requireCurrentProfile()
+        return friendDao.getFriendshipBetween(me.id, profileId)
+    }
+
     suspend fun sendFriendRequest(targetProfileId: String): Result<Unit> = runCatching {
         val me = requireCurrentProfile()
         if (targetProfileId == me.id) {

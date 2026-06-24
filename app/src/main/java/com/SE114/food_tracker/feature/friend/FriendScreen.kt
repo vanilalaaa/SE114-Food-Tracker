@@ -19,6 +19,7 @@ import com.SE114.food_tracker.data.local.dao.FriendItemDto
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.friend.components.*
+import com.SE114.food_tracker.feature.report.ReportDialog
 
 @Composable
 fun FriendScreen(
@@ -36,11 +37,13 @@ fun FriendScreen(
     val profileLoadError by viewModel.profileLoadError.collectAsStateWithLifecycle()
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
     val busyFriendshipIds by viewModel.busyFriendshipIds.collectAsStateWithLifecycle()
+    val isReportSubmitting by viewModel.isReportSubmitting.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var friendPendingDelete by remember { mutableStateOf<FriendItemDto?>(null) }
     var requestPendingDecline by remember { mutableStateOf<FriendItemDto?>(null) }
     var requestPendingCancel by remember { mutableStateOf<FriendItemDto?>(null) }
+    var friendPendingReport by remember { mutableStateOf<FriendItemDto?>(null) }
 
     // Surface failed friend actions as a one-shot snackbar.
     LaunchedEffect(actionMessage) {
@@ -79,6 +82,7 @@ fun FriendScreen(
             onDeclineRequest = { request -> requestPendingDecline = request },
             onCancelOutgoingRequest = { request -> requestPendingCancel = request },
             onUnfriend = { friend -> friendPendingDelete = friend },
+            onReportFriend = { friend -> friendPendingReport = friend },
             onOpenMyProfile = { currentProfile?.id?.let(onNavigateToProfile) },
             onOpenFriendProfile = { friend -> onNavigateToProfile(friend.userId) },
             onNavigateBack = onNavigateBack
@@ -125,6 +129,16 @@ fun FriendScreen(
                 onDismiss = { requestPendingCancel = null }
             )
         }
+        friendPendingReport?.let { friend ->
+            ReportDialog(
+                isSubmitting = isReportSubmitting,
+                onDismissRequest = { friendPendingReport = null },
+                onConfirmReport = { reason ->
+                    viewModel.submitReport(friend.userId, reason)
+                    friendPendingReport = null
+                }
+            )
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -153,6 +167,7 @@ fun FriendScreenContent(
     onDeclineRequest: (FriendItemDto) -> Unit,
     onCancelOutgoingRequest: (FriendItemDto) -> Unit,
     onUnfriend: (FriendItemDto) -> Unit,
+    onReportFriend: (FriendItemDto) -> Unit,
     onOpenMyProfile: () -> Unit,
     onOpenFriendProfile: (FriendItemDto) -> Unit,
     onNavigateBack: () -> Unit
@@ -266,6 +281,7 @@ fun FriendScreenContent(
                     friend = friend,
                     onOpenProfile = { onOpenFriendProfile(friend) },
                     isBusy = friend.friendshipId in busyFriendshipIds,
+                    onReport = { onReportFriend(friend) },
                     onUnfriend = { onUnfriend(friend) }
                 )
             }
@@ -305,6 +321,7 @@ fun Preview_EmptyFriendScreen() {
             onDeclineRequest = {},
             onCancelOutgoingRequest = {},
             onUnfriend = {},
+            onReportFriend = {},
             onOpenMyProfile = {},
             onOpenFriendProfile = {},
             onNavigateBack = {}
@@ -342,6 +359,7 @@ fun Preview_FilledFriendScreen() {
             onDeclineRequest = {},
             onCancelOutgoingRequest = {},
             onUnfriend = {},
+            onReportFriend = {},
             onOpenMyProfile = {},
             onOpenFriendProfile = {},
             onNavigateBack = {}

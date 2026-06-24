@@ -21,7 +21,11 @@ data class ProfileUiState(
     val posts: List<FeedPostDto> = emptyList(),
     val isPostsLoading: Boolean = false,
     val isReportSubmitting: Boolean = false,
-    val reportMessage: String? = null
+    val reportMessage: String? = null,
+    val friendshipId: String? = null,
+    val friendshipStatus: String? = null,
+    val isFriendshipOutgoing: Boolean = false,
+    val isFriendshipActionSubmitting: Boolean = false
 ) {
     val displayName: String
         get() = profile?.displayName?.takeIf { it.isNotBlank() }
@@ -30,4 +34,11 @@ data class ProfileUiState(
 
     val handle: String
         get() = profile?.userId?.takeIf { it.isNotBlank() }?.let { "@$it" }.orEmpty()
+
+    val friendshipActionLabel: String?
+        get() = when (friendshipStatus) {
+            "accepted" -> "Hủy kết bạn"
+            "pending" -> if (isFriendshipOutgoing) "Hủy lời mời" else "Từ chối lời mời"
+            else -> null
+        }
 }

@@ -22,10 +22,20 @@ import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.rpc
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.RealtimeChannel
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Instant
@@ -43,6 +53,11 @@ class FeedRepository @Inject constructor(
     private val supabaseClient: SupabaseClient,
     @ApplicationContext private val context: Context
 ) {
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var feedRealtimeChannel: RealtimeChannel? = null
+    private val _postRealtimeEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val postRealtimeEvents: SharedFlow<Unit> = _postRealtimeEvents.asSharedFlow()
+
     fun currentUserId(): String =
         supabaseClient.auth.currentUserOrNull()?.id ?: LOCAL_USER_ID
 
@@ -78,6 +93,42 @@ class FeedRepository @Inject constructor(
 
     fun observeSourceItems(): Flow<List<FeedSourceItemDto>> =
         feedDao.observeSourceItems(limit = PAGE_SIZE)
+
+    fun subscribeToFeedRealtime() {
+        repositoryScope.launch {
+            if (feedRealtimeChannel != null) return@launch
+
+            runCatching {
+                val channel = supabaseClient.channel("feed_posts_realtime")
+
+                val insertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    table = "post"
+                }
+                val updateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                    table = "post"
+                }
+                val deleteFlow = channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+                    table = "post"
+                }
+
+                repositoryScope.launch {
+                    insertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    updateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    deleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                }
+
+                channel.subscribe()
+                feedRealtimeChannel = channel
+                Timber.d("[FeedRealtime] subscribed to post changes")
+            }.onFailure { throwable ->
+                Timber.e(throwable, "[FeedRealtime] subscribe failed")
+            }
+        }
+    }
 
     suspend fun refreshVisibleFromSupabase(): Boolean {
         val ownerId = currentAuthenticatedUserId()

@@ -6,6 +6,8 @@ import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.FriendRepository
+import com.SE114.food_tracker.data.repository.ReportRepository
+import com.SE114.food_tracker.feature.report.ReportReason
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
 import javax.inject.Inject
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 class FriendViewModel @Inject constructor(
     private val repository: FriendRepository,
     private val feedRepository: FeedRepository,
+    private val reportRepository: ReportRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -51,6 +54,9 @@ class FriendViewModel @Inject constructor(
 
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage = _actionMessage.asStateFlow()
+
+    private val _isReportSubmitting = MutableStateFlow(false)
+    val isReportSubmitting = _isReportSubmitting.asStateFlow()
 
     private val _busyFriendshipIds = MutableStateFlow<Set<String>>(emptySet())
     val busyFriendshipIds = _busyFriendshipIds.asStateFlow()
@@ -123,6 +129,21 @@ class FriendViewModel @Inject constructor(
 
     fun cancelOutgoingRequest(friendshipId: String) =
         runFriendAction(friendshipId) { repository.cancelOutgoingRequest(friendshipId) }
+
+    fun submitReport(targetId: String, reason: ReportReason) {
+        if (_isReportSubmitting.value) return
+
+        viewModelScope.launch {
+            _isReportSubmitting.value = true
+            reportRepository.submitProfileReport(
+                targetId = targetId,
+                reason = reason.remoteValue
+            ).onSuccess {
+                _actionMessage.value = "Đã gửi báo cáo, admin sẽ xem xét"
+            }.onFailure { reportActionError(it) }
+            _isReportSubmitting.value = false
+        }
+    }
 
     private fun loadFriendData() {
         loadFriendDataJob?.cancel()

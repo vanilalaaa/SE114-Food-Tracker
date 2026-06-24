@@ -16,6 +16,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -52,6 +54,7 @@ class FeedViewModel @Inject constructor(
     private val _isCreatingPost = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
     private val _currentUserId = MutableStateFlow(feedRepository.currentUserId())
+    private var realtimeRefreshJob: Job? = null
 
     private val posts = combine(_page, _currentUserId) { page, currentUserId -> page to currentUserId }
         .flatMapLatest { (page, currentUserId) ->
@@ -115,6 +118,10 @@ class FeedViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = FeedUiState(isLoading = true)
             )
+
+    init {
+        subscribeToRealtimePosts()
+    }
 
     fun loadNextPage() {
         if (_isLoading.value || !uiState.value.canLoadMore) return
@@ -283,13 +290,34 @@ class FeedViewModel @Inject constructor(
     }
 
     private suspend fun refreshVisibleFeedAfterCreate() {
+        refreshVisibleFeedSilently("[FeedVM] Silent feed refresh after create failed")
+    }
+
+    private fun subscribeToRealtimePosts() {
+        feedRepository.subscribeToFeedRealtime()
+        viewModelScope.launch {
+            feedRepository.postRealtimeEvents.collect {
+                scheduleRealtimeRefresh()
+            }
+        }
+    }
+
+    private fun scheduleRealtimeRefresh() {
+        realtimeRefreshJob?.cancel()
+        realtimeRefreshJob = viewModelScope.launch {
+            delay(500)
+            refreshVisibleFeedSilently("[FeedVM] Realtime feed refresh failed")
+        }
+    }
+
+    private suspend fun refreshVisibleFeedSilently(errorLogMessage: String) {
         runCatching {
             friendRepository.refreshCurrentProfile().getOrThrow()
             friendRepository.refreshFriendships().getOrThrow()
             syncCurrentUserId()
             feedRepository.refreshVisibleFromSupabase()
         }.onFailure { throwable ->
-            Timber.e(throwable, "[FeedVM] Silent feed refresh after create failed")
+            Timber.e(throwable, errorLogMessage)
         }
     }
 
