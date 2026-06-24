@@ -28,6 +28,18 @@ alter table public.profile
 alter table public.profile
   add column if not exists created_at timestamptz not null default now();
 
+-- The report table is assumed to come from the base schema, but no migration creates it.
+-- Create it (guarded) so the report feature + admin reports work on a fresh project. The
+-- columns match the app's ReportDTO insert and admin_list_reports. No-op if it already exists.
+create table if not exists public.report (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references public.profile(id) on delete cascade,
+  target_id uuid not null references public.profile(id) on delete cascade,
+  reason text not null,
+  status text not null default 'pending',
+  created_at timestamptz not null default now()
+);
+
 -- report.created_at is required by admin_list_reports (the "time" column) and by
 -- ordering; guarded in case the base report table predates it.
 alter table public.report
@@ -297,9 +309,26 @@ create policy admin_all_reports on public.report
   using (public.am_i_admin())
   with check (public.am_i_admin());
 
+-- Owner policies: enabling RLS above would otherwise block the report-submit feature.
+-- A user may file a report as themselves and read back their own reports.
+drop policy if exists report_insert_own on public.report;
+create policy report_insert_own on public.report
+  for insert to authenticated with check (reporter_id = auth.uid());
+
+drop policy if exists report_select_own on public.report;
+create policy report_select_own on public.report
+  for select to authenticated using (reporter_id = auth.uid());
+
 -- 6. Session-guard note -------------------------------------------------------
 -- Banned / soft-deleted users are rejected at the SESSION layer: the client
 -- session guard calls am_i_active() on session resolve / app resume and signs
 -- them out. Broadly rewriting every table's RLS to also exclude banned users
 -- from writes is intentionally out of scope for this migration (separate change);
 -- this file focuses on admin capability + admin read access.
+
+-- 7. Reload PostgREST schema cache -------------------------------------------
+-- Newly created/replaced functions are invisible to the REST API until PostgREST
+-- reloads its schema cache. Without this, admin_list_users / admin_list_reports /
+-- admin_dashboard_stats fail with PGRST202 "Could not find the function ... in the
+-- schema cache" even though they exist. Safe to run every time.
+notify pgrst, 'reload schema';
