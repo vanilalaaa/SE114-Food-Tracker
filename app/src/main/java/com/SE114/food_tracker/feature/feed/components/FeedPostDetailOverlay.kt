@@ -34,10 +34,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -95,6 +98,8 @@ fun FeedPostDetailOverlay(
     onNavigateToProfile: (String) -> Unit,
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
+    onHidePost: (String) -> Unit,
+    onDownloadPost: (FeedPostDto) -> Unit,
     onDeletePost: (String) -> Unit,
     onAddComment: (String, String, String?) -> Unit,
     onEditComment: (String, String) -> Unit,
@@ -127,6 +132,7 @@ fun FeedPostDetailOverlay(
         var pendingScrollToBottom by rememberSaveable { mutableStateOf(false) }
         var isCommentsSheetOpen by rememberSaveable { mutableStateOf(false) }
         var pendingDeletePostId by rememberSaveable { mutableStateOf<String?>(null) }
+        var actionPost by remember { mutableStateOf<FeedPostDto?>(null) }
         val snackbarHostState = remember { SnackbarHostState() }
 
         LaunchedEffect(uiState.error) {
@@ -176,7 +182,7 @@ fun FeedPostDetailOverlay(
                             emptyList()
                         },
                         onToggleLike = onToggleLike,
-                        onDeletePost = { postId -> pendingDeletePostId = postId },
+                        onOpenPostActions = { post -> actionPost = post },
                         onOpenComments = { isCommentsSheetOpen = true },
                         onNavigateToProfile = { profileId ->
                             onClose()
@@ -290,7 +296,7 @@ fun FeedPostDetailOverlay(
                     AlertDialog(
                         onDismissRequest = { pendingDeletePostId = null },
                         title = { Text(text = "Xóa bài viết?") },
-                        text = { Text(text = "Bài viết sẽ bị ẩn khỏi bảng tin và đồng bộ xóa lên Supabase.") },
+                        text = { Text(text = "Bài viết sẽ bị ẩn khỏi bảng tin.") },
                         confirmButton = {
                             TextButton(
                                 onClick = {
@@ -308,6 +314,26 @@ fun FeedPostDetailOverlay(
                         }
                     )
                 }
+
+                actionPost?.let { post ->
+                    FeedPostActionSheet(
+                        post = post,
+                        currentUserId = uiState.currentUserId,
+                        onHide = {
+                            actionPost = null
+                            onHidePost(post.postId)
+                        },
+                        onDownload = {
+                            actionPost = null
+                            onDownloadPost(post)
+                        },
+                        onDelete = {
+                            actionPost = null
+                            pendingDeletePostId = post.postId
+                        },
+                        onDismiss = { actionPost = null }
+                    )
+                }
             }
         }
     }
@@ -319,7 +345,7 @@ private fun FeedPostDetailPage(
     currentUserId: String,
     comments: List<FeedCommentDto>,
     onToggleLike: (String) -> Unit,
-    onDeletePost: (String) -> Unit,
+    onOpenPostActions: (FeedPostDto) -> Unit,
     onOpenComments: () -> Unit,
     onNavigateToProfile: (String) -> Unit
 ) {
@@ -365,10 +391,9 @@ private fun FeedPostDetailPage(
 
             FeedStoryActionBar(
                 post = post,
-                canDelete = post.ownerId == currentUserId,
                 commentCount = comments.size,
                 onToggleLike = onToggleLike,
-                onDeletePost = onDeletePost,
+                onOpenPostActions = onOpenPostActions,
                 onOpenComments = onOpenComments
             )
         }
@@ -480,6 +505,14 @@ private fun FeedAuthorBlock(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "• ${formatCommentAge(post.createdAt)}",
+                color = Color.White.copy(alpha = 0.46f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
         }
 
         if (post.caption.isNotBlank()) {
@@ -501,10 +534,9 @@ private fun FeedAuthorBlock(
 @Composable
 private fun FeedStoryActionBar(
     post: FeedPostDto,
-    canDelete: Boolean,
     commentCount: Int,
     onToggleLike: (String) -> Unit,
-    onDeletePost: (String) -> Unit,
+    onOpenPostActions: (FeedPostDto) -> Unit,
     onOpenComments: () -> Unit
 ) {
     Row(
@@ -525,7 +557,19 @@ private fun FeedStoryActionBar(
                 .clickable(onClick = onOpenComments)
         )
 
-        IconButton(onClick = { onToggleLike(post.postId) }) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable { onToggleLike(post.postId) }
+        ) {
+            if (post.likeCount > 0) {
+                Text(
+                    text = post.likeCount.toString(),
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.width(3.dp))
+            }
             Icon(
                 imageVector = if (post.isLikedByMe) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                 contentDescription = "Thích",
@@ -556,16 +600,100 @@ private fun FeedStoryActionBar(
             }
         }
 
-        if (canDelete) {
-            IconButton(onClick = { onDeletePost(post.postId) }) {
-                Icon(
-                    imageVector = Icons.Outlined.DeleteOutline,
-                    contentDescription = "Xóa bài viết",
-                    tint = Color.White,
-                    modifier = Modifier.size(30.dp)
+        IconButton(onClick = { onOpenPostActions(post) }) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "Tùy chọn bài viết",
+                tint = Color.White,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FeedPostActionSheet(
+    post: FeedPostDto,
+    currentUserId: String,
+    onHide: () -> Unit,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val isOwner = post.ownerId == currentUserId
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color(0xFF202229).copy(alpha = 0.96f),
+        scrimColor = Color.Black.copy(alpha = 0.45f),
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        dragHandle = null
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(top = 18.dp, bottom = 18.dp)
+        ) {
+            if (!isOwner) {
+                FeedPostActionRow(
+                    text = "Ẩn",
+                    textColor = Color.White,
+                    icon = { Icon(Icons.Outlined.VisibilityOff, contentDescription = null, tint = Color.White) },
+                    onClick = onHide
                 )
             }
+            FeedPostActionRow(
+                text = "Tải về",
+                textColor = Color.White,
+                icon = { Icon(Icons.Outlined.FileDownload, contentDescription = null, tint = Color.White) },
+                onClick = onDownload
+            )
+            if (isOwner) {
+                FeedPostActionRow(
+                    text = "Xóa",
+                    textColor = Color(0xFFFF5B6B),
+                    icon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = Color(0xFFFF5B6B)) },
+                    onClick = onDelete
+                )
+            }
+            FeedPostActionRow(
+                text = "Hủy",
+                textColor = Color.White.copy(alpha = 0.88f),
+                icon = null,
+                onClick = onDismiss
+            )
         }
+    }
+}
+
+@Composable
+private fun FeedPostActionRow(
+    text: String,
+    textColor: Color,
+    icon: (@Composable () -> Unit)?,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 28.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (icon != null) {
+            icon()
+            Spacer(Modifier.width(14.dp))
+        }
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

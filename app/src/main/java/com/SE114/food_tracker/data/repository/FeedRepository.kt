@@ -8,6 +8,7 @@ import com.SE114.food_tracker.data.local.dao.FeedDAO
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.data.local.entities.FeedComment
+import com.SE114.food_tracker.data.local.entities.FeedHiddenPost
 import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
 import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
@@ -63,7 +64,7 @@ class FeedRepository @Inject constructor(
         supabaseClient.auth.currentUserOrNull()?.id ?: LOCAL_USER_ID
 
     fun currentDisplayName(): String =
-        supabaseClient.auth.currentUserOrNull()?.email?.substringBefore("@") ?: "Thao Uyen"
+        supabaseClient.auth.currentUserOrNull()?.email?.substringBefore("@") ?: "Người dùng"
 
     fun observePosts(
         pageSize: Int,
@@ -202,6 +203,15 @@ class FeedRepository @Inject constructor(
         feedDao.toggleLike(postId, currentUserId())
     }
 
+    suspend fun hidePost(postId: String) {
+        val currentUserId = currentAuthenticatedUserId()
+        val post = feedDao.getPostById(postId) ?: error("Không tìm thấy bài viết.")
+        if (post.ownerId == currentUserId) {
+            error("Bài viết của bạn chỉ có thể xóa, không thể ẩn.")
+        }
+        feedDao.insertHiddenPost(FeedHiddenPost(postId = postId, userId = currentUserId))
+    }
+
     suspend fun addComment(
         postId: String,
         body: String,
@@ -294,7 +304,7 @@ class FeedRepository @Inject constructor(
 
         val deletedPost = feedDao.getPostById(postId)
             ?: throw FeedPostDeleteSyncException(
-                "Đã ẩn bài viết trên máy, nhưng không tìm thấy bài viết local để đồng bộ lên Supabase."
+                "Đã ẩn bài viết."
             )
 
         return runCatching { pushPost(deletedPost, ownerId) }
@@ -306,7 +316,7 @@ class FeedRepository @Inject constructor(
             .getOrElse { throwable ->
                 val reason = throwable.message ?: throwable::class.java.simpleName
                 throw FeedPostDeleteSyncException(
-                    message = "Đã ẩn bài viết trên máy, nhưng Supabase chưa cập nhật xóa: $reason",
+                    message = "Đã ẩn bài viết: $reason",
                     cause = throwable
                 )
             }
@@ -609,7 +619,8 @@ class FeedRepository @Inject constructor(
             syncStatus = SyncStatus.SYNCED.name,
             isDeleted = isDeleted,
             createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
-            updatedAt = Instant.parse(createdAt).toEpochMilliseconds()
+            updatedAt = deletedAt?.let { Instant.parse(it).toEpochMilliseconds() }
+                ?: Instant.parse(createdAt).toEpochMilliseconds()
         )
 
     private fun FeedLikeRemoteDTO.toEntity(): FeedLike =

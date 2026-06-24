@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.SE114.food_tracker.data.local.entities.FeedComment
+import com.SE114.food_tracker.data.local.entities.FeedHiddenPost
 import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
 import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
@@ -63,6 +64,12 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND NOT EXISTS(
+            SELECT 1
+            FROM feed_hidden_post hp
+            WHERE hp.post_id = p.post_id
+                AND hp.user_id = :currentUserId
+        )
         AND (
             p.owner_id = :currentUserId
             OR p.visibility = 'public'
@@ -138,6 +145,12 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND NOT EXISTS(
+            SELECT 1
+            FROM feed_hidden_post hp
+            WHERE hp.post_id = p.post_id
+                AND hp.user_id = :currentUserId
+        )
         AND p.owner_id = :ownerId
         AND (
             p.owner_id = :currentUserId
@@ -226,6 +239,9 @@ interface FeedDAO {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComment(comment: FeedComment)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHiddenPost(hiddenPost: FeedHiddenPost)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComments(comments: List<FeedComment>)

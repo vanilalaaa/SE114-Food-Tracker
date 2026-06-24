@@ -1,7 +1,10 @@
 package com.SE114.food_tracker.feature.feed
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
+import java.net.URL
 import java.util.UUID
 import javax.inject.Inject
 
@@ -347,10 +351,40 @@ class FeedViewModel @Inject constructor(
     fun toggleLike(postId: String) {
         viewModelScope.launch {
             runCatching { feedRepository.toggleLike(postId) }
-                .onSuccess { SyncScheduler.triggerImmediateSync(context) }
+                .onSuccess {
+                    SyncScheduler.triggerImmediateSync(context)
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after like failed")
+                }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Toggle like failed")
                     _error.value = throwable.message ?: "Không cập nhật được lượt thích"
+                }
+        }
+    }
+
+    fun hidePost(postId: String) {
+        viewModelScope.launch {
+            runCatching { feedRepository.hidePost(postId) }
+                .onSuccess {
+                    closePostDetail()
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after post hide failed")
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Hide post failed")
+                    _error.value = throwable.message ?: "Không ẩn được bài viết"
+                }
+        }
+    }
+
+    fun downloadPostImage(post: FeedPostDto) {
+        viewModelScope.launch {
+            runCatching { savePostImageToGallery(post) }
+                .onSuccess {
+                    _error.value = "Đã tải ảnh về thư viện"
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Download post image failed")
+                    _error.value = throwable.message ?: "Không tải được ảnh"
                 }
         }
     }
@@ -465,6 +499,51 @@ class FeedViewModel @Inject constructor(
 
             Uri.fromFile(target).toString()
         }
+
+    private suspend fun savePostImageToGallery(post: FeedPostDto) {
+        val imageModel = post.imageUrl.feedImageModelOrNull()
+            ?: error("Bài viết này không có ảnh để tải.")
+
+        withContext(Dispatchers.IO) {
+            val bytes = when {
+                imageModel.startsWith("http", ignoreCase = true) ->
+                    URL(imageModel).openStream().use { it.readBytes() }
+
+                else -> {
+                    val uri = Uri.parse(imageModel)
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: error("Không đọc được ảnh bài viết.")
+                }
+            }
+
+            val filename = "food_tracker_${post.postId}.jpg"
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/FoodTracker")
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                }
+            }
+
+            val resolver = context.contentResolver
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: error("Không tạo được file ảnh trong thư viện.")
+
+            runCatching {
+                resolver.openOutputStream(uri)?.use { output -> output.write(bytes) }
+                    ?: error("Không ghi được ảnh vào thư viện.")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    values.clear()
+                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+                }
+            }.onFailure { throwable ->
+                resolver.delete(uri, null, null)
+                throw throwable
+            }.getOrThrow()
+        }
+    }
 
     private companion object {
         const val AUTO_REFRESH_INTERVAL_MS = 5_000L
