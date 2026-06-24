@@ -39,10 +39,14 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 fun ChatScreen(
     conversationId: String,
     conversationName: String,
+    targetFriendId: String? = null,
     viewModel: ChatViewModel,
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        println("DEBUG_SCREEN: Đang mở chat với ID: '$conversationId'")
+    }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -61,7 +65,7 @@ fun ChatScreen(
 
     val memberList by viewModel.groupMembers.collectAsState()
     val isAdmin by viewModel.isCurrentAdmin.collectAsState()
-
+    val friendId = memberList.firstOrNull { it.first != currentUserId }?.first
     ChatScreenContent(
         conversationId = conversationId,
         conversationName = conversationState?.name ?: conversationName,
@@ -90,8 +94,16 @@ fun ChatScreen(
                 }
             }
         },
+
         onSendMessage = { text ->
-            viewModel.sendTextMessage(conversationId, text)
+            val realFriendId = conversationId
+
+            viewModel.sendTextMessage(
+                conversationId = "", // Ép nó về rỗng để buộc hệ thống tạo phòng mới
+                text = text,
+                isOneToOne = true,
+                friendUserId = realFriendId // Đẩy cái ID bị nhầm đó vào đúng chỗ
+            )
         },
         onSendImage = { imageUri ->
             viewModel.sendImageMessage(conversationId, imageUri)
@@ -238,12 +250,14 @@ fun ChatScreenContent(
                         }
                     }
 
-                    IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = StatPinkDark
-                        )
+                    if (isGroup) {
+                        IconButton(onClick = { showSettingsDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = StatPinkDark
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)

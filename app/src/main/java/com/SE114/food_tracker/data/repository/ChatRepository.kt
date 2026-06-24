@@ -197,8 +197,8 @@ class ChatRepository @Inject constructor(
     // ── CHỨC NĂNG REALTIME CHANNEL ──
 
     fun subscribeToChatRealtime(conversationId: String) {
+        if (activeChannels.containsKey(conversationId)) return
         repositoryScope.launch {
-            if (activeChannels.containsKey(conversationId)) return@launch
 
             try {
                 val channel = supabaseClient.channel("chat_channel_$conversationId")
@@ -304,12 +304,11 @@ class ChatRepository @Inject constructor(
                         _walletUpdateSignal.tryEmit(conversationId)
                     }
                 }
-
-                channel.subscribe()
                 activeChannels[conversationId] = channel
-                println("Supabase Realtime: Đã mở cổng đồng bộ cho phòng $conversationId")
+                channel.subscribe()
+                // println("Supabase Realtime: Đã mở cổng đồng bộ cho phòng $conversationId")
             } catch (e: Exception) {
-                println("Supabase Realtime Lỗi kết nối ban đầu: ${e.localizedMessage}")
+                // println("Supabase Realtime Lỗi kết nối ban đầu: ${e.localizedMessage}")
                 handleRealtimeReconnect(conversationId)
             }
         }
@@ -407,6 +406,13 @@ class ChatRepository @Inject constructor(
         imageUrl: String?,
         isSystem: Boolean = false
     ) {
+        println("DEBUG_CHECK: Đang kiểm tra conversationId: '$conversationId'")
+
+        // Nếu ID là kết quả của một hàm bị lỗi (trả về null hoặc rỗng), phải dừng ngay
+        if (conversationId.isBlank() || conversationId.length < 36) {
+            println("LỖI NGHIÊM TRỌNG: ConversationId '$conversationId' không hợp lệ! Hủy gửi tin.")
+            return
+        }
         val localId = UUID.randomUUID().toString()
         val pendingMessage = Message(
             localId = localId,
@@ -424,58 +430,69 @@ class ChatRepository @Inject constructor(
     }
 
     suspend fun getOrCreateOneToOneChat(friendUserId: String): String? {
+        println("DEBUG_TRACE: Đã bắt đầu vào hàm!")
         return try {
             val currentUserId = getAuthenticatedUserId()
+
+            // 1. Kiểm tra định dạng UUID ngay đầu hàm
+            // Một UUID chuẩn có độ dài 36 ký tự. Nếu friendUserId ngắn hơn, chắc chắn là Nickname.
+            if (friendUserId.length < 36) {
+                println("LỖI: Bạn đang truyền Nickname '$friendUserId' thay vì UUID. Phải lấy UUID từ memberList!")
+                return null
+            }
+
+            val targetFriendId = friendUserId.lowercase()
+
+            // 2. Tìm cuộc hội thoại đã tồn tại
             val myParticipations = supabaseClient.from("conversation_participant")
-                .select {
-                    filter { eq("user_id", currentUserId) }
-                }.decodeList<Map<String, String>>()
+                .select { filter { eq("user_id", currentUserId) } }
+                .decodeList<SupabaseParticipantDto>()
 
-            var existingConversationId: String? = null
-            for (part in myParticipations) {
-                val convId = part["conversation_id"] ?: continue
-                val isGroupCheck = supabaseClient.from("conversation")
-                    .select {
-                        filter { eq("id", convId) }
-                    }.decodeSingle<SupabaseConversationDto>().isGroup
+            val myConvIds = myParticipations.map { it.conversationId }
 
-                if (!isGroupCheck) {
-                    val friendCheck = supabaseClient.from("conversation_participant")
-                        .select {
-                            filter {
-                                eq("conversation_id", convId)
-                                eq("user_id", friendUserId.lowercase())
-                            }
-                        }.decodeList<Map<String, String>>()
+            if (myConvIds.isNotEmpty()) {
+                val potentialParticipants = supabaseClient.from("conversation_participant")
+                    .select { filter { eq("user_id", targetFriendId) } }
+                    .decodeList<SupabaseParticipantDto>()
 
-                    if (friendCheck.isNotEmpty()) {
-                        existingConversationId = convId
-                        break
+                for (part in potentialParticipants) {
+                    if (myConvIds.contains(part.conversationId)) {
+                        val conv = supabaseClient.from("conversation")
+                            .select { filter { eq("id", part.conversationId) } }
+                            .decodeSingleOrNull<SupabaseConversationDto>()
+
+                        if (conv != null && !conv.isGroup) return part.conversationId
                     }
                 }
             }
 
-            if (existingConversationId != null) return existingConversationId
-
+            // 3. Tạo mới với gen_random_uuid() ở server (nếu Supabase hỗ trợ)
+            // Hoặc cứ dùng UUID.randomUUID().toString()
             val newChatUuid = UUID.randomUUID().toString()
-            supabaseClient.from("conversation")
-                .insert(mapOf("id" to newChatUuid, "is_group" to false, "name" to null))
 
-            val participantRows = listOf(
-                mapOf(
-                    "conversation_id" to newChatUuid,
-                    "user_id" to currentUserId,
-                    "is_admin" to false
-                ),
-                mapOf(
-                    "conversation_id" to newChatUuid,
-                    "user_id" to friendUserId.lowercase(),
-                    "is_admin" to false
-                )
-            )
-            supabaseClient.from("conversation_participant").insert(participantRows)
-            newChatUuid
+            println("DEBUG_: Đang insert conv với UUID: $newChatUuid và user: $targetFriendId")
+
+            supabaseClient.from("conversation").insert(mapOf(
+                "id" to newChatUuid,
+                "is_group" to false,
+                "name" to null
+            ))
+            // ÉP KIỂM TRA NGAY TẠI CHỖ
+            val verify = supabaseClient.from("conversation").select { filter { eq("id", newChatUuid) } }.decodeSingleOrNull<SupabaseConversationDto>()
+            if (verify == null) {
+                println("DEBUG_CRITICAL: Insert xong nhưng DB không tìm thấy ID vừa insert!")
+            } else {
+                println("DEBUG: Insert thành công, đã thấy ID trong DB")
+            }
+            supabaseClient.from("conversation_participant").insert(listOf(
+                SupabaseParticipantDto(newChatUuid, currentUserId, false),
+                SupabaseParticipantDto(newChatUuid, targetFriendId, false)
+            ))
+
+            return newChatUuid
         } catch (e: Exception) {
+            println("LỖI CHI TIẾT TẠO CHAT: ${e.message}")
+            e.printStackTrace()
             null
         }
     }
@@ -880,11 +897,15 @@ class ChatRepository @Inject constructor(
                 senderId = finalSenderId,
                 createdAt = parseServerTimeToLong(insertedDto.createdAt)
             )
-            chatDAO.updateMessage(successMessage)
+            println("DEBUG: Đang gửi tin vào conv: ${message.conversationId}")
 
+            supabaseClient.from("message").insert(messageDto)
+
+            chatDAO.updateMessage(message.copy(syncStatus = MessageSyncStatus.SENT))
         } catch (e: Exception) {
-            val failedMessage = message.copy(syncStatus = MessageSyncStatus.FAILED)
-            chatDAO.updateMessage(failedMessage)
+            println("LỖI GỬI TIN CHI TIẾT: ${e.localizedMessage}")
+            e.printStackTrace()
+            chatDAO.updateMessage(message.copy(syncStatus = MessageSyncStatus.FAILED))
         }
     }
 

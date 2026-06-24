@@ -172,9 +172,24 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    fun sendTextMessage(conversationId: String, text: String) {
+    fun sendTextMessage(conversationId: String, text: String, isOneToOne: Boolean = false, friendUserId: String? = null) {
         viewModelScope.launch {
-            chatRepository.sendMessage(conversationId, currentUserId, body = text, imageUrl = null)
+            var targetConvId = conversationId
+
+            if (isOneToOne && !friendUserId.isNullOrBlank()) {
+                val existingId = chatRepository.getOrCreateOneToOneChat(friendUserId)
+                if (existingId != null) {
+                    targetConvId = existingId // <--- Bạn đã có ID mới ở đây!
+                }
+            }
+
+            // CHỖ NÀY: Hãy chắc chắn targetConvId không rỗng trước khi gửi
+            if (targetConvId.isBlank()) {
+                println("LỖI: Không lấy được targetConvId!")
+                return@launch
+            }
+
+            chatRepository.sendMessage(targetConvId, currentUserId, body = text, imageUrl = null)
         }
     }
     fun sendImageMessage(conversationId: String, imageUri: String) {
