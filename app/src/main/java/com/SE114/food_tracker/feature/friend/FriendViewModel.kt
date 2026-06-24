@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -52,6 +53,9 @@ class FriendViewModel @Inject constructor(
     private val _profileLoadError = MutableStateFlow<String?>(null)
     val profileLoadError = _profileLoadError.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing = _isRefreshing.asStateFlow()
+
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage = _actionMessage.asStateFlow()
 
@@ -64,10 +68,12 @@ class FriendViewModel @Inject constructor(
     private var loadFriendDataJob: Job? = null
     private var searchJob: Job? = null
     private var realtimeFriendshipRefreshJob: Job? = null
+    private var autoFriendshipRefreshJob: Job? = null
 
     init {
         loadFriendData()
         subscribeToFriendshipRealtime()
+        startAutoFriendshipRefresh()
 
         viewModelScope.launch {
             authRepository.currentSessionFlow()
@@ -101,6 +107,7 @@ class FriendViewModel @Inject constructor(
             .onSuccess {
                 repository.refreshFriendships()
                     .onSuccess {
+                        refreshSearchRelationship()
                         runCatching { feedRepository.refreshVisibleFromSupabase() }
                             .onFailure { reportActionError(it) }
                     }
@@ -110,6 +117,21 @@ class FriendViewModel @Inject constructor(
                 _profileLoadError.value = e.message ?: "Không lấy được ID"
             }
     }
+
+    private fun startAutoFriendshipRefresh() {
+        if (autoFriendshipRefreshJob != null) return
+
+        autoFriendshipRefreshJob = viewModelScope.launch {
+            while (isActive) {
+                delay(AUTO_REFRESH_INTERVAL_MS)
+                if (_busyFriendshipIds.value.isEmpty() && !_isRefreshing.value) {
+                    refreshFriendDataFromRealtime()
+                }
+            }
+        }
+    }
+
+    fun refresh() = loadFriendData(showRefreshing = true)
 
     fun retryLoadProfile() = loadFriendData()
 
@@ -180,17 +202,20 @@ class FriendViewModel @Inject constructor(
         }
     }
 
-    private fun loadFriendData() {
+    private fun loadFriendData(showRefreshing: Boolean = false) {
         loadFriendDataJob?.cancel()
         loadFriendDataJob = viewModelScope.launch {
+            if (showRefreshing) _isRefreshing.value = true
             _profileLoadError.value = null
             repository.refreshCurrentProfile()
                 .onSuccess {
                     repository.refreshFriendships()
+                        .onSuccess { refreshSearchRelationship() }
                 }
                 .onFailure { e ->
                     _profileLoadError.value = e.message ?: "Không lấy được ID"
                 }
+            if (showRefreshing) _isRefreshing.value = false
         }
     }
 
@@ -202,6 +227,9 @@ class FriendViewModel @Inject constructor(
             try {
                 action()
                     .onSuccess {
+                        repository.refreshFriendships()
+                            .onSuccess { refreshSearchRelationship() }
+                            .onFailure { reportActionError(it) }
                         runCatching { feedRepository.refreshVisibleFromSupabase() }
                             .onFailure { reportActionError(it) }
                     }
@@ -231,9 +259,21 @@ class FriendViewModel @Inject constructor(
         _isLoadingSearch.value = false
     }
 
+    private suspend fun refreshSearchRelationship() {
+        val currentSearch = _searchResult.value?.getOrNull() ?: return
+        _searchResult.value = Result.success(
+            currentSearch.copy(
+                relationship = FriendRelationship.fromStatus(
+                    repository.friendshipStatusWith(currentSearch.profile.id)
+                )
+            )
+        )
+    }
+
     private companion object {
         const val MIN_SEARCH_ID_LENGTH = 3
         const val SEARCH_DEBOUNCE_MS = 450L
+        const val AUTO_REFRESH_INTERVAL_MS = 5_000L
     }
 }
 

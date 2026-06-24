@@ -314,7 +314,11 @@ class FeedRepository @Inject constructor(
                 )
             }
             if (visibleRemotePosts.isEmpty()) {
-                Timber.w("[FeedSync] remote visible posts empty; keeping local synced feed cache")
+                feedDao.deleteAllSyncedPosts()
+            } else {
+                feedDao.deleteSyncedPostsMissingFromRemote(
+                    remotePostIds = visibleRemotePosts.map { it.id }
+                )
             }
             if (postEntities.isNotEmpty()) {
                 feedDao.insertPosts(postEntities)

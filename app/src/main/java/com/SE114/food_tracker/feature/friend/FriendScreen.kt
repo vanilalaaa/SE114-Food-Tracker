@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +33,7 @@ fun FriendScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResult by viewModel.searchResult.collectAsStateWithLifecycle()
     val isLoadingSearch by viewModel.isLoadingSearch.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val acceptedFriends by viewModel.acceptedFriends.collectAsStateWithLifecycle()
     val incomingRequests by viewModel.incomingRequests.collectAsStateWithLifecycle()
     val outgoingRequests by viewModel.outgoingRequests.collectAsStateWithLifecycle()
@@ -72,11 +76,13 @@ fun FriendScreen(
             searchQuery = searchQuery,
             searchResult = searchResult,
             isLoadingSearch = isLoadingSearch,
+            isRefreshing = isRefreshing,
             acceptedFriends = acceptedFriends,
             incomingRequests = incomingRequests,
             outgoingRequests = outgoingRequests,
             busyFriendshipIds = busyFriendshipIds,
             onUpdateSearchQuery = viewModel::updateSearchQuery,
+            onRefresh = viewModel::refresh,
             onSendFriendRequest = viewModel::sendFriendRequest,
             onAcceptRequest = viewModel::acceptRequest,
             onDeclineRequest = { request -> requestPendingDecline = request },
@@ -148,6 +154,7 @@ fun FriendScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FriendScreenContent(
     myProfileId: String?,
@@ -157,11 +164,13 @@ fun FriendScreenContent(
     searchQuery: String,
     searchResult: Result<FriendSearchResult>?,
     isLoadingSearch: Boolean,
+    isRefreshing: Boolean,
     acceptedFriends: List<FriendItemDto>,
     incomingRequests: List<FriendItemDto>,
     outgoingRequests: List<FriendItemDto>,
     busyFriendshipIds: Set<String>,
     onUpdateSearchQuery: (String) -> Unit,
+    onRefresh: () -> Unit,
     onSendFriendRequest: (String) -> Unit,
     onAcceptRequest: (String) -> Unit,
     onDeclineRequest: (FriendItemDto) -> Unit,
@@ -172,13 +181,31 @@ fun FriendScreenContent(
     onOpenFriendProfile: (FriendItemDto) -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    LazyColumn(
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
         modifier = Modifier
             .fillMaxSize()
-            .background(MainBackground)
-            .statusBarsPadding(),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
+            .background(MainBackground),
+        state = pullToRefreshState,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pullToRefreshState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = CardWhite,
+                color = OrangeMain
+            )
+        }
     ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
+        ) {
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -286,6 +313,7 @@ fun FriendScreenContent(
                 )
             }
         }
+        }
     }
 }
 
@@ -311,11 +339,13 @@ fun Preview_EmptyFriendScreen() {
                 )
             ),
             isLoadingSearch = false,
+            isRefreshing = false,
             acceptedFriends = emptyList(),
             incomingRequests = emptyList(),
             outgoingRequests = emptyList(),
             busyFriendshipIds = emptySet(),
             onUpdateSearchQuery = {},
+            onRefresh = {},
             onSendFriendRequest = {},
             onAcceptRequest = {},
             onDeclineRequest = {},
@@ -341,6 +371,7 @@ fun Preview_FilledFriendScreen() {
             searchQuery = "",
             searchResult = null,
             isLoadingSearch = false,
+            isRefreshing = false,
             acceptedFriends = listOf(
                 FriendItemDto("1", "profile-tdi", "tdi", "tdi", null, "accepted"),
                 FriendItemDto("2", "profile-tzan", "tzan", "tzan", null, "accepted"),
@@ -354,6 +385,7 @@ fun Preview_FilledFriendScreen() {
             ),
             busyFriendshipIds = emptySet(),
             onUpdateSearchQuery = {},
+            onRefresh = {},
             onSendFriendRequest = {},
             onAcceptRequest = {},
             onDeclineRequest = {},
