@@ -24,12 +24,14 @@ fun FriendListItem(
     onUnfriend: (String) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenProfile)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ProfileAvatar(
-            avatarUrl = friend.avatarUrl,
-            modifier = Modifier.clickable(onClick = onOpenProfile)
+            avatarUrl = friend.avatarUrl
         )
         Spacer(modifier = Modifier.width(16.dp))
 
