@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -265,18 +268,27 @@ private fun FeedPostDetailPage(
     onOpenComments: () -> Unit,
     onNavigateToProfile: (String) -> Unit
 ) {
+    val density = LocalDensity.current
+    val navigationBarBottom = with(density) {
+        WindowInsets.navigationBars.getBottom(density).toDp()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.90f))
             .statusBarsPadding()
-            .navigationBarsPadding()
             .imePadding()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 22.dp, vertical = 22.dp),
+                .padding(
+                    start = 22.dp,
+                    top = 22.dp,
+                    end = 22.dp,
+                    bottom = navigationBarBottom + 16.dp
+                ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.weight(0.58f))
@@ -536,7 +548,7 @@ private fun FeedCommentsBottomSheet(
                 .fillMaxWidth()
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
+                .padding(start = 18.dp, end = 18.dp, bottom = 12.dp)
         ) {
             FeedCommentsList(
                 comments = comments,

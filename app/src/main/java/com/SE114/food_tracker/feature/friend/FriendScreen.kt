@@ -237,7 +237,7 @@ fun Preview_EmptyFriendScreen() {
             acceptedFriends = emptyList(),
             incomingRequests = emptyList(),
             outgoingRequests = listOf(
-                FriendItemDto("5", "waiting", "Pending Friend", null, "pending")
+                FriendItemDto("5", "profile-waiting", "waiting", "Pending Friend", null, "pending")
             ),
             busyFriendshipIds = emptySet(),
             onUpdateSearchQuery = {},
@@ -262,15 +262,15 @@ fun Preview_FilledFriendScreen() {
             searchResult = null,
             isLoadingSearch = false,
             acceptedFriends = listOf(
-                FriendItemDto("1", "tdi", "tdi", null, "accepted"),
-                FriendItemDto("2", "tzan", "tzan", null, "accepted"),
-                FriendItemDto("3", "azun", "azun", null, "accepted")
+                FriendItemDto("1", "profile-tdi", "tdi", "tdi", null, "accepted"),
+                FriendItemDto("2", "profile-tzan", "tzan", "tzan", null, "accepted"),
+                FriendItemDto("3", "profile-azun", "azun", "azun", null, "accepted")
             ),
             incomingRequests = listOf(
-                FriendItemDto("4", "stranger", "Người Lạ", null, "pending")
+                FriendItemDto("4", "profile-stranger", "stranger", "Người Lạ", null, "pending")
             ),
             outgoingRequests = listOf(
-                FriendItemDto("5", "waiting", "Pending Friend", null, "pending")
+                FriendItemDto("5", "profile-waiting", "waiting", "Pending Friend", null, "pending")
             ),
             busyFriendshipIds = emptySet(),
             onUpdateSearchQuery = {},

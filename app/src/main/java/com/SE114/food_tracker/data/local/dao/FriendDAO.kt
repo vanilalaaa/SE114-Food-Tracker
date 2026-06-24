@@ -34,6 +34,7 @@ interface FriendDAO {
     @Query("""
         SELECT f.friendship_id AS friendshipId, 
                c.user_id AS userId, 
+               COALESCE(NULLIF(c.profile_user_id, ''), c.user_id) AS searchUserId,
                c.display_name AS displayName, 
                c.avatar_url AS avatarUrl, 
                f.status AS status
@@ -52,6 +53,7 @@ interface FriendDAO {
     @Query("""
         SELECT f.friendship_id AS friendshipId, 
                c.user_id AS userId, 
+               COALESCE(NULLIF(c.profile_user_id, ''), c.user_id) AS searchUserId,
                c.display_name AS displayName, 
                c.avatar_url AS avatarUrl, 
                f.status AS status
@@ -67,6 +69,7 @@ interface FriendDAO {
     @Query("""
         SELECT f.friendship_id AS friendshipId, 
                c.user_id AS userId, 
+               COALESCE(NULLIF(c.profile_user_id, ''), c.user_id) AS searchUserId,
                c.display_name AS displayName, 
                c.avatar_url AS avatarUrl, 
                f.status AS status
