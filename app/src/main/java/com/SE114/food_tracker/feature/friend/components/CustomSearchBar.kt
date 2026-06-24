@@ -24,7 +24,7 @@ fun CustomSearchBar(
     TextField(
         value = query,
         onValueChange = onQueryChange,
-        placeholder = { Text("Nhập ID (VD: uyen_123)", color = HintGray) },
+        placeholder = { Text("Nhập ID bạn bè", color = HintGray) },
         leadingIcon = {
             Icon(Icons.Default.Search, contentDescription = null, tint = HintGray)
         },

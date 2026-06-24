@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -164,7 +165,7 @@ private fun FeedGrid(
             items = posts,
             key = { it.postId }
         ) { post ->
-            FeedPostTile(
+            FeedGridPostTile(
                 post = post,
                 onClick = { onPostClick(post.postId) }
             )
@@ -173,7 +174,7 @@ private fun FeedGrid(
 }
 
 @Composable
-private fun FeedPostTile(
+fun FeedGridPostTile(
     post: FeedPostDto,
     onClick: () -> Unit
 ) {
@@ -262,13 +263,17 @@ private fun FeedEmptyState(error: String?) {
         Spacer(Modifier.height(14.dp))
         Text(
             text = error ?: "Chưa có bài viết nào",
+            modifier = Modifier.fillMaxWidth(),
             color = if (error == null) TextPrimary else MaterialTheme.colorScheme.error,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
         )
         Text(
             text = "Đăng bài viết đầu tiên từ nhật ký hoặc ảnh của bạn.",
+            modifier = Modifier.fillMaxWidth(),
             color = HintGray,
-            fontSize = 13.sp
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center
         )
     }
 }

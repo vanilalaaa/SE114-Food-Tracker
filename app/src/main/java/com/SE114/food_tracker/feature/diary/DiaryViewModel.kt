@@ -338,18 +338,45 @@ class DiaryViewModel @Inject constructor(
         }
     }
 
-    suspend fun computeStreak(): Int = withContext(Dispatchers.IO) {
-        var cursor = Clock.System.todayIn(TimeZone.currentSystemDefault())
-        var streak = 0
-        while (true) {
-            val range = cursor.utcDayRange()
-            val count = itemRepository.getItemCountForDay(range.start, range.end).first()
-            if (count <= 0) break
-            streak += 1
-            cursor  = cursor.plus(DatePeriod(days = -1))
+    private suspend fun computeStreak(): Int = withContext(Dispatchers.IO) {
+        try {
+            val systemTimeZone = TimeZone.currentSystemDefault()
+            val today = Clock.System.todayIn(systemTimeZone)
+
+            // 1. Lấy chuỗi ID người dùng hiện tại
+            val ownerId = itemRepository.getCurrentUserId().orEmpty()
+
+            // 2. TỐI ƯU HIỆU NĂNG: Chỉ lấy danh sách các Epoch thuần túy (Kiểu Long) thay vì cả bảng Item
+            val distinctEpochs = itemRepository.getDistinctEntryDates(ownerId)
+
+            // 3.
+            val activeDates = distinctEpochs.map { epoch ->
+                Instant.fromEpochMilliseconds(epoch)
+                    .toLocalDateTime(systemTimeZone)
+                    .date
+            }.toSet()
+
+            // 4. Thuật toán đếm lùi chuỗi ngày liên tục (Streak) trên RAM
+            var streak = 0
+            var cursor = today
+
+            // UX bảo vệ chuỗi: Nếu hôm nay chưa ăn/nhập gì, lùi lại bắt đầu xét từ hôm qua
+            if (!activeDates.contains(cursor)) {
+                cursor = cursor.plus(DatePeriod(days = -1))
+            }
+
+            // Vòng lặp đếm lùi siêu tốc cho đến khi đứt chuỗi
+            while (activeDates.contains(cursor)) {
+                streak++
+                cursor = cursor.plus(DatePeriod(days = -1))
+            }
+
+            _streak.value = streak
+            return@withContext streak
+        } catch (e: Exception) {
+            Timber.e(e, "[DiaryVM] Lỗi tính toán streak")
+            return@withContext _streak.value
         }
-        _streak.value = streak
-        return@withContext streak
     }
 
     private suspend fun compressToJpeg(rawBytes: ByteArray, uri: Uri, maxBytes: Int): ByteArray =

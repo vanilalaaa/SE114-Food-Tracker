@@ -35,6 +35,20 @@ val StatTabInactiveStyle = TextStyle(
     color = TextLabelGray
 )
 
+val StatTabActiveStyle2 = TextStyle(
+    fontFamily = FontFamily.Default,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 14.sp,
+    color = TextSecondary
+)
+
+val StatTabInactiveStyle2 = TextStyle(
+    fontFamily = FontFamily.Default,
+    fontWeight = FontWeight.Medium,
+    fontSize = 14.sp,
+    color = TextLabelGray
+)
+
 val StatValueStyle = TextStyle(
     fontFamily = FontFamily.Default,
     fontWeight = FontWeight.ExtraBold,

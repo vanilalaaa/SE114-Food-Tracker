@@ -18,7 +18,11 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.dao.FriendItemDto
 
 @Composable
-fun OutgoingRequestItem(request: FriendItemDto, onCancel: (String) -> Unit) {
+fun OutgoingRequestItem(
+    request: FriendItemDto,
+    isBusy: Boolean,
+    onCancel: (String) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -44,6 +48,7 @@ fun OutgoingRequestItem(request: FriendItemDto, onCancel: (String) -> Unit) {
 
         OutlinedButton(
             onClick = { onCancel(request.friendshipId) },
+            enabled = !isBusy,
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = HintGray),
             contentPadding = PaddingValues(horizontal = 10.dp),

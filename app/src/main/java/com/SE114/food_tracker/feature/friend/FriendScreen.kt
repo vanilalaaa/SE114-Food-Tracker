@@ -34,6 +34,7 @@ fun FriendScreen(
     val currentProfile by viewModel.currentProfile.collectAsStateWithLifecycle()
     val profileLoadError by viewModel.profileLoadError.collectAsStateWithLifecycle()
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
+    val busyFriendshipIds by viewModel.busyFriendshipIds.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var friendPendingDelete by remember { mutableStateOf<FriendItemDto?>(null) }
@@ -63,6 +64,7 @@ fun FriendScreen(
             acceptedFriends = acceptedFriends,
             incomingRequests = incomingRequests,
             outgoingRequests = outgoingRequests,
+            busyFriendshipIds = busyFriendshipIds,
             onUpdateSearchQuery = viewModel::updateSearchQuery,
             onSendFriendRequest = viewModel::sendFriendRequest,
             onAcceptRequest = viewModel::acceptRequest,
@@ -104,6 +106,7 @@ fun FriendScreenContent(
     acceptedFriends: List<FriendItemDto>,
     incomingRequests: List<FriendItemDto>,
     outgoingRequests: List<FriendItemDto>,
+    busyFriendshipIds: Set<String>,
     onUpdateSearchQuery: (String) -> Unit,
     onSendFriendRequest: (String) -> Unit,
     onAcceptRequest: (String) -> Unit,
@@ -179,6 +182,7 @@ fun FriendScreenContent(
             items(incomingRequests, key = { it.friendshipId }) { request ->
                 IncomingRequestItem(
                     request = request,
+                    isBusy = request.friendshipId in busyFriendshipIds,
                     onAccept = onAcceptRequest,
                     onDecline = onDeclineRequest
                 )
@@ -194,6 +198,7 @@ fun FriendScreenContent(
             items(outgoingRequests, key = { it.friendshipId }) { request ->
                 OutgoingRequestItem(
                     request = request,
+                    isBusy = request.friendshipId in busyFriendshipIds,
                     onCancel = onCancelOutgoingRequest
                 )
             }
@@ -212,6 +217,7 @@ fun FriendScreenContent(
                 FriendListItem(
                     friend = friend,
                     onOpenProfile = { onOpenFriendProfile(friend) },
+                    isBusy = friend.friendshipId in busyFriendshipIds,
                     onUnfriend = { onUnfriend(friend) }
                 )
             }
@@ -231,8 +237,9 @@ fun Preview_EmptyFriendScreen() {
             acceptedFriends = emptyList(),
             incomingRequests = emptyList(),
             outgoingRequests = listOf(
-                FriendItemDto("5", "waiting", "Pending Friend", null, "pending")
+                FriendItemDto("5", "profile-waiting", "waiting", "Pending Friend", null, "pending")
             ),
+            busyFriendshipIds = emptySet(),
             onUpdateSearchQuery = {},
             onSendFriendRequest = {},
             onAcceptRequest = {},
@@ -255,16 +262,17 @@ fun Preview_FilledFriendScreen() {
             searchResult = null,
             isLoadingSearch = false,
             acceptedFriends = listOf(
-                FriendItemDto("1", "tdi", "tdi", null, "accepted"),
-                FriendItemDto("2", "tzan", "tzan", null, "accepted"),
-                FriendItemDto("3", "azun", "azun", null, "accepted")
+                FriendItemDto("1", "profile-tdi", "tdi", "tdi", null, "accepted"),
+                FriendItemDto("2", "profile-tzan", "tzan", "tzan", null, "accepted"),
+                FriendItemDto("3", "profile-azun", "azun", "azun", null, "accepted")
             ),
             incomingRequests = listOf(
-                FriendItemDto("4", "stranger", "Người Lạ", null, "pending")
+                FriendItemDto("4", "profile-stranger", "stranger", "Người Lạ", null, "pending")
             ),
             outgoingRequests = listOf(
-                FriendItemDto("5", "waiting", "Pending Friend", null, "pending")
+                FriendItemDto("5", "profile-waiting", "waiting", "Pending Friend", null, "pending")
             ),
+            busyFriendshipIds = emptySet(),
             onUpdateSearchQuery = {},
             onSendFriendRequest = {},
             onAcceptRequest = {},

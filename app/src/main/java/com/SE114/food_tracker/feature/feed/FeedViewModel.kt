@@ -51,10 +51,16 @@ class FeedViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     private val _isCreatingPost = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
+    private val _currentUserId = MutableStateFlow(feedRepository.currentUserId())
 
-    private val posts = _page.flatMapLatest { page ->
-        feedRepository.observePosts(pageSize = FeedRepository.PAGE_SIZE, page = page)
-    }
+    private val posts = combine(_page, _currentUserId) { page, currentUserId -> page to currentUserId }
+        .flatMapLatest { (page, currentUserId) ->
+            feedRepository.observePosts(
+                pageSize = FeedRepository.PAGE_SIZE,
+                page = page,
+                currentUserId = currentUserId
+            )
+        }
 
     private val selectedComments = _selectedPostId.flatMapLatest { postId ->
         if (postId == null) flowOf(emptyList()) else feedRepository.observeComments(postId)
@@ -63,6 +69,7 @@ class FeedViewModel @Inject constructor(
     val uiState: StateFlow<FeedUiState> =
         combine(
             posts,
+            _currentUserId,
             feedRepository.observeSourceItems(),
             _selectedPostId,
             _selectedPostIndex,
@@ -80,22 +87,22 @@ class FeedViewModel @Inject constructor(
         ) { values ->
             @Suppress("UNCHECKED_CAST")
             FeedUiState(
-                currentUserId = feedRepository.currentUserId(),
+                currentUserId = values[1] as String,
                 posts = values[0] as List<FeedPostDto>,
-                sourceItems = values[1] as List<FeedSourceItemDto>,
-                selectedPostId = values[2] as String?,
-                selectedPostIndex = values[3] as Int,
-                selectedComments = values[4] as List<FeedCommentDto>,
-                page = values[5] as Int,
-                isCreateSheetOpen = values[6] as Boolean,
-                selectedSourceItem = values[7] as FeedSourceItemDto?,
-                pickedImageUri = values[8] as Uri?,
-                draftFreeImageTitle = values[9] as String,
-                draftCaption = values[10] as String,
-                draftVisibility = values[11] as String,
-                isLoading = values[12] as Boolean,
-                isCreatingPost = values[13] as Boolean,
-                error = values[14] as String?
+                sourceItems = values[2] as List<FeedSourceItemDto>,
+                selectedPostId = values[3] as String?,
+                selectedPostIndex = values[4] as Int,
+                selectedComments = values[5] as List<FeedCommentDto>,
+                page = values[6] as Int,
+                isCreateSheetOpen = values[7] as Boolean,
+                selectedSourceItem = values[8] as FeedSourceItemDto?,
+                pickedImageUri = values[9] as Uri?,
+                draftFreeImageTitle = values[10] as String,
+                draftCaption = values[11] as String,
+                draftVisibility = values[12] as String,
+                isLoading = values[13] as Boolean,
+                isCreatingPost = values[14] as Boolean,
+                error = values[15] as String?
             )
         }
             .catch { throwable ->
@@ -119,12 +126,14 @@ class FeedViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isLoading.value = true
+            syncCurrentUserId()
             _page.value = 1
             _error.value = null
 
             runCatching {
                 friendRepository.refreshCurrentProfile().getOrThrow()
                 friendRepository.refreshFriendships().getOrThrow()
+                syncCurrentUserId()
                 if (!feedRepository.refreshVisibleFromSupabase()) {
                     error("Không làm mới được bảng tin")
                 }
@@ -219,19 +228,22 @@ class FeedViewModel @Inject constructor(
                 val visibility = _draftVisibility.value
                     .takeUnless { it == FeedVisibility.PUBLIC.value }
                     ?: FeedVisibility.FRIENDS.value
+                var createdOwnerId: String? = null
 
                 when {
-                    sourceItem != null -> feedRepository.createPostFromItem(
-                        item = sourceItem,
-                        caption = caption,
-                        visibility = visibility
-                    )
+                    sourceItem != null -> {
+                        createdOwnerId = feedRepository.createPostFromItem(
+                            item = sourceItem,
+                            caption = caption,
+                            visibility = visibility
+                        )
+                    }
 
                     pickedImageUri != null -> {
                         if (freeImageTitle.isBlank()) {
                             _error.value = "Nhập tên loại ảnh trước khi đăng"
                         } else {
-                            feedRepository.createPostFromImage(
+                            createdOwnerId = feedRepository.createPostFromImage(
                                 imageUrl = copyPickedImageToFeedStorage(pickedImageUri),
                                 caption = buildFreeImageCaption(freeImageTitle, caption),
                                 visibility = visibility
@@ -243,8 +255,10 @@ class FeedViewModel @Inject constructor(
                 }
 
                 if (_error.value == null) {
+                    createdOwnerId?.let(::setCurrentUserId)
                     closeCreateSheet()
                     resetPage()
+                    refreshVisibleFeedAfterCreate()
                     SyncScheduler.triggerImmediateSync(context)
                 }
             } catch (throwable: Throwable) {
@@ -253,6 +267,29 @@ class FeedViewModel @Inject constructor(
             } finally {
                 _isCreatingPost.value = false
             }
+        }
+    }
+
+    private fun syncCurrentUserId() {
+        setCurrentUserId(feedRepository.currentUserId())
+    }
+
+    private fun setCurrentUserId(currentUserId: String) {
+        if (_currentUserId.value != currentUserId) {
+            _selectedPostId.value = null
+            _selectedPostIndex.value = -1
+            _currentUserId.value = currentUserId
+        }
+    }
+
+    private suspend fun refreshVisibleFeedAfterCreate() {
+        runCatching {
+            friendRepository.refreshCurrentProfile().getOrThrow()
+            friendRepository.refreshFriendships().getOrThrow()
+            syncCurrentUserId()
+            feedRepository.refreshVisibleFromSupabase()
+        }.onFailure { throwable ->
+            Timber.e(throwable, "[FeedVM] Silent feed refresh after create failed")
         }
     }
 

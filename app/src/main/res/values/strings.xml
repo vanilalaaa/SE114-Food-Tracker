@@ -166,4 +166,25 @@
     <string name="profile_user_id_cooldown">Có thể đổi sau %1$d ngày</string>
     <string name="profile_save">Lưu</string>
     <string name="profile_edit_title">Chỉnh sửa hồ sơ</string>
+    <!-- Public profile -->
+    <string name="profile_viewer_title">Profile</string>
+    <string name="profile_menu_open">Mở menu</string>
+    <string name="profile_report">Báo cáo</string>
+    <string name="profile_self_badge">Đây là profile của bạn</string>
+    <string name="profile_retry">Thử lại</string>
+    <string name="profile_tab_diary">Nhật ký</string>
+    <string name="profile_tab_posts">Bài viết</string>
+    <string name="profile_diary_empty">Người dùng chưa chia sẻ món nào</string>
+    <string name="profile_posts_empty">Người dùng chưa có bài viết nào</string>
+
+    <!-- Report -->
+    <string name="report_dialog_title">Báo cáo người dùng</string>
+    <string name="report_reason_prompt">Chọn lý do báo cáo:</string>
+    <string name="report_submit">Gửi báo cáo</string>
+    <string name="report_submitting">Đang gửi...</string>
+    <string name="report_cancel">Hủy</string>
+    <string name="report_reason_spam">Spam</string>
+    <string name="report_reason_inappropriate">Nội dung không phù hợp</string>
+    <string name="report_reason_harassment">Quấy rối</string>
+    <string name="report_reason_other">Khác</string>
 </resources>

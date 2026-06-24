@@ -74,12 +74,9 @@ class FriendRepository @Inject constructor(
             friendDao.insertFriendship(dto.toEntity())
         }
 
-        val remoteIds = remoteFriendships.map { it.id }
-        if (remoteIds.isEmpty()) {
-            friendDao.softDeleteAllFriendshipsForUser(me.id)
-        } else {
-            friendDao.softDeleteFriendshipsMissingFromRemote(me.id, remoteIds)
-        }
+        // A transient empty/incomplete friendship response should not hide every
+        // friends-only feed post from the local cache. Explicit unfriend/cancel
+        // actions still update the affected friendship immediately.
     }
 
     suspend fun acceptRequest(friendshipId: String): Result<Unit> =
@@ -237,6 +234,7 @@ class FriendRepository @Inject constructor(
             displayName = displayName?.takeIf { it.isNotBlank() }
                 ?: userId?.takeIf { it.isNotBlank() }
                 ?: "Người dùng",
+            profileUserId = userId.orEmpty(),
             avatarUrl = avatarUrl.orEmpty()
         )
 

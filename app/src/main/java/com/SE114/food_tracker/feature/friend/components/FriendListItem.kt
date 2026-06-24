@@ -20,27 +20,42 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 fun FriendListItem(
     friend: FriendItemDto,
     onOpenProfile: () -> Unit,
+    isBusy: Boolean,
     onUnfriend: (String) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenProfile)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ProfileAvatar(
-            avatarUrl = friend.avatarUrl,
-            modifier = Modifier.clickable(onClick = onOpenProfile)
+            avatarUrl = friend.avatarUrl
         )
         Spacer(modifier = Modifier.width(16.dp))
 
-        Text(
-            text = friend.displayName,
-            color = TextPrimary,
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp,
-            modifier = Modifier.weight(1f)
-        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = friend.displayName,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+            Text(
+                text = "@${friend.searchUserId}",
+                color = HintGray,
+                fontSize = 12.sp
+            )
+        }
 
-        IconButton(onClick = { onUnfriend(friend.friendshipId) }) {
+        IconButton(
+            onClick = { onUnfriend(friend.friendshipId) },
+            enabled = !isBusy
+        ) {
             Icon(Icons.Default.Clear, contentDescription = "Xóa", tint = HintGray)
         }
     }
