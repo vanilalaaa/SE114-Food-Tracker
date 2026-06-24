@@ -77,7 +77,16 @@ internal fun Throwable.toAdminError(): AuthError {
         Timber.tag("Admin").e(this, "admin action rejected: not_authorized")
         return AuthError.NotAuthorized
     }
-    return toAuthError()
+    Timber.tag("Admin").e(this, "admin RPC failed")
+    val mapped = toAuthError()
+    // Keep NoNetwork etc.; for any other REST/server failure surface the full server text
+    // (e.g. "Could not find the function ... in the schema cache", "column ... does not exist")
+    // so the on-screen message names the real cause instead of a vague generic.
+    return if (mapped is AuthError.Unknown && this is RestException) {
+        AuthError.Unknown(body.trim().ifBlank { null })
+    } else {
+        mapped
+    }
 }
 
 private fun Throwable.messageFallback(): AuthError {
