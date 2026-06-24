@@ -197,4 +197,50 @@
     <string name="admin_dashboard_reports">Báo cáo</string>
     <string name="admin_users_title">Quản lý người dùng</string>
     <string name="admin_reports_title">Báo cáo</string>
+
+    <!-- Admin: common -->
+    <string name="admin_retry">Thử lại</string>
+    <string name="admin_cancel">Hủy</string>
+    <string name="admin_err_not_authorized">Bạn không có quyền thực hiện thao tác này</string>
+    <string name="admin_err_generic">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
+
+    <!-- Admin: dashboard stats -->
+    <string name="admin_stat_total_users">Tổng người dùng</string>
+    <string name="admin_stat_banned">Đã khóa</string>
+    <string name="admin_stat_deleted">Đã xóa</string>
+    <string name="admin_stat_pending_reports">Báo cáo chờ xử lý</string>
+
+    <!-- Admin: users -->
+    <string name="admin_users_search_hint">Tìm theo User ID hoặc tên</string>
+    <string name="admin_users_empty">Không có người dùng</string>
+    <string name="admin_user_no_name">(Chưa đặt tên)</string>
+    <string name="admin_status_active">Hoạt động</string>
+    <string name="admin_status_banned">Đã khóa</string>
+    <string name="admin_status_deleted">Đã xóa</string>
+    <string name="admin_action_ban">Khóa tài khoản</string>
+    <string name="admin_action_unban">Mở khóa tài khoản</string>
+    <string name="admin_action_delete">Xóa tài khoản</string>
+    <string name="admin_action_restore">Khôi phục tài khoản</string>
+    <string name="admin_ban_confirm_title">Khóa tài khoản?</string>
+    <string name="admin_ban_confirm_body">Người dùng %1$s sẽ bị đăng xuất và không thể đăng nhập lại.</string>
+    <string name="admin_confirm_ban">Khóa</string>
+    <string name="admin_delete_confirm_title">Xóa tài khoản?</string>
+    <string name="admin_delete_confirm_body">Tài khoản %1$s sẽ bị xóa mềm và ẩn khỏi người khác.</string>
+    <string name="admin_confirm_delete">Xóa</string>
+
+    <!-- Admin: reports -->
+    <string name="admin_reports_filter_pending">Chờ xử lý</string>
+    <string name="admin_reports_filter_resolved">Đã xử lý</string>
+    <string name="admin_reports_filter_dismissed">Đã bỏ qua</string>
+    <string name="admin_reports_empty">Không có báo cáo</string>
+    <string name="admin_report_target">Bị báo cáo: %1$s</string>
+    <string name="admin_report_reporter">Người báo cáo: %1$s</string>
+    <string name="admin_report_reason">Lý do: %1$s</string>
+    <string name="admin_report_status_pending">Chờ xử lý</string>
+    <string name="admin_report_status_resolved">Đã xử lý</string>
+    <string name="admin_report_status_dismissed">Đã bỏ qua</string>
+    <string name="admin_report_actions_title">Xử lý báo cáo</string>
+    <string name="admin_report_resolve">Giải quyết</string>
+    <string name="admin_report_dismiss">Bỏ qua</string>
+    <string name="admin_report_also_ban">Đồng thời khóa người bị báo cáo</string>
 </resources>

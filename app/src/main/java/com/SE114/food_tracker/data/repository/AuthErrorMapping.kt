@@ -61,6 +61,25 @@ internal fun Throwable.toProfileError(): AuthError {
     return toAuthError()
 }
 
+/**
+ * Maps admin-RPC failures: the `not_authorized` exception raised by the admin gate
+ * becomes [AuthError.NotAuthorized]; everything else delegates to [toAuthError].
+ */
+internal fun Throwable.toAdminError(): AuthError {
+    val body = buildString {
+        append(message.orEmpty())
+        if (this@toAdminError is RestException) {
+            append(' '); append(error)
+            append(' '); append(description)
+        }
+    }
+    if ("not_authorized" in body) {
+        Timber.tag("Admin").e(this, "admin action rejected: not_authorized")
+        return AuthError.NotAuthorized
+    }
+    return toAuthError()
+}
+
 private fun Throwable.messageFallback(): AuthError {
     val msg = message?.lowercase().orEmpty()
     return when {

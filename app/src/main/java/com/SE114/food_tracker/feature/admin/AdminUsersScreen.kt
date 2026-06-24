@@ -1,35 +1,266 @@
 package com.SE114.food_tracker.feature.admin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.R
+import com.SE114.food_tracker.core.designsystem.components.AppButton
+import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
 import com.SE114.food_tracker.core.designsystem.components.AppScaffold
+import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
+import com.SE114.food_tracker.data.repository.AdminUser
 import com.SE114.food_tracker.feature.admin.components.AdminTopBar
+import com.SE114.food_tracker.feature.admin.components.AdminUserRow
+import kotlinx.coroutines.flow.distinctUntilChanged
+
+private enum class UserConfirmKind { BAN, DELETE }
+private data class UserConfirm(val user: AdminUser, val kind: UserConfirmKind)
 
 @Composable
-fun AdminUsersScreen(onBack: () -> Unit) {
-    AdminUsersContent(onBack = onBack)
+fun AdminUsersScreen(
+    onBack: () -> Unit,
+    viewModel: AdminUsersViewModel = hiltViewModel()
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var selectedUser by remember { mutableStateOf<AdminUser?>(null) }
+    var pendingConfirm by remember { mutableStateOf<UserConfirm?>(null) }
+
+    val actionErrorText = state.actionError?.adminMessage()
+    LaunchedEffect(state.actionError) {
+        if (actionErrorText != null) {
+            snackbarHostState.showSnackbar(actionErrorText)
+            viewModel.clearActionError()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AdminUsersContent(
+            state = state,
+            onBack = onBack,
+            onSearchChange = viewModel::onSearchChange,
+            onRetry = viewModel::reload,
+            onLoadMore = viewModel::loadMore,
+            onUserClick = { selectedUser = it }
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+        )
+    }
+
+    selectedUser?.let { user ->
+        UserActionSheet(
+            user = user,
+            onDismiss = { selectedUser = null },
+            onBanToggle = {
+                selectedUser = null
+                if (user.isBanned) viewModel.setBanned(user, false)
+                else pendingConfirm = UserConfirm(user, UserConfirmKind.BAN)
+            },
+            onDeleteToggle = {
+                selectedUser = null
+                if (user.isDeleted) viewModel.setDeleted(user, false)
+                else pendingConfirm = UserConfirm(user, UserConfirmKind.DELETE)
+            }
+        )
+    }
+
+    pendingConfirm?.let { confirm ->
+        val handle = confirm.user.userId ?: confirm.user.displayName.orEmpty()
+        when (confirm.kind) {
+            UserConfirmKind.BAN -> ConfirmDialog(
+                title = stringResource(R.string.admin_ban_confirm_title),
+                body = stringResource(R.string.admin_ban_confirm_body, handle),
+                confirmLabel = stringResource(R.string.admin_confirm_ban),
+                cancelLabel = stringResource(R.string.admin_cancel),
+                destructive = true,
+                onConfirm = { pendingConfirm = null; viewModel.setBanned(confirm.user, true) },
+                onDismiss = { pendingConfirm = null }
+            )
+            UserConfirmKind.DELETE -> ConfirmDialog(
+                title = stringResource(R.string.admin_delete_confirm_title),
+                body = stringResource(R.string.admin_delete_confirm_body, handle),
+                confirmLabel = stringResource(R.string.admin_confirm_delete),
+                cancelLabel = stringResource(R.string.admin_cancel),
+                destructive = true,
+                onConfirm = { pendingConfirm = null; viewModel.setDeleted(confirm.user, true) },
+                onDismiss = { pendingConfirm = null }
+            )
+        }
+    }
 }
 
 @Composable
-private fun AdminUsersContent(onBack: () -> Unit) {
+private fun AdminUsersContent(
+    state: AdminUsersUiState,
+    onBack: () -> Unit,
+    onSearchChange: (String) -> Unit,
+    onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
+    onUserClick: (AdminUser) -> Unit
+) {
     AppScaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp)
         ) {
             AdminTopBar(title = stringResource(R.string.admin_users_title), onBack = onBack)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = state.search,
+                onValueChange = onSearchChange,
+                placeholder = { Text(stringResource(R.string.admin_users_search_hint)) },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+
+            val listState = rememberLazyListState()
+            LaunchedEffect(listState, state.users.size, state.canLoadMore) {
+                snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+                    .distinctUntilChanged()
+                    .collect { lastVisible ->
+                        if (state.canLoadMore && lastVisible >= state.users.lastIndex - 3) onLoadMore()
+                    }
+            }
+
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                when {
+                    state.isLoading && state.users.isEmpty() ->
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+
+                    state.error != null && state.users.isEmpty() -> Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(state.error.adminMessage(), color = MaterialTheme.colorScheme.error)
+                        AppButton(
+                            text = stringResource(R.string.admin_retry),
+                            onClick = onRetry,
+                            variant = AppButtonVariant.Secondary
+                        )
+                    }
+
+                    state.users.isEmpty() -> Text(
+                        text = stringResource(R.string.admin_users_empty),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+
+                    else -> LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)
+                    ) {
+                        items(state.users, key = { it.id }) { user ->
+                            AdminUserRow(user = user, onClick = { onUserClick(user) })
+                        }
+                        if (state.isLoadingMore) {
+                            item {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp)
+                                        .wrapContentWidth(Alignment.CenterHorizontally)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UserActionSheet(
+    user: AdminUser,
+    onDismiss: () -> Unit,
+    onBanToggle: () -> Unit,
+    onDeleteToggle: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = user.displayName?.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.admin_user_no_name),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = "@" + (user.userId ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            AppButton(
+                text = stringResource(
+                    if (user.isBanned) R.string.admin_action_unban else R.string.admin_action_ban
+                ),
+                onClick = onBanToggle,
+                variant = if (user.isBanned) AppButtonVariant.Secondary else AppButtonVariant.Destructive,
+                modifier = Modifier.fillMaxWidth()
+            )
+            AppButton(
+                text = stringResource(
+                    if (user.isDeleted) R.string.admin_action_restore else R.string.admin_action_delete
+                ),
+                onClick = onDeleteToggle,
+                variant = if (user.isDeleted) AppButtonVariant.Secondary else AppButtonVariant.Destructive,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -38,6 +269,19 @@ private fun AdminUsersContent(onBack: () -> Unit) {
 @Composable
 private fun AdminUsersContentPreview() {
     FoodTrackerTheme {
-        AdminUsersContent(onBack = {})
+        AdminUsersContent(
+            state = AdminUsersUiState(
+                users = listOf(
+                    AdminUser("1", "An Nguyễn", "an.nguyen", null, isBanned = false, isDeleted = false),
+                    AdminUser("2", "Bảo Trần", "bao.tran", null, isBanned = true, isDeleted = false),
+                    AdminUser("3", "Chi Lê", "chi.le", null, isBanned = false, isDeleted = true)
+                )
+            ),
+            onBack = {},
+            onSearchChange = {},
+            onRetry = {},
+            onLoadMore = {},
+            onUserClick = {}
+        )
     }
 }
