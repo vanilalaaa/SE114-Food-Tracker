@@ -149,6 +149,9 @@ class LoginViewModel @Inject constructor(
 
     // Admin-entry sign-in: an admin goes to the admin area; anyone else falls through to the normal app.
     private suspend fun resolveAdminDestination() {
+        // am_i_admin() reads auth.uid(); wait for the just-created session to settle, or the RPC
+        // runs unauthenticated, returns false, and the admin lands in the normal app.
+        authRepository.awaitActiveSession()
         when (val outcome = profileRepository.amIAdmin()) {
             is AuthOutcome.Success ->
                 if (outcome.data) {

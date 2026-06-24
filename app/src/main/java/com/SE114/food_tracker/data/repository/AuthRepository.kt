@@ -9,6 +9,13 @@ interface AuthRepository {
     /** True when a session is already loaded — lets the admin entry skip re-login. */
     fun hasSession(): Boolean
 
+    /**
+     * Suspends until the session has settled to Authenticated (or a short timeout elapses), so the
+     * next authenticated call carries the new token. Returns true if a session is active. Needed
+     * right after sign-in because RPCs that read `auth.uid()` race the just-created session.
+     */
+    suspend fun awaitActiveSession(): Boolean
+
     suspend fun signIn(email: String, password: String): AuthOutcome<Unit>
     suspend fun signUp(email: String, password: String, displayName: String, userId: String): AuthOutcome<Unit>
     suspend fun signInWithGoogle(idToken: String, rawNonce: String): AuthOutcome<Unit>
