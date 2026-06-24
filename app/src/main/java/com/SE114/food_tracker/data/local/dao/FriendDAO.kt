@@ -34,20 +34,26 @@ interface FriendDAO {
     @Query("""
         SELECT f.friendship_id AS friendshipId, 
                c.user_id AS userId, 
+               COALESCE(NULLIF(c.profile_user_id, ''), c.user_id) AS searchUserId,
                c.display_name AS displayName, 
                c.avatar_url AS avatarUrl, 
                f.status AS status
         FROM friendship f
-        INNER JOIN user_profile_cache c ON (c.user_id = f.sender_id OR c.user_id = f.receiver_id)
+        INNER JOIN user_profile_cache c ON c.user_id = CASE
+            WHEN f.sender_id = :myUserId THEN f.receiver_id
+            ELSE f.sender_id
+        END
         WHERE f.status = 'accepted' 
         AND f.is_deleted = 0 
-        AND c.user_id != :myUserId
+        AND (f.sender_id = :myUserId OR f.receiver_id = :myUserId)
+        ORDER BY lower(c.display_name), c.user_id
     """)
     fun getAcceptedFriends(myUserId: String): Flow<List<FriendItemDto>>
 
     @Query("""
         SELECT f.friendship_id AS friendshipId, 
                c.user_id AS userId, 
+               COALESCE(NULLIF(c.profile_user_id, ''), c.user_id) AS searchUserId,
                c.display_name AS displayName, 
                c.avatar_url AS avatarUrl, 
                f.status AS status
@@ -56,12 +62,14 @@ interface FriendDAO {
         WHERE f.receiver_id = :myUserId 
         AND f.status = 'pending' 
         AND f.is_deleted = 0
+        ORDER BY f.created_at DESC, f.friendship_id
     """)
     fun getIncomingRequests(myUserId: String): Flow<List<FriendItemDto>>
 
     @Query("""
         SELECT f.friendship_id AS friendshipId, 
                c.user_id AS userId, 
+               COALESCE(NULLIF(c.profile_user_id, ''), c.user_id) AS searchUserId,
                c.display_name AS displayName, 
                c.avatar_url AS avatarUrl, 
                f.status AS status
@@ -70,6 +78,7 @@ interface FriendDAO {
         WHERE f.sender_id = :myUserId 
         AND f.status = 'pending' 
         AND f.is_deleted = 0
+        ORDER BY f.created_at DESC, f.friendship_id
     """)
     fun getOutgoingRequests(myUserId: String): Flow<List<FriendItemDto>>
 
@@ -85,6 +94,32 @@ interface FriendDAO {
     suspend fun softDeleteFriendship(
         friendshipId: String,
         syncStatus: String = "PENDING",
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("""
+        UPDATE friendship
+        SET is_deleted = 1, sync_status = :syncStatus, updated_at = :updatedAt
+        WHERE is_deleted = 0
+        AND (sender_id = :myUserId OR receiver_id = :myUserId)
+        AND friendship_id NOT IN (:remoteFriendshipIds)
+    """)
+    suspend fun softDeleteFriendshipsMissingFromRemote(
+        myUserId: String,
+        remoteFriendshipIds: List<String>,
+        syncStatus: String = "SYNCED",
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("""
+        UPDATE friendship
+        SET is_deleted = 1, sync_status = :syncStatus, updated_at = :updatedAt
+        WHERE is_deleted = 0
+        AND (sender_id = :myUserId OR receiver_id = :myUserId)
+    """)
+    suspend fun softDeleteAllFriendshipsForUser(
+        myUserId: String,
+        syncStatus: String = "SYNCED",
         updatedAt: Long = System.currentTimeMillis()
     )
 }

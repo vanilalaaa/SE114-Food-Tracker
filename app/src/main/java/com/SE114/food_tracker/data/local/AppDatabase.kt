@@ -36,7 +36,7 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         FeedLike::class,
         FeedComment::class
     ],
-    version = 11,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -71,6 +71,19 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DELETE FROM item")
                 db.execSQL("DELETE FROM category WHERE is_system = 0")
                 db.execSQL("DELETE FROM budget")
+            }
+        }
+
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE feed_comment ADD COLUMN parent_comment_id TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
+            }
+        }
+
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_profile_cache ADD COLUMN profile_user_id TEXT NOT NULL DEFAULT ''")
             }
         }
     }
@@ -123,6 +136,7 @@ private fun SupportSQLiteDatabase.createFeedTables() {
             user_id TEXT NOT NULL,
             display_name TEXT NOT NULL,
             body TEXT NOT NULL,
+            parent_comment_id TEXT,
             sync_status TEXT NOT NULL DEFAULT 'PENDING',
             is_deleted INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL,
@@ -131,6 +145,7 @@ private fun SupportSQLiteDatabase.createFeedTables() {
         """.trimIndent()
     )
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_post_id ON feed_comment(post_id)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_user_id ON feed_comment(user_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_sync_status ON feed_comment(sync_status)")
 }

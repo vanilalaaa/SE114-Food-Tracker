@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,8 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.core.designsystem.components.*
@@ -105,6 +105,9 @@ fun DiaryScreenContent(
     var calendarScale       by remember { mutableStateOf(1f) }
     val scrollState         = rememberScrollState()
     var preSelectedCategory by remember { mutableStateOf<DiaryCategory?>(null) }
+
+    val sourceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val entrySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Tính toán danh sách món ăn đã lọc theo Danh mục đang chọn
     val filteredItems = remember(uiState.items, uiState.selectedCategoryId) {
@@ -217,10 +220,12 @@ fun DiaryScreenContent(
         )
     }
 
+    // Chuyển từ Dialog sang ModalBottomSheet (TV1)
     if (showSourceScreen) {
-        Dialog(
+        ModalBottomSheet(
             onDismissRequest = { showSourceScreen = false },
-            properties       = DialogProperties(usePlatformDefaultWidth = false)
+            sheetState = sourceSheetState,
+            containerColor = MainBackground
         ) {
             AddFoodSourceScreen(
                 categories  = categories,
@@ -244,14 +249,17 @@ fun DiaryScreenContent(
         }
     }
 
+    // Chuyển từ Dialog sang ModalBottomSheet (TV1)
     if (showEntryScreen) {
-        Dialog(
+        ModalBottomSheet(
             onDismissRequest = {
                 showEntryScreen     = false
                 selectedItemForEdit = null
                 preSelectedCategory = null
+                onClearPendingImage()
             },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+            sheetState = entrySheetState,
+            containerColor = MainBackground
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = MainBackground) {
                 val editingItem = selectedItemForEdit

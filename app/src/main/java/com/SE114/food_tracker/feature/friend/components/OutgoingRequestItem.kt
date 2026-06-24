@@ -18,14 +18,18 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.dao.FriendItemDto
 
 @Composable
-fun OutgoingRequestItem(request: FriendItemDto, onCancel: (String) -> Unit) {
+fun OutgoingRequestItem(
+    request: FriendItemDto,
+    isBusy: Boolean,
+    onCancel: (String) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProfileAvatar(avatarUrl = request.avatarUrl, hasStory = false)
+        ProfileAvatar(avatarUrl = request.avatarUrl)
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
@@ -36,7 +40,7 @@ fun OutgoingRequestItem(request: FriendItemDto, onCancel: (String) -> Unit) {
                 fontSize = 16.sp
             )
             Text(
-                text = "Đang chờ phản hồi",
+                text = "@${request.searchUserId}",
                 color = TextLabelGray,
                 fontSize = 12.sp
             )
@@ -44,6 +48,7 @@ fun OutgoingRequestItem(request: FriendItemDto, onCancel: (String) -> Unit) {
 
         OutlinedButton(
             onClick = { onCancel(request.friendshipId) },
+            enabled = !isBusy,
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = HintGray),
             contentPadding = PaddingValues(horizontal = 10.dp),

@@ -19,19 +19,39 @@ import com.SE114.food_tracker.data.local.dao.FriendItemDto
 import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
-fun IncomingRequestItem(request: FriendItemDto, onAccept: (String) -> Unit, onDecline: (String) -> Unit) {
+fun IncomingRequestItem(
+    request: FriendItemDto,
+    isBusy: Boolean,
+    onAccept: (String) -> Unit,
+    onDecline: (String) -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProfileAvatar(avatarUrl = request.avatarUrl, hasStory = false)
+        ProfileAvatar(avatarUrl = request.avatarUrl)
         Spacer(modifier = Modifier.width(12.dp))
 
-        Text(request.displayName, color = TextPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = request.displayName,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+            Text(
+                text = "@${request.searchUserId}",
+                color = TextLabelGray,
+                fontSize = 12.sp
+            )
+        }
 
         Row {
             Button(
                 onClick = { onAccept(request.friendshipId) },
+                enabled = !isBusy,
                 colors = ButtonDefaults.buttonColors(containerColor = OrangeMain),
                 shape = RoundedCornerShape(16.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp),
@@ -40,7 +60,11 @@ fun IncomingRequestItem(request: FriendItemDto, onAccept: (String) -> Unit, onDe
                 Text("Nhận", color = CardWhite, fontSize = 14.sp)
             }
             Spacer(modifier = Modifier.width(8.dp))
-            IconButton(onClick = { onDecline(request.friendshipId) }, modifier = Modifier.size(32.dp)) {
+            IconButton(
+                onClick = { onDecline(request.friendshipId) },
+                enabled = !isBusy,
+                modifier = Modifier.size(32.dp)
+            ) {
                 Icon(Icons.Default.Clear, contentDescription = "Xóa", tint = HintGray)
             }
         }

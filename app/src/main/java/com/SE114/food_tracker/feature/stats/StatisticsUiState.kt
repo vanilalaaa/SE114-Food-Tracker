@@ -1,5 +1,7 @@
 package com.SE114.food_tracker.feature.stats
 
+import com.SE114.food_tracker.core.util.AppCurrency
+import com.SE114.food_tracker.core.util.CurrencyFormatter
 import com.SE114.food_tracker.core.util.TimeFrame
 import kotlinx.datetime.LocalDate
 
@@ -86,9 +88,9 @@ data class StatisticsSummary(
 
 /**
  * Three-point forecast for [LocalLineTrendChartCard]:
- *  - [previousTotal]  → total spend in the period immediately before the active one (solid, past)
- *  - [currentActual]  → real-time spend so far in the active period (solid, past)
- *  - [projectedTotal] → forecasted end-of-period total (dashed, future)
+ * - [previousTotal]  → total spend in the period immediately before the active one (solid, past)
+ * - [currentActual]  → real-time spend so far in the active period (solid, past)
+ * - [projectedTotal] → forecasted end-of-period total (dashed, future)
  *
  * [projectedTotal] = currentActual + (historicalCycleAverage * remainingCycles).
  * For [com.SE114.food_tracker.core.util.TimeFrame.DAY] there is no sub-cycle to project
@@ -138,4 +140,47 @@ data class StatisticsUiState(
     // Async
     val isLoading: Boolean = true,
     val error: String? = null
-)
+) {
+    fun getDynamicInsights(
+        displayCurrency: AppCurrency = AppCurrency.VND,
+        rates: Map<String, Double> = emptyMap()
+    ): List<String> {
+        val insights = mutableListOf<String>()
+
+        // 1. Average cost per item
+        if (summary.itemCount > 0 && summary.totalSpent > 0.0) {
+            val avg = summary.totalSpent / summary.itemCount
+            val converted = CurrencyFormatter.convert(
+                avg, AppCurrency.VND.code, displayCurrency.code, rates
+            )
+            val formatted = CurrencyFormatter.formatShortIn(converted, displayCurrency)
+            insights += "Trung bình $formatted / món"
+        }
+
+        // 2. Most expensive category — use topCategories (already sorted by total desc)
+        val topCat = topCategories.firstOrNull()
+        if (topCat != null) {
+            val catItems = detailItems.count { it.categoryName == topCat.name }
+            insights += "${topCat.iconUrl} ${topCat.name} chiếm nhiều nhất ($catItems món)"
+        }
+
+        // 3. Peak spending session
+        val sessionTotals = detailItems
+            .groupBy { it.timeLabel }
+            .mapValues { (_, items) -> items.sumOf { it.price } }
+        val peakSession = sessionTotals.maxByOrNull { it.value }
+        if (peakSession != null && peakSession.value > 0.0) {
+            insights += "Buổi ${peakSession.key} là thời điểm chi nhiều tiền nhất"
+        }
+
+        // 4. Period comparison
+        if (summary.previousPeriodTotal > 0.0) {
+            val pct = summary.percentChange
+            val dir = if (summary.isIncrease) "tăng" else "giảm"
+            val sign = if (pct >= 0) "+" else ""
+            insights += "Chi tiêu $dir $sign${"%.1f".format(pct)}% so với kỳ trước"
+        }
+
+        return insights
+    }
+}
