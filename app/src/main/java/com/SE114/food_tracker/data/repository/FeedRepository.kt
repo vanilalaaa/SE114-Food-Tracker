@@ -468,6 +468,7 @@ class FeedRepository @Inject constructor(
         UserProfileCacheEntity(
             userId = id,
             displayName = this.displayNameOrFallback(id),
+            profileUserId = userId.orEmpty(),
             avatarUrl = avatarUrl
         )
 

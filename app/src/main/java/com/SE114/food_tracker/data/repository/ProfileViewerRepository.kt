@@ -86,6 +86,7 @@ class ProfileViewerRepository @Inject constructor(
             displayName = displayName?.takeIf { it.isNotBlank() }
                 ?: userId?.takeIf { it.isNotBlank() }
                 ?: "Người dùng",
+            profileUserId = userId.orEmpty(),
             avatarUrl = avatarUrl.orEmpty()
         )
 

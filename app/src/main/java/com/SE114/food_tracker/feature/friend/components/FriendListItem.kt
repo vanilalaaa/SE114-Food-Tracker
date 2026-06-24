@@ -33,13 +33,22 @@ fun FriendListItem(
         )
         Spacer(modifier = Modifier.width(16.dp))
 
-        Text(
-            text = friend.displayName,
-            color = TextPrimary,
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp,
-            modifier = Modifier.weight(1f)
-        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = friend.displayName,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+            Text(
+                text = "@${friend.searchUserId}",
+                color = HintGray,
+                fontSize = 12.sp
+            )
+        }
 
         IconButton(
             onClick = { onUnfriend(friend.friendshipId) },
