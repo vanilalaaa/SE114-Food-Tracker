@@ -1,6 +1,10 @@
 package com.SE114.food_tracker.feature.diary
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,35 +13,50 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.core.designsystem.theme.AppTypography
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.feature.diary.components.DayItem
 import com.SE114.food_tracker.feature.diary.components.PrimaryButton
 import com.SE114.food_tracker.feature.diary.components.StatBox
 import com.SE114.food_tracker.feature.diary.components.getEmojiByName
+import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import com.SE114.food_tracker.core.util.*
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +105,7 @@ fun DayDetailBottomSheetContent(
     val scrollState = rememberScrollState()
 
     val totalEntry = items.sumOf { it.price }
-    val displayTotal = totalEntry.formatVndShort()
+    val displayTotal = LocalCurrencyDisplay.current.formatShort(totalEntry)
 
     val dayOfWeekLabel = when (selectedDate.dayOfWeek.ordinal) {
         0 -> "Thứ Hai"
@@ -126,7 +145,7 @@ fun DayDetailBottomSheetContent(
         Spacer(Modifier.height(28.dp))
         Text("Danh sách", style = AppTypography.titleSmall)
         Text(
-            "Swipe left to delete. Tap to edit.",
+            "Swipe left to reveal delete. Tap to edit.",
             style = AppTypography.labelMedium,
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
@@ -135,34 +154,29 @@ fun DayDetailBottomSheetContent(
 
         Spacer(Modifier.height(12.dp))
 
+        // Single dialog anchor — one dialog for all rows
+        var itemToDelete by remember { mutableStateOf<DiaryItem?>(null) }
+
+        itemToDelete?.let { target ->
+            ConfirmDialog(
+                title        = "Xóa món ăn?",
+                body         = "Bạn có chắc chắn muốn xóa món ăn này không? Hành động này không thể hoàn tác.",
+                confirmLabel = "Xóa",
+                cancelLabel  = "Huỷ",
+                destructive  = true,
+                onConfirm    = {
+                    onDeleteItem(target.itemId)
+                    itemToDelete = null
+                },
+                onDismiss    = { itemToDelete = null }
+            )
+        }
+
         items.forEach { item ->
             key(item.itemId) {
-                val dismissState = rememberSwipeToDismissBoxState(
-                    confirmValueChange = { value ->
-                        if (value == SwipeToDismissBoxValue.EndToStart) {
-                            onDeleteItem(item.itemId)
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                )
-
-                SwipeToDismissBox(
-                    state = dismissState,
-                    backgroundContent = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color(0xFFE57373), RoundedCornerShape(16.dp))
-                                .padding(horizontal = 20.dp),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            Text("Delete", color = Color.White)
-                        }
-                    },
-                    enableDismissFromStartToEnd = false,
-                    enableDismissFromEndToStart = true
+                SwipeToRevealDeleteRow(
+                    isDialogOpen = itemToDelete != null,
+                    onDeleteRequest = { itemToDelete = item }
                 ) {
                     val matchedCategory = categories.find { it.categoryId == item.categoryId }
                     val catName = matchedCategory?.name ?: item.categoryName
@@ -180,6 +194,98 @@ fun DayDetailBottomSheetContent(
                 }
                 Spacer(Modifier.height(12.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun SwipeToRevealDeleteRow(
+    isDialogOpen: Boolean,
+    onDeleteRequest: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val density       = LocalDensity.current
+    val revealWidthDp = 80.dp
+    val revealWidthPx = with(density) { revealWidthDp.toPx() }
+
+    // Animated horizontal offset of the foreground card (always <= 0)
+    val offsetX = remember { Animatable(0f) }
+    val scope   = rememberCoroutineScope()
+
+    LaunchedEffect(isDialogOpen) {
+        if (!isDialogOpen && offsetX.value != 0f) {
+            offsetX.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+            )
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // ── Background: fixed-width red panel anchored to the right ──────────
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .size(width = revealWidthDp, height = 72.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFE57373), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(onClick = onDeleteRequest) {
+                    Icon(
+                        imageVector        = Icons.Default.Delete,
+                        contentDescription = "Xóa",
+                        tint               = Color.White,
+                        modifier           = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+
+        // ── Foreground: the actual item card, draggable ───────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .pointerInput(isDialogOpen) {
+                    if (isDialogOpen) return@pointerInput
+
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            scope.launch {
+                                val target = if (offsetX.value < -(revealWidthPx / 2f)) {
+                                    -revealWidthPx
+                                } else {
+                                    0f
+                                }
+                                offsetX.animateTo(
+                                    targetValue   = target,
+                                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
+                                )
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch {
+                                offsetX.animateTo(
+                                    targetValue   = 0f,
+                                    animationSpec = spring(stiffness = Spring.StiffnessMedium)
+                                )
+                            }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            val newValue = (offsetX.value + dragAmount).coerceIn(-revealWidthPx, 0f)
+                            scope.launch { offsetX.snapTo(newValue) }
+
+                            change.consume()
+                        }
+                    )
+                }
+        ) {
+            content()
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.data.repository
 
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -30,13 +31,22 @@ class SupabaseAuthRepository @Inject constructor(
         }
     }
 
-    override suspend fun signUp(email: String, password: String, displayName: String): AuthOutcome<Unit> =
+    override suspend fun signUp(
+        email: String,
+        password: String,
+        displayName: String,
+        userId: String
+    ): AuthOutcome<Unit> =
         runAuth {
             auth.signUpWith(Email) {
                 this.email = email
                 this.password = password
-                // The on_auth_user_created trigger reads full_name from user metadata.
-                data = buildJsonObject { put("full_name", displayName) }
+                // The on_auth_user_created trigger reads full_name; user_id is carried too
+                // but the chosen handle is committed by the immediate completeOnboarding call.
+                data = buildJsonObject {
+                    put("full_name", displayName)
+                    put("user_id", userId)
+                }
             }
             Unit
         }
@@ -51,6 +61,36 @@ class SupabaseAuthRepository @Inject constructor(
 
     override suspend fun sendPasswordReset(email: String): AuthOutcome<Unit> = runAuth {
         auth.resetPasswordForEmail(email)
+    }
+
+    override suspend fun verifyRecoveryOtp(email: String, token: String): AuthOutcome<Unit> = runAuth {
+        auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, email = email, token = token)
+    }
+
+    override suspend fun verifySignupOtp(email: String, token: String): AuthOutcome<Unit> = runAuth {
+        auth.verifyEmailOtp(type = OtpType.Email.SIGNUP, email = email, token = token)
+    }
+
+    override suspend fun resendSignupOtp(email: String): AuthOutcome<Unit> = runAuth {
+        auth.resendEmail(type = OtpType.Email.SIGNUP, email = email)
+    }
+
+    override suspend fun updatePassword(newPassword: String): AuthOutcome<Unit> = runAuth {
+        auth.updateUser { password = newPassword }
+        Unit
+    }
+
+    override suspend fun changePassword(currentPassword: String, newPassword: String): AuthOutcome<Unit> = runAuth {
+        val email = auth.currentUserOrNull()?.email
+            ?: error("No email on the current session")
+        // Verify the current password by re-authenticating (config: require current password when
+        // updating). Wrong password throws → mapped to InvalidCredentials.
+        auth.signInWith(Email) {
+            this.email = email
+            this.password = currentPassword
+        }
+        auth.updateUser { password = newPassword }
+        Unit
     }
 
     override suspend fun signOut(): AuthOutcome<Unit> = runAuth {

@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,20 +29,25 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -72,6 +80,7 @@ import com.SE114.food_tracker.feature.feed.feedFallbackIcon
 import com.SE114.food_tracker.feature.feed.feedImageModelOrNull
 import com.SE114.food_tracker.feature.friend.components.ProfileAvatar
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.math.max
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +91,8 @@ fun FeedPostDetailOverlay(
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
     onDeletePost: (String) -> Unit,
-    onAddComment: (String, String) -> Unit
+    onAddComment: (String, String, String?) -> Unit,
+    onClearError: () -> Unit
 ) {
     val posts = uiState.posts
     val selectedIndex = uiState.selectedPostIndex
@@ -101,7 +111,19 @@ fun FeedPostDetailOverlay(
             pageCount = { posts.size }
         )
         var commentText by rememberSaveable { mutableStateOf("") }
+        var replyingToCommentId by rememberSaveable { mutableStateOf<String?>(null) }
+        var replyingToDisplayName by rememberSaveable { mutableStateOf<String?>(null) }
         var isCommentsSheetOpen by rememberSaveable { mutableStateOf(false) }
+        var pendingDeletePostId by rememberSaveable { mutableStateOf<String?>(null) }
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        LaunchedEffect(uiState.error) {
+            val error = uiState.error
+            if (error != null) {
+                snackbarHostState.showSnackbar(error)
+                onClearError()
+            }
+        }
 
         LaunchedEffect(selectedIndex, posts.size) {
             val targetPage = selectedIndex.coerceIn(posts.indices)
@@ -113,7 +135,11 @@ fun FeedPostDetailOverlay(
         LaunchedEffect(pagerState, posts.size) {
             snapshotFlow { pagerState.currentPage }
                 .distinctUntilChanged()
-                .collect { page -> onSelectPostAt(page) }
+                .collect { page ->
+                    replyingToCommentId = null
+                    replyingToDisplayName = null
+                    onSelectPostAt(page)
+                }
         }
 
         Surface(
@@ -134,7 +160,7 @@ fun FeedPostDetailOverlay(
                             emptyList()
                         },
                         onToggleLike = onToggleLike,
-                        onDeletePost = onDeletePost,
+                        onDeletePost = { postId -> pendingDeletePostId = postId },
                         onOpenComments = { isCommentsSheetOpen = true },
                         onNavigateToProfile = { profileId ->
                             onClose()
@@ -158,24 +184,73 @@ fun FeedPostDetailOverlay(
                     )
                 }
 
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                )
+
                 if (isCommentsSheetOpen) {
                     FeedCommentsBottomSheet(
                         comments = uiState.selectedComments,
                         commentText = commentText,
+                        replyingToDisplayName = replyingToDisplayName,
                         onCommentTextChange = { commentText = it },
+                        onCancelReply = {
+                            replyingToCommentId = null
+                            replyingToDisplayName = null
+                        },
                         onNavigateToProfile = { profileId ->
                             isCommentsSheetOpen = false
                             onClose()
                             onNavigateToProfile(profileId)
                         },
-                        onSend = {
-                            val post = uiState.selectedPost
-                            if (post != null && commentText.isNotBlank()) {
-                                onAddComment(post.postId, commentText)
+                        onReply = { comment ->
+                            replyingToCommentId = comment.commentId
+                            replyingToDisplayName = comment.displayName
+                            if (commentText.isBlank()) {
                                 commentText = ""
                             }
                         },
-                        onDismiss = { isCommentsSheetOpen = false }
+                        onSend = {
+                            val post = uiState.selectedPost
+                            if (post != null && commentText.isNotBlank()) {
+                                onAddComment(post.postId, commentText, replyingToCommentId)
+                                commentText = ""
+                                replyingToCommentId = null
+                                replyingToDisplayName = null
+                            }
+                        },
+                        onDismiss = {
+                            isCommentsSheetOpen = false
+                            replyingToCommentId = null
+                            replyingToDisplayName = null
+                        }
+                    )
+                }
+
+                pendingDeletePostId?.let { postId ->
+                    AlertDialog(
+                        onDismissRequest = { pendingDeletePostId = null },
+                        title = { Text(text = "Xóa bài viết?") },
+                        text = { Text(text = "Bài viết sẽ bị ẩn khỏi bảng tin và đồng bộ xóa lên Supabase.") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    pendingDeletePostId = null
+                                    onDeletePost(postId)
+                                }
+                            ) {
+                                Text(text = "Xóa")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { pendingDeletePostId = null }) {
+                                Text(text = "Hủy")
+                            }
+                        }
                     )
                 }
             }
@@ -193,18 +268,27 @@ private fun FeedPostDetailPage(
     onOpenComments: () -> Unit,
     onNavigateToProfile: (String) -> Unit
 ) {
+    val density = LocalDensity.current
+    val navigationBarBottom = with(density) {
+        WindowInsets.navigationBars.getBottom(density).toDp()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.90f))
             .statusBarsPadding()
-            .navigationBarsPadding()
             .imePadding()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 22.dp, vertical = 22.dp),
+                .padding(
+                    start = 22.dp,
+                    top = 22.dp,
+                    end = 22.dp,
+                    bottom = navigationBarBottom + 16.dp
+                ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.weight(0.58f))
@@ -330,7 +414,6 @@ private fun FeedAuthorBlock(
         ) {
             ProfileAvatar(
                 avatarUrl = post.ownerAvatarUrl,
-                hasStory = false,
                 modifier = Modifier.size(42.dp)
             )
             Spacer(Modifier.width(8.dp))
@@ -436,8 +519,11 @@ private fun FeedStoryActionBar(
 private fun FeedCommentsBottomSheet(
     comments: List<FeedCommentDto>,
     commentText: String,
+    replyingToDisplayName: String?,
     onCommentTextChange: (String) -> Unit,
+    onCancelReply: () -> Unit,
     onNavigateToProfile: (String) -> Unit,
+    onReply: (FeedCommentDto) -> Unit,
     onSend: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -462,11 +548,12 @@ private fun FeedCommentsBottomSheet(
                 .fillMaxWidth()
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
+                .padding(start = 18.dp, end = 18.dp, bottom = 12.dp)
         ) {
             FeedCommentsList(
                 comments = comments,
                 onNavigateToProfile = onNavigateToProfile,
+                onReply = onReply,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 280.dp, max = 430.dp)
@@ -476,7 +563,9 @@ private fun FeedCommentsBottomSheet(
 
             FeedCommentInput(
                 value = commentText,
+                replyingToDisplayName = replyingToDisplayName,
                 onValueChange = onCommentTextChange,
+                onCancelReply = onCancelReply,
                 onSend = onSend
             )
         }
@@ -487,6 +576,7 @@ private fun FeedCommentsBottomSheet(
 private fun FeedCommentsList(
     comments: List<FeedCommentDto>,
     onNavigateToProfile: (String) -> Unit,
+    onReply: (FeedCommentDto) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (comments.isEmpty()) {
@@ -503,15 +593,53 @@ private fun FeedCommentsList(
         return
     }
 
+    val commentIds = comments.map { it.commentId }.toSet()
+    val rootComments = comments.filter { it.parentCommentId == null || it.parentCommentId !in commentIds }
+    val repliesByParentId = comments
+        .filter { it.parentCommentId != null && it.parentCommentId in commentIds }
+        .groupBy { it.parentCommentId }
+
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        items(comments, key = { it.commentId }) { comment ->
-            FeedCommentRow(
+        items(rootComments, key = { it.commentId }) { comment ->
+            FeedCommentThread(
                 comment = comment,
-                onNavigateToProfile = onNavigateToProfile
+                repliesByParentId = repliesByParentId,
+                replyDepth = 0,
+                onNavigateToProfile = onNavigateToProfile,
+                onReply = onReply
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeedCommentThread(
+    comment: FeedCommentDto,
+    repliesByParentId: Map<String?, List<FeedCommentDto>>,
+    replyDepth: Int,
+    onNavigateToProfile: (String) -> Unit,
+    onReply: (FeedCommentDto) -> Unit
+) {
+    Column {
+        FeedCommentRow(
+            comment = comment,
+            replyDepth = replyDepth,
+            onNavigateToProfile = onNavigateToProfile,
+            onReply = onReply
+        )
+
+        repliesByParentId[comment.commentId].orEmpty().forEach { reply ->
+            Spacer(Modifier.height(8.dp))
+            FeedCommentThread(
+                comment = reply,
+                repliesByParentId = repliesByParentId,
+                replyDepth = replyDepth + 1,
+                onNavigateToProfile = onNavigateToProfile,
+                onReply = onReply
             )
         }
     }
@@ -520,12 +648,16 @@ private fun FeedCommentsList(
 @Composable
 private fun FeedCommentRow(
     comment: FeedCommentDto,
-    onNavigateToProfile: (String) -> Unit
+    replyDepth: Int,
+    onNavigateToProfile: (String) -> Unit,
+    onReply: (FeedCommentDto) -> Unit = {}
 ) {
-    Row(verticalAlignment = Alignment.Top) {
+    Row(
+        modifier = Modifier.padding(start = (replyDepth.coerceAtMost(2) * 42).dp),
+        verticalAlignment = Alignment.Top
+    ) {
         ProfileAvatar(
             avatarUrl = comment.avatarUrl,
-            hasStory = false,
             modifier = Modifier
                 .size(42.dp)
                 .clickable { onNavigateToProfile(comment.userId) }
@@ -533,15 +665,23 @@ private fun FeedCommentRow(
 
         Spacer(Modifier.width(8.dp))
 
-        Column(
-            modifier = Modifier.clickable { onNavigateToProfile(comment.userId) }
-        ) {
-            Text(
-                text = comment.displayName,
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
-            )
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = comment.displayName,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onNavigateToProfile(comment.userId) }
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = formatCommentAge(comment.createdAt),
+                    color = Color.White.copy(alpha = 0.36f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Text(
                 text = comment.body,
                 color = Color.White,
@@ -552,18 +692,69 @@ private fun FeedCommentRow(
                 color = Color.White.copy(alpha = 0.36f),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 3.dp)
+                modifier = Modifier
+                    .padding(top = 3.dp)
+                    .clickable { onReply(comment) }
             )
         }
+    }
+}
+
+private fun formatCommentAge(createdAt: Long): String {
+    val elapsedMillis = max(0L, System.currentTimeMillis() - createdAt)
+    val minute = 60_000L
+    val hour = 60 * minute
+    val day = 24 * hour
+    val week = 7 * day
+    val month = 30 * day
+    val year = 365 * day
+
+    return when {
+        elapsedMillis < minute -> "Vừa xong"
+        elapsedMillis < hour -> "${elapsedMillis / minute} phút"
+        elapsedMillis < day -> "${elapsedMillis / hour} giờ"
+        elapsedMillis < week -> "${elapsedMillis / day} ngày"
+        elapsedMillis < month -> "${elapsedMillis / week} tuần"
+        elapsedMillis < year -> "${elapsedMillis / month} tháng"
+        else -> "${elapsedMillis / year} năm"
     }
 }
 
 @Composable
 private fun FeedCommentInput(
     value: String,
+    replyingToDisplayName: String?,
     onValueChange: (String) -> Unit,
+    onCancelReply: () -> Unit,
     onSend: () -> Unit
 ) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (replyingToDisplayName != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White.copy(alpha = 0.10f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Đang trả lời $replyingToDisplayName",
+                    color = Color.White.copy(alpha = 0.72f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "Hủy",
+                    color = Color.White.copy(alpha = 0.88f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable(onClick = onCancelReply)
+                )
+            }
+        }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -576,6 +767,7 @@ private fun FeedCommentInput(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.weight(1f),
+            textStyle = LocalTextStyle.current.copy(color = Color.White),
             placeholder = {
                 Text(
                     text = "Viết bình luận...",
@@ -601,10 +793,11 @@ private fun FeedCommentInput(
                 .background(Color.White.copy(alpha = 0.18f), CircleShape)
         ) {
             Icon(
-                imageVector = Icons.Default.Send,
+                imageVector = Icons.AutoMirrored.Filled.Send,
                 contentDescription = "Gửi",
                 tint = Color.White
             )
         }
+    }
     }
 }

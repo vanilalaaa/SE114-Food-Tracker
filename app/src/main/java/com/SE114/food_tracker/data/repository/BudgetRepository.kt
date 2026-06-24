@@ -1,10 +1,9 @@
 package com.SE114.food_tracker.data.repository
 
+import com.SE114.food_tracker.core.network.SessionProvider
 import com.SE114.food_tracker.core.sync.SyncStatus
 import com.SE114.food_tracker.data.local.dao.BudgetDAO
 import com.SE114.food_tracker.data.local.entities.Budget
-import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import javax.inject.Inject
@@ -25,9 +24,9 @@ import javax.inject.Singleton
 @Singleton
 class BudgetRepository @Inject constructor(
     private val budgetDAO: BudgetDAO,
-    private val supabaseClient: SupabaseClient
+    private val sessionProvider: SessionProvider
 ) {
-    fun getCurrentUserId(): String? = supabaseClient.auth.currentUserOrNull()?.id
+    fun getCurrentUserId(): String? = sessionProvider.currentUserId()
 
     /** Live stream of the user's budget row from Room. Returns null if not set yet. */
     fun getBudget(userId: String): Flow<Budget?> = budgetDAO.getBudgetByUserId(userId)

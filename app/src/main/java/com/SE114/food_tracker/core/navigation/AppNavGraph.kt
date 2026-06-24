@@ -1,26 +1,31 @@
 package com.SE114.food_tracker.core.navigation
 
 import android.net.Uri
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.SE114.food_tracker.feature.auth.ChangePasswordScreen
 import com.SE114.food_tracker.feature.auth.CompleteProfileScreen
 import com.SE114.food_tracker.feature.auth.ForgotPasswordScreen
 import com.SE114.food_tracker.feature.auth.LoginScreen
 import com.SE114.food_tracker.feature.auth.PostAuthDestination
 import com.SE114.food_tracker.feature.auth.RegisterScreen
 import com.SE114.food_tracker.feature.auth.SplashScreen
+import com.SE114.food_tracker.feature.auth.VerifyEmailScreen
 import com.SE114.food_tracker.feature.diary.DiaryScreen
 import com.SE114.food_tracker.feature.profile.MyProfileScreen
+import com.SE114.food_tracker.feature.settings.CategoryManagementScreen
 import com.SE114.food_tracker.feature.settings.SettingsScreen
 import com.SE114.food_tracker.feature.stats.StatisticsScreen
 import com.SE114.food_tracker.feature.feed.FeedScreen
 import com.SE114.food_tracker.feature.friend.FriendScreen
 import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
+import com.SE114.food_tracker.feature.chat.GroupWalletScreen
 import com.SE114.food_tracker.feature.profile.ProfileScreen
 
 object NavGraphs {
@@ -79,7 +84,16 @@ fun AppNavGraph(
             composable(AppDestinations.Register.route) {
                 RegisterScreen(
                     onAuthenticated = ::navigatePostAuth,
+                    onNavigateToVerifyEmail = { email, displayName, userId ->
+                        navController.navigate(AppDestinations.VerifyEmail.createRoute(email, displayName, userId))
+                    },
                     onNavigateLogin = { navController.popBackStack() }
+                )
+            }
+            composable(AppDestinations.VerifyEmail.route) {
+                VerifyEmailScreen(
+                    onVerified = ::enterMain,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(AppDestinations.Forgot.route) {
@@ -111,7 +125,10 @@ fun AppNavGraph(
 
             composable(AppDestinations.Friend.route) {
                 FriendScreen(
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToProfile = { profileId ->
+                        navController.navigate(AppDestinations.Profile.createRoute(profileId))
+                    }
                 )
             }
 
@@ -135,24 +152,46 @@ fun AppNavGraph(
                 val id = backStackEntry.arguments?.getString("conversationId") ?: ""
                 val name = backStackEntry.arguments?.getString("conversationName") ?: "Người dùng"
 
-                val chatDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>()
-
+                val chatDetailViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.SE114.food_tracker.feature.chat.ChatViewModel>(
+                    key = id
+                )
                 ChatScreen(
                     conversationId = id,
                     conversationName = name,
                     viewModel = chatDetailViewModel,
+                    onBackClick = { navController.popBackStack() },
+                    onWalletClick = {
+                        navController.navigate("group_wallet_screen/$id")
+                    }
+                )
+            }
+            composable("group_wallet_screen/{conversationId}") { backStackEntry ->
+                val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+
+                GroupWalletScreen(
+                    conversationId = conversationId,
                     onBackClick = { navController.popBackStack() }
                 )
             }
 
             composable(AppDestinations.Settings.route) {
                 SettingsScreen(
-                    onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) }
+                    onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) },
+                    onNavigateToCategories = { navController.navigate(AppDestinations.CategoryManagement.route) },
+                    onChangePassword = { navController.navigate(AppDestinations.ChangePassword.route) }
                 )
+            }
+
+            composable(AppDestinations.ChangePassword.route) {
+                ChangePasswordScreen(onBack = { navController.popBackStack() })
             }
 
             composable(AppDestinations.MyProfile.route) {
                 MyProfileScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(AppDestinations.CategoryManagement.route) {
+                CategoryManagementScreen(onBack = { navController.popBackStack() })
             }
         }
     }

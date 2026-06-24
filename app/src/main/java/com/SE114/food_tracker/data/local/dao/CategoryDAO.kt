@@ -41,20 +41,25 @@ interface CategoryDAO {
     @Query("SELECT COUNT(*) FROM item WHERE category_id = :categoryId AND is_deleted = 0")
     suspend fun countActiveItemsForCategory(categoryId: String): Int
 
-    // Exclude soft-deleted rows from all user-facing queries
-    @Query("SELECT * FROM category WHERE is_deleted = 0 ORDER BY is_system DESC, name ASC")
-    fun getAllCategories(): Flow<List<Category>>
+    // Exclude soft-deleted rows; scope to system categories + the current user's own
+    @Query("SELECT * FROM category WHERE is_deleted = 0 AND (is_system = 1 OR owner_id = :ownerId) ORDER BY is_system DESC, name ASC")
+    fun getAllCategories(ownerId: String): Flow<List<Category>>
 
-    @Query("SELECT * FROM category WHERE is_hidden = 0 AND is_deleted = 0 ORDER BY is_system DESC, name ASC")
-    fun getVisibleCategories(): Flow<List<Category>>
+    @Query("SELECT * FROM category WHERE is_hidden = 0 AND is_deleted = 0 AND (is_system = 1 OR owner_id = :ownerId) ORDER BY is_system DESC, name ASC")
+    fun getVisibleCategories(ownerId: String): Flow<List<Category>>
     @Query("SELECT * FROM category WHERE category_id = :id")
     suspend fun getCategoryByIdOneShot(id: String): Category?
 
     // ── SYNC ──
 
-    // Pending = needs upsert or delete pushed to server
-    @Query("SELECT * FROM category WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
-    suspend fun getPendingCategories(): List<Category>
+    // Pending = needs upsert or delete pushed to server. System categories (owner_id NULL)
+    // are seeded/shared globally; the user's own customs are scoped by owner_id.
+    @Query("SELECT * FROM category WHERE (sync_status = 'PENDING' OR sync_status = 'FAILED') AND (is_system = 1 OR owner_id = :ownerId)")
+    suspend fun getPendingCategories(ownerId: String): List<Category>
+
+    /** Removes the current device's custom categories on explicit logout; system rows stay. */
+    @Query("DELETE FROM category WHERE is_system = 0")
+    suspend fun clearUserCategories()
 
     @Upsert
     suspend fun upsertCategoriesFromServer(categories: List<Category>)

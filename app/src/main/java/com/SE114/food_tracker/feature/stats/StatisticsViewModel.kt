@@ -32,31 +32,22 @@ class StatisticsViewModel @Inject constructor(
 ) : ViewModel() {
 
     // ── Navigation state ──────────────────────────────────────────────────────
-
     private val _timeFrame  = MutableStateFlow(TimeFrame.DAY)
     private val _contentTab = MutableStateFlow(ContentTab.EXPENSE)
     private val _anchor     = MutableStateFlow(TimeRangeProvider.today())
 
     // ── Derived range ─────────────────────────────────────────────────────────
-
-    /** Half-open [start, end) epoch-millis range for the currently selected period. */
     private val _range: Flow<DateRange> =
         combine(_timeFrame, _anchor) { tf, anchor ->
             TimeRangeProvider.rangeFor(tf, anchor)
         }
 
-    /** Previous period range — used for the "+X% vs last period" insight. */
     private val _previousRange: Flow<DateRange> =
         combine(_timeFrame, _anchor) { tf, anchor ->
             TimeRangeProvider.previousRangeFor(tf, anchor)
         }
 
-    // ── Budget flow (from Room, scoped to current user) ───────────────────────
-
-    /**
-     * Emits a [BudgetUiState] whenever the budget row or the active time-frame changes.
-     * When no user is authenticated yet (userId null), returns an empty BudgetUiState.
-     */
+    // ── Budget flow ───────────────────────────────────────────────────────────
     private fun budgetFlow(timeFrame: TimeFrame, spent: Double): Flow<BudgetUiState> {
         val userId = budgetRepository.getCurrentUserId() ?: return flowOf(BudgetUiState())
         return budgetRepository.getBudget(userId).map { budget ->
@@ -78,7 +69,6 @@ class StatisticsViewModel @Inject constructor(
     }
 
     // ── Root UiState ──────────────────────────────────────────────────────────
-
     val uiState: StateFlow<StatisticsUiState> = combine(
         _timeFrame, _contentTab, _anchor, _range, _previousRange
     ) { tf, tab, anchor, range, prevRange ->
@@ -103,24 +93,18 @@ class StatisticsViewModel @Inject constructor(
                 destroyer     = args[6] as WalletDestroyerItem?
             )
         }.flatMapLatest { nd ->
-            combine(
-                statisticsRepository.getDetailItems(nav.range.start, nav.range.end),
-                statisticsRepository.getHistoricalCycleAverage(nav.timeFrame, nav.anchor)
-            ) { detailItems, cycleAverage ->
-                detailItems to cycleAverage
-            }.flatMapLatest { (detailItems, cycleAverage) ->
+            statisticsRepository.getDetailItems(nav.range.start, nav.range.end).flatMapLatest { detailItems ->
                 val summary = StatisticsSummary(
                     totalSpent          = nd.totalSpent,
                     itemCount           = nd.itemCount,
                     previousPeriodTotal = nd.previousTotal
                 )
                 budgetFlow(nav.timeFrame, nd.totalSpent).map { budget ->
-                    val forecast = buildTrendForecast(
-                        timeFrame      = nav.timeFrame,
-                        anchor         = nav.anchor,
-                        previousTotal  = nd.previousTotal,
-                        currentActual  = nd.totalSpent,
-                        cycleAverage   = cycleAverage
+                    val forecast = TrendForecast(
+                        previousTotal   = nd.previousTotal.coerceAtLeast(0.0),
+                        currentActual   = nd.totalSpent.coerceAtLeast(0.0),
+                        projectedTotal  = 0.0, // UI tự tính toán dựa trên Live Rate
+                        remainingCycles = 0
                     )
                     val datesWithData = detailItems
                         .map { it.entryDateEpoch }
@@ -132,6 +116,7 @@ class StatisticsViewModel @Inject constructor(
                                 .dayOfMonth
                         }
                         .distinct()
+
                     StatisticsUiState(
                         timeFrame       = nav.timeFrame,
                         contentTab      = nav.contentTab,
@@ -160,115 +145,37 @@ class StatisticsViewModel @Inject constructor(
         )
 
     // ── User actions ──────────────────────────────────────────────────────────
+    fun onTimeFrameSelected(tf: TimeFrame) { _timeFrame.value = tf }
+    fun onContentTabSelected(tab: ContentTab) { _contentTab.value = tab }
+    fun onPrevious() { _anchor.value = TimeRangeProvider.shift(_timeFrame.value, _anchor.value, forward = false) }
+    fun onNext() { _anchor.value = TimeRangeProvider.shift(_timeFrame.value, _anchor.value, forward = true) }
 
-    fun onTimeFrameSelected(tf: TimeFrame) {
-        _timeFrame.value = tf
-    }
-
-    fun onContentTabSelected(tab: ContentTab) {
-        _contentTab.value = tab
-    }
-
-    fun onPrevious() {
-        _anchor.value = TimeRangeProvider.shift(_timeFrame.value, _anchor.value, forward = false)
-    }
-
-    fun onNext() {
-        _anchor.value = TimeRangeProvider.shift(_timeFrame.value, _anchor.value, forward = true)
-    }
-
-    /** Called when user taps a day cell in CalendarCard. */
     fun onDateSelected(day: Int) {
         val current = _anchor.value
         _anchor.value = LocalDate(current.year, current.monthNumber, day)
     }
 
-    /** Called when MonthYearPickerDialog confirms a new month/year. */
     fun onYearMonthSelected(month: Int, year: Int) {
         _anchor.value = LocalDate(year, month, 1)
     }
 
-    /**
-     * Save budget limits.
-     *
-     * Pass the complete set of 4 values as shown by the current dialog state.
-     * [BudgetRepository.setBudget] merges with the existing row — null means "unchanged",
-     * so pass null only if the user genuinely didn't touch that field.
-     *
-     * Sync is triggered by the existing [SyncScheduler] periodic worker; no immediate
-     * sync is kicked here to match the offline-first pattern (PENDING → worker picks up).
-     */
-    fun saveBudget(
-        daily: Double?,
-        weekly: Double?,
-        monthly: Double?,
-        yearly: Double?
-    ) {
-        val userId = budgetRepository.getCurrentUserId()
-        if (userId == null) {
-            Timber.w("[StatisticsViewModel] saveBudget called with no authenticated user — skipping")
-            return
-        }
+    fun saveBudget(daily: Double?, weekly: Double?, monthly: Double?, yearly: Double?) {
+        val userId = budgetRepository.getCurrentUserId() ?: return
         viewModelScope.launch {
             runCatching {
                 budgetRepository.setBudget(
-                    userId  = userId,
-                    daily   = daily,
-                    weekly  = weekly,
-                    monthly = monthly,
-                    yearly  = yearly
+                    userId = userId, daily = daily, weekly = weekly, monthly = monthly, yearly = yearly
                 )
-                Timber.d("[StatisticsViewModel] budget saved for $userId")
             }.onFailure { e ->
                 Timber.e(e, "[StatisticsViewModel] failed to save budget")
             }
         }
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    /**
-     * Builds the 3-point forecast for [LocalLineTrendChartCard] per Sprint 3 SRS #1/#2:
-     *
-     *   Projected Total = Current Period Spent + (7-cycle historical average * remaining cycles)
-     *
-     * "Remaining cycles" is the count of whole forecast-cycles left in the active period,
-     * computed dynamically off the real system clock via [TimeRangeProvider.remainingCyclesInPeriod]
-     * (cycle = day for WEEK/MONTH, week for YEAR). [TimeFrame.DAY] has no sub-cycle, so it
-     * always has 0 remaining cycles and the projection collapses to the current actual spend.
-     */
-    private fun buildTrendForecast(
-        timeFrame: TimeFrame,
-        anchor: LocalDate,
-        previousTotal: Double,
-        currentActual: Double,
-        cycleAverage: Double
-    ): TrendForecast {
-        val remaining = TimeRangeProvider.remainingCyclesInPeriod(timeFrame, anchor)
-        val projected = currentActual + (cycleAverage.coerceAtLeast(0.0) * remaining)
-        return TrendForecast(
-            previousTotal    = previousTotal.coerceAtLeast(0.0),
-            currentActual    = currentActual.coerceAtLeast(0.0),
-            projectedTotal   = projected.coerceAtLeast(0.0),
-            remainingCycles  = remaining
-        )
-    }
-
-    /** Bundle for combine → flatMapLatest handoff. */
     private data class NavParams(
-        val timeFrame   : TimeFrame,
-        val contentTab  : ContentTab,
-        val anchor      : LocalDate,
-        val range       : DateRange,
-        val prevRange   : DateRange
+        val timeFrame: TimeFrame, val contentTab: ContentTab, val anchor: LocalDate, val range: DateRange, val prevRange: DateRange
     )
     private data class NavData(
-        val totalSpent    : Double,
-        val itemCount     : Int,
-        val previousTotal : Double,
-        val bars          : List<ChartBar>,
-        val donut         : List<ChartSlice>,
-        val topCats       : List<CategoryStat>,
-        val destroyer     : WalletDestroyerItem?
+        val totalSpent: Double, val itemCount: Int, val previousTotal: Double, val bars: List<ChartBar>, val donut: List<ChartSlice>, val topCats: List<CategoryStat>, val destroyer: WalletDestroyerItem?
     )
 }

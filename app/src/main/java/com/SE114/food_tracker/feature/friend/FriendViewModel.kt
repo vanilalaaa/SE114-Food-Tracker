@@ -2,23 +2,27 @@ package com.SE114.food_tracker.feature.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.SE114.food_tracker.data.repository.AuthRepository
-import com.SE114.food_tracker.data.repository.FriendRepository
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
+import com.SE114.food_tracker.data.repository.AuthRepository
+import com.SE114.food_tracker.data.repository.FeedRepository
+import com.SE114.food_tracker.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
+import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @HiltViewModel
 class FriendViewModel @Inject constructor(
     private val repository: FriendRepository,
+    private val feedRepository: FeedRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -36,7 +40,7 @@ class FriendViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
-    private val _searchResult = MutableStateFlow<Result<ProfileDTO>?>(null)
+    private val _searchResult = MutableStateFlow<Result<FriendSearchResult>?>(null)
     val searchResult = _searchResult.asStateFlow()
 
     private val _isLoadingSearch = MutableStateFlow(false)
@@ -44,6 +48,15 @@ class FriendViewModel @Inject constructor(
 
     private val _profileLoadError = MutableStateFlow<String?>(null)
     val profileLoadError = _profileLoadError.asStateFlow()
+
+    private val _actionMessage = MutableStateFlow<String?>(null)
+    val actionMessage = _actionMessage.asStateFlow()
+
+    private val _busyFriendshipIds = MutableStateFlow<Set<String>>(emptySet())
+    val busyFriendshipIds = _busyFriendshipIds.asStateFlow()
+
+    private var loadFriendDataJob: Job? = null
+    private var searchJob: Job? = null
 
     init {
         loadFriendData()
@@ -57,23 +70,25 @@ class FriendViewModel @Inject constructor(
         }
     }
 
-    private fun loadFriendData() {
-        viewModelScope.launch {
-            repository.refreshCurrentProfile()
-                .onSuccess {
-                    _profileLoadError.value = null
-                    repository.refreshFriendships()
-                }
-                .onFailure {
-                    _profileLoadError.value = "Không lấy được ID"
-                }
-        }
+    fun retryLoadProfile() = loadFriendData()
+
+    fun clearActionMessage() {
+        _actionMessage.value = null
     }
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
-        if (query.isBlank()) {
+        searchJob?.cancel()
+
+        if (query.trim().length < MIN_SEARCH_ID_LENGTH) {
             _searchResult.value = null
+            _isLoadingSearch.value = false
+            return
+        }
+
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            performSearch(query.trim())
         }
     }
 
@@ -82,9 +97,8 @@ class FriendViewModel @Inject constructor(
         if (query.isBlank()) return
 
         viewModelScope.launch {
-            _isLoadingSearch.value = true
-            _searchResult.value = repository.searchUser(query)
-            _isLoadingSearch.value = false
+            searchJob?.cancel()
+            performSearch(query)
         }
     }
 
@@ -92,33 +106,100 @@ class FriendViewModel @Inject constructor(
         viewModelScope.launch {
             repository.sendFriendRequest(targetProfileId)
                 .onSuccess {
-                    _searchResult.value = null
-                    _searchQuery.value = ""
+                    searchUser()
+                }
+                .onFailure { reportActionError(it) }
+        }
+    }
+
+    fun acceptRequest(friendshipId: String) =
+        runFriendAction(friendshipId) { repository.acceptRequest(friendshipId) }
+
+    fun declineRequest(friendshipId: String) =
+        runFriendAction(friendshipId) { repository.declineRequest(friendshipId) }
+
+    fun unfriend(friendshipId: String) =
+        runFriendAction(friendshipId) { repository.unfriend(friendshipId) }
+
+    fun cancelOutgoingRequest(friendshipId: String) =
+        runFriendAction(friendshipId) { repository.cancelOutgoingRequest(friendshipId) }
+
+    private fun loadFriendData() {
+        loadFriendDataJob?.cancel()
+        loadFriendDataJob = viewModelScope.launch {
+            _profileLoadError.value = null
+            repository.refreshCurrentProfile()
+                .onSuccess {
+                    repository.refreshFriendships()
+                }
+                .onFailure { e ->
+                    _profileLoadError.value = e.message ?: "Không lấy được ID"
                 }
         }
     }
 
-    fun acceptRequest(friendshipId: String) {
+    private fun runFriendAction(friendshipId: String, action: suspend () -> Result<Unit>) {
+        if (friendshipId in _busyFriendshipIds.value) return
+        _busyFriendshipIds.update { it + friendshipId }
+
         viewModelScope.launch {
-            repository.acceptRequest(friendshipId)
+            try {
+                action()
+                    .onSuccess {
+                        runCatching { feedRepository.refreshVisibleFromSupabase() }
+                            .onFailure { reportActionError(it) }
+                    }
+                    .onFailure { reportActionError(it) }
+            } finally {
+                _busyFriendshipIds.update { it - friendshipId }
+            }
         }
     }
 
-    fun declineRequest(friendshipId: String) {
-        viewModelScope.launch {
-            repository.declineRequest(friendshipId)
-        }
+    private fun reportActionError(t: Throwable) {
+        _actionMessage.value = t.message ?: "Đã xảy ra lỗi, vui lòng thử lại."
     }
 
-    fun unfriend(friendshipId: String) {
-        viewModelScope.launch {
-            repository.unfriend(friendshipId)
+    private suspend fun performSearch(query: String) {
+        if (query != _searchQuery.value.trim()) return
+
+        _isLoadingSearch.value = true
+        _searchResult.value = repository.searchUser(query).map { profile ->
+            FriendSearchResult(
+                profile = profile,
+                relationship = FriendRelationship.fromStatus(
+                    repository.friendshipStatusWith(profile.id)
+                )
+            )
         }
+        _isLoadingSearch.value = false
     }
 
-    fun cancelOutgoingRequest(friendshipId: String) {
-        viewModelScope.launch {
-            repository.cancelOutgoingRequest(friendshipId)
-        }
+    private companion object {
+        const val MIN_SEARCH_ID_LENGTH = 3
+        const val SEARCH_DEBOUNCE_MS = 450L
+    }
+}
+
+data class FriendSearchResult(
+    val profile: ProfileDTO,
+    val relationship: FriendRelationship
+)
+
+enum class FriendRelationship(
+    val label: String?,
+    val canSendRequest: Boolean
+) {
+    NONE(label = null, canSendRequest = true),
+    FRIENDS(label = "Bạn bè", canSendRequest = false),
+    PENDING(label = "Đang chờ", canSendRequest = false);
+
+    companion object {
+        fun fromStatus(status: String?): FriendRelationship =
+            when (status) {
+                "accepted" -> FRIENDS
+                "pending" -> PENDING
+                else -> NONE
+            }
     }
 }

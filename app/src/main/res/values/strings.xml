@@ -6,7 +6,8 @@
 
     <!-- Login -->
     <string name="auth_login_title">Đăng nhập</string>
-    <string name="auth_login_email">Email</string>
+    <string name="auth_login_identifier">Email hoặc User ID</string>
+    <string name="auth_login_identifier_helper">Bạn có thể đăng nhập bằng email hoặc User ID</string>
     <string name="auth_login_password">Mật khẩu</string>
     <string name="auth_login_submit">Đăng nhập</string>
     <string name="auth_login_forgot">Quên mật khẩu?</string>
@@ -24,30 +25,44 @@
     <string name="auth_register_have_account">Đã có tài khoản?</string>
     <string name="auth_register_login_cta">Đăng nhập</string>
 
-    <!-- Forgot password -->
+    <!-- Forgot password (6-digit email OTP reset) -->
     <string name="auth_forgot_title">Đặt lại mật khẩu</string>
-    <string name="auth_forgot_subtitle">Nhập email của bạn, chúng tôi sẽ gửi liên kết đặt lại mật khẩu.</string>
     <string name="auth_forgot_email">Email</string>
-    <string name="auth_forgot_submit">Gửi liên kết</string>
-    <string name="auth_forgot_success">Đã gửi liên kết đặt lại. Vui lòng kiểm tra email của bạn.</string>
-    <string name="auth_forgot_error">Không gửi được liên kết. Vui lòng thử lại.</string>
     <string name="auth_forgot_back">Quay lại đăng nhập</string>
+    <string name="auth_reset_request_subtitle">Nhập email, chúng tôi sẽ gửi mã 6 số để đặt lại mật khẩu.</string>
+    <string name="auth_reset_send_code">Gửi mã</string>
+    <string name="auth_reset_verify_subtitle">Nhập mã gồm 6 chữ số đã gửi tới %1$s</string>
+    <string name="auth_reset_code_label">Mã OTP</string>
+    <string name="auth_reset_verify_submit">Xác nhận mã</string>
+    <string name="auth_reset_resend">Gửi lại mã</string>
+    <string name="auth_reset_resend_cooldown">Gửi lại mã (%1$d giây)</string>
+    <string name="auth_reset_new_password_subtitle">Tạo mật khẩu mới cho tài khoản của bạn.</string>
+    <string name="auth_reset_new_password_label">Mật khẩu mới</string>
+    <string name="auth_reset_confirm_password_label">Nhập lại mật khẩu</string>
+    <string name="auth_reset_submit">Đặt lại mật khẩu</string>
+    <string name="auth_reset_done_title">Đổi mật khẩu thành công</string>
+    <string name="auth_reset_done_subtitle">Hãy đăng nhập bằng mật khẩu mới của bạn.</string>
+    <string name="auth_reset_done_login">Đăng nhập</string>
 
     <!-- Auth errors -->
     <string name="auth_err_invalid_credentials">Email hoặc mật khẩu không đúng</string>
     <string name="auth_err_email_not_confirmed">Email chưa được xác nhận. Vui lòng kiểm tra hộp thư của bạn.</string>
     <string name="auth_err_email_registered">Email đã được đăng ký</string>
-    <string name="auth_err_weak_password">Mật khẩu quá yếu — cần ít nhất 6 ký tự</string>
+    <string name="auth_err_weak_password">Mật khẩu chưa đạt yêu cầu: tối thiểu 6 ký tự, gồm chữ thường, chữ hoa và số</string>
     <string name="auth_err_invalid_email">Email không hợp lệ</string>
     <string name="auth_err_rate_limited">Bạn thao tác quá nhanh. Vui lòng thử lại sau giây lát.</string>
     <string name="auth_err_user_id_taken">User ID đã tồn tại</string>
     <string name="auth_err_user_id_cooldown">Bạn vừa đổi User ID gần đây. Vui lòng thử lại sau.</string>
+    <string name="auth_err_otp_invalid">Mã OTP không đúng hoặc đã hết hạn</string>
     <string name="auth_err_no_network">Không có kết nối mạng. Vui lòng kiểm tra Internet và thử lại.</string>
     <string name="auth_err_unknown">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
     <string name="auth_err_password_mismatch">Mật khẩu nhập lại không khớp</string>
 
     <!-- Register confirm password -->
     <string name="auth_register_confirm_password">Nhập lại mật khẩu</string>
+
+    <!-- Password requirement hint (shown on focus); matches Supabase password policy -->
+    <string name="auth_password_hint">Tối thiểu 6 ký tự, gồm chữ thường, chữ hoa và số</string>
 
     <!-- Complete profile -->
     <string name="auth_complete_title">Hoàn tất hồ sơ</string>
@@ -66,6 +81,24 @@
     <string name="auth_complete_user_id_available_desc">Khả dụng</string>
     <string name="auth_complete_user_id_taken_desc">Đã được dùng</string>
     <string name="auth_complete_submit">Hoàn tất</string>
+    <string name="auth_complete_back">Quay lại</string>
+
+    <!-- Change password (in-session: current + new + confirm) -->
+    <string name="auth_change_pw_title">Đổi mật khẩu</string>
+    <string name="auth_change_pw_current">Mật khẩu hiện tại</string>
+    <string name="auth_change_pw_new">Mật khẩu mới</string>
+    <string name="auth_change_pw_confirm">Nhập lại mật khẩu mới</string>
+    <string name="auth_change_pw_submit">Đổi mật khẩu</string>
+    <string name="auth_change_pw_success">Đổi mật khẩu thành công</string>
+    <string name="auth_change_pw_wrong_current">Mật khẩu hiện tại không đúng</string>
+    <string name="auth_change_pw_same">Mật khẩu mới phải khác mật khẩu hiện tại</string>
+    <string name="auth_change_pw_back">Quay lại</string>
+
+    <!-- Verify email (signup OTP activation) -->
+    <string name="auth_verify_email_title">Xác nhận email</string>
+    <string name="auth_verify_email_subtitle">Nhập mã gồm 6 chữ số đã gửi tới %1$s</string>
+    <string name="auth_verify_email_submit">Xác nhận</string>
+    <string name="auth_verify_email_back">Quay lại</string>
 
     <!-- Google sign-in -->
     <string name="auth_google_signin">Tiếp tục với Google</string>
@@ -78,7 +111,39 @@
     <string name="settings_no_user_id">Chưa đặt User ID</string>
     <string name="settings_open_profile">Mở hồ sơ</string>
     <string name="settings_avatar_desc">Ảnh đại diện</string>
+    <string name="settings_currency">Đơn vị tiền tệ</string>
+    <string name="settings_currency_title">Đơn vị tiền</string>
+    <string name="settings_currency_note">Giá đã nhập được giữ nguyên; chỉ thay đổi cách hiển thị.</string>
+    <string name="settings_change_password">Đổi mật khẩu</string>
     <string name="settings_logout">Đăng xuất</string>
+
+    <!-- Category management -->
+    <string name="settings_category_manage">Quản lý loại</string>
+    <string name="settings_category_title">Quản lý loại</string>
+    <string name="settings_category_back">Quay lại</string>
+    <string name="settings_category_system_group">Mặc định (hệ thống)</string>
+    <string name="settings_category_my_group">Của tôi</string>
+    <string name="settings_category_empty_mine">Bạn chưa tạo loại nào</string>
+    <string name="settings_category_create">Tạo loại mới</string>
+    <string name="settings_category_create_title">Tạo loại mới</string>
+    <string name="settings_category_edit_title">Chỉnh sửa loại</string>
+    <string name="settings_category_name_label">Tên loại</string>
+    <string name="settings_category_icon_label">Biểu tượng</string>
+    <string name="settings_category_save">Lưu</string>
+    <string name="settings_category_cancel">Huỷ</string>
+    <string name="settings_category_delete_title">Xóa loại?</string>
+    <string name="settings_category_delete_body">Loại \"%1$s\" sẽ bị xóa.</string>
+    <string name="settings_category_delete_confirm">Xóa</string>
+    <string name="settings_category_in_use">Loại đang được sử dụng, không thể xóa</string>
+    <string name="settings_category_name_required">Tên loại không được để trống</string>
+    <string name="settings_category_unauthenticated">Bạn cần đăng nhập để thực hiện</string>
+    <string name="settings_category_error_title">Không thể thực hiện</string>
+    <string name="settings_category_error_generic">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
+    <string name="settings_category_error_ok">Đã hiểu</string>
+    <string name="settings_category_show">Hiện</string>
+    <string name="settings_category_hide">Ẩn</string>
+    <string name="settings_category_edit">Sửa</string>
+    <string name="settings_category_delete">Xóa</string>
     <string name="settings_logout_confirm_title">Đăng xuất khỏi tài khoản?</string>
     <string name="settings_logout_confirm_body">Bạn sẽ cần đăng nhập lại để tiếp tục.</string>
     <string name="settings_logout_confirm_yes">Đăng xuất</string>
@@ -100,4 +165,26 @@
     <string name="profile_user_id_check_error">Không kiểm tra được, vui lòng thử lại</string>
     <string name="profile_user_id_cooldown">Có thể đổi sau %1$d ngày</string>
     <string name="profile_save">Lưu</string>
+    <string name="profile_edit_title">Chỉnh sửa hồ sơ</string>
+    <!-- Public profile -->
+    <string name="profile_viewer_title">Profile</string>
+    <string name="profile_menu_open">Mở menu</string>
+    <string name="profile_report">Báo cáo</string>
+    <string name="profile_self_badge">Đây là profile của bạn</string>
+    <string name="profile_retry">Thử lại</string>
+    <string name="profile_tab_diary">Nhật ký</string>
+    <string name="profile_tab_posts">Bài viết</string>
+    <string name="profile_diary_empty">Người dùng chưa chia sẻ món nào</string>
+    <string name="profile_posts_empty">Người dùng chưa có bài viết nào</string>
+
+    <!-- Report -->
+    <string name="report_dialog_title">Báo cáo người dùng</string>
+    <string name="report_reason_prompt">Chọn lý do báo cáo:</string>
+    <string name="report_submit">Gửi báo cáo</string>
+    <string name="report_submitting">Đang gửi...</string>
+    <string name="report_cancel">Hủy</string>
+    <string name="report_reason_spam">Spam</string>
+    <string name="report_reason_inappropriate">Nội dung không phù hợp</string>
+    <string name="report_reason_harassment">Quấy rối</string>
+    <string name="report_reason_other">Khác</string>
 </resources>

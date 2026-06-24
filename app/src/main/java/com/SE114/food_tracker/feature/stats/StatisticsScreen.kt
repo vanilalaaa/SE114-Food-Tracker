@@ -22,8 +22,8 @@ import com.SE114.food_tracker.core.designsystem.components.*
 import com.SE114.food_tracker.core.util.TimeFrame
 import com.SE114.food_tracker.feature.stats.components.*
 import com.SE114.food_tracker.core.designsystem.theme.*
-import com.SE114.food_tracker.core.util.formatVndExact
-import com.SE114.food_tracker.core.util.formatVndShort
+import com.SE114.food_tracker.core.util.CurrencyDisplay
+import com.SE114.food_tracker.core.util.LocalCurrencyDisplay
 
 @Composable
 fun StatisticsScreen(
@@ -31,6 +31,7 @@ fun StatisticsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
+    val currency = LocalCurrencyDisplay.current
 
     // Budget dialog state (purely local UI)
     var showBudgetDialog by remember { mutableStateOf(false) }
@@ -144,11 +145,11 @@ fun StatisticsScreen(
                         }
                 ) {
                     StatisticsSummaryGrid(
-                        totalMeals    = uiState.budget.limit?.formatVndShort() ?: "—",
-                        totalSpending = uiState.summary.totalSpent.formatVndShort(),
+                        totalMeals    = uiState.budget.limit?.let { currency.formatShort(it) } ?: "—",
+                        totalSpending = currency.formatShort(uiState.summary.totalSpent),
                         averagePerMeal = if (uiState.budget.hasLimit) {
                             val rem = uiState.budget.remaining
-                            if (rem < 0) "-${(-rem).formatVndShort()}" else rem.formatVndShort()
+                            if (rem < 0) "-${currency.formatShort(-rem)}" else currency.formatShort(rem)
                         } else "—",
                         label1 = "NGÂN SÁCH",
                         label2 = "ĐÃ CHI",
@@ -166,7 +167,7 @@ fun StatisticsScreen(
                             TimeFrame.YEAR  -> "Chi tiêu theo tháng"
                         },
                         data = uiState.barChartData.map { bar ->
-                            bar.label to bar.value   // Double — no lossy toInt()
+                            bar.label to bar.value
                         }
                     )
                 }
@@ -199,7 +200,7 @@ fun StatisticsScreen(
                 if (uiState.detailItems.isNotEmpty()) {
                     val isWeeklyMode = uiState.timeFrame != TimeFrame.DAY
                     DetailCardSection(
-                        dataGroups   = uiState.detailItems.toDetailDayGroups(isWeeklyMode),
+                        dataGroups   = uiState.detailItems.toDetailDayGroups(isWeeklyMode, currency),
                         isWeeklyMode = isWeeklyMode
                     )
                 } else {
@@ -222,12 +223,12 @@ fun StatisticsScreen(
                 // PHÂN TÍCH tab
                 // ════════════════════════════════════════════════════════════
 
-                if (uiState.trendForecast.points.size >= 3) {
-                    LocalLineTrendChartCard(
-                        title    = "Dự báo xu hướng kỳ tới",
-                        forecast = uiState.trendForecast
-                    )
-                }
+                ForecastCard(
+                    forecast    = uiState.trendForecast,
+                    budgetLimit = uiState.budget.limit,
+                    timeFrame   = uiState.timeFrame,
+                    anchorDate  = uiState.anchorDate ?: com.SE114.food_tracker.core.util.TimeRangeProvider.today()
+                )
 
                 // ── Wallet Destroyer ──────────────────────────────────────────
                 WalletDestroyerCard(item = uiState.walletDestroyer)
@@ -261,8 +262,10 @@ fun StatisticsScreen(
                     }
                 )
 
-                val insightText = buildInsightText(uiState)
-                InsightCard(insightText = insightText)
+                val dynamicInsights = uiState.getDynamicInsights(currency.displayCurrency, currency.rates)
+                val finalInsights = dynamicInsights.ifEmpty { listOf(buildInsightText(uiState, currency)) }
+
+                InsightCard(insights = finalInsights)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -337,7 +340,6 @@ fun StatisticsScreen(
 
 // ─── Mappers & helpers ────────────────────────────────────────────────────────
 
-/** Convert tab index (0..3) → [TimeFrame] */
 private fun Int.toTimeFrame(): TimeFrame = when (this) {
     0    -> TimeFrame.DAY
     1    -> TimeFrame.WEEK
@@ -345,7 +347,6 @@ private fun Int.toTimeFrame(): TimeFrame = when (this) {
     else -> TimeFrame.YEAR
 }
 
-/** Convert [TimeFrame] → tab index for [TimeRangeSelector] */
 private fun TimeFrame.toTabIndex(): Int = when (this) {
     TimeFrame.DAY   -> 0
     TimeFrame.WEEK  -> 1
@@ -353,20 +354,14 @@ private fun TimeFrame.toTabIndex(): Int = when (this) {
     TimeFrame.YEAR  -> 3
 }
 
-/**
- * Groups a flat [DetailItem] list into [DayGroup]s ready for [DetailCardSection].
- *
- * - DAY mode   : single group, no date header
- * - other modes: one group per unique [DetailItem.dateLabel], ordered by date DESC
- */
-private fun List<DetailItem>.toDetailDayGroups(isWeeklyMode: Boolean): List<DayGroup> {
+private fun List<DetailItem>.toDetailDayGroups(isWeeklyMode: Boolean, currency: CurrencyDisplay): List<DayGroup> {
     if (isEmpty()) return emptyList()
 
     return if (!isWeeklyMode) {
         listOf(
             DayGroup(
                 dateLabel = null,
-                meals     = map { it.toMealRecord() }
+                meals     = map { it.toMealRecord(currency) }
             )
         )
     } else {
@@ -377,33 +372,32 @@ private fun List<DetailItem>.toDetailDayGroups(isWeeklyMode: Boolean): List<DayG
         ordered.map { (label, items) ->
             DayGroup(
                 dateLabel = label,
-                meals     = items.map { it.toMealRecord() }
+                meals     = items.map { it.toMealRecord(currency) }
             )
         }
     }
 }
 
-private fun DetailItem.toMealRecord(): MealRecord = MealRecord(
+private fun DetailItem.toMealRecord(currency: CurrencyDisplay): MealRecord = MealRecord(
     time      = timeLabel,
     name      = name,
     category  = categoryName,
-    price     = "${price.formatVndExact()} đ",
+    price     = currency.format(price, currencyCode),
     iconText  = categoryIconUrl,
     imageUrl  = imageUrl
 )
 
-/** Generate a simple insight sentence from the current UiState. */
-private fun buildInsightText(state: StatisticsUiState): String {
+private fun buildInsightText(state: StatisticsUiState, currency: CurrencyDisplay): String {
     val destroyer = state.walletDestroyer
     val topCat    = state.topCategories.firstOrNull()
 
     return when {
         state.budget.isExceeded ->
-            "Bạn đã vượt ngân sách ${(-state.budget.remaining).formatVndShort()}đ — hãy điều chỉnh chi tiêu!"
+            "Bạn đã vượt ngân sách ${currency.formatShort(-state.budget.remaining)} — hãy điều chỉnh chi tiêu!"
         destroyer != null ->
-            "\"${destroyer.name}\" là món tốn nhất kỳ này (${destroyer.price.formatVndShort()}đ)"
+            "\"${destroyer.name}\" là món tốn nhất kỳ này (${currency.formatShort(destroyer.price)})"
         topCat != null ->
-            "Danh mục tốn nhiều nhất: ${topCat.iconUrl} ${topCat.name} (${topCat.total.formatVndShort()}đ)"
+            "Danh mục tốn nhiều nhất: ${topCat.iconUrl} ${topCat.name} (${currency.formatShort(topCat.total)})"
         state.summary.itemCount == 0 ->
             "Chưa có dữ liệu — hãy ghi nhật ký món ăn đầu tiên!"
         state.summary.isIncrease ->

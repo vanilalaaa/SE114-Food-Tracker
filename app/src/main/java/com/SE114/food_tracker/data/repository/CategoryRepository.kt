@@ -1,22 +1,23 @@
 package com.SE114.food_tracker.data.repository
 
+import com.SE114.food_tracker.core.network.SessionProvider
 import com.SE114.food_tracker.data.local.dao.CategoryDAO
 import com.SE114.food_tracker.data.local.entities.Category
-import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 class CategoryRepository @Inject constructor(
     private val categoryDAO: CategoryDAO,
-    private val supabaseClient: SupabaseClient
+    private val sessionProvider: SessionProvider
 ) {
 
-    fun getAllCategories(): Flow<List<Category>> = categoryDAO.getAllCategories()
+    private fun owner(): String = sessionProvider.currentUserId().orEmpty()
 
-    fun getVisibleCategories(): Flow<List<Category>> = categoryDAO.getVisibleCategories()
+    fun getAllCategories(): Flow<List<Category>> = categoryDAO.getAllCategories(owner())
 
-    fun getCurrentUserId(): String? = supabaseClient.auth.currentUserOrNull()?.id
+    fun getVisibleCategories(): Flow<List<Category>> = categoryDAO.getVisibleCategories(owner())
+
+    fun getCurrentUserId(): String? = sessionProvider.currentUserId()
 
     suspend fun insertCategory(category: Category) = categoryDAO.insert(category)
 
@@ -38,7 +39,7 @@ class CategoryRepository @Inject constructor(
 
     // ── SYNC ──
 
-    suspend fun getPendingCategories(): List<Category> = categoryDAO.getPendingCategories()
+    suspend fun getPendingCategories(): List<Category> = categoryDAO.getPendingCategories(owner())
 
     suspend fun upsertCategoriesFromServer(categories: List<Category>) =
         categoryDAO.upsertCategoriesFromServer(categories)

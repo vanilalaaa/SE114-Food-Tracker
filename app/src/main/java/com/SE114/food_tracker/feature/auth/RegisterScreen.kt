@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
@@ -36,6 +37,7 @@ import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 @Composable
 fun RegisterScreen(
     onAuthenticated: (PostAuthDestination) -> Unit,
+    onNavigateToVerifyEmail: (email: String, displayName: String, userId: String) -> Unit,
     onNavigateLogin: () -> Unit,
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
@@ -45,9 +47,14 @@ fun RegisterScreen(
         state.navTarget?.let(onAuthenticated)
     }
 
+    LaunchedEffect(state.pendingVerification) {
+        state.pendingVerification?.let { onNavigateToVerifyEmail(it.email, it.displayName, it.userId) }
+    }
+
     RegisterContent(
         state = state,
         onDisplayNameChange = viewModel::onDisplayNameChange,
+        onUserIdChange = viewModel::onUserIdChange,
         onEmailChange = viewModel::onEmailChange,
         onPasswordChange = viewModel::onPasswordChange,
         onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
@@ -68,6 +75,7 @@ fun RegisterScreen(
 private fun RegisterContent(
     state: RegisterUiState,
     onDisplayNameChange: (String) -> Unit,
+    onUserIdChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onConfirmPasswordChange: (String) -> Unit,
@@ -98,6 +106,17 @@ private fun RegisterContent(
             )
 
             AppTextField(
+                value = state.userId,
+                onValueChange = onUserIdChange,
+                label = stringResource(R.string.auth_complete_user_id),
+                leadingIcon = Icons.Outlined.AlternateEmail,
+                isError = state.userIdStatus.isError(),
+                errorText = userIdErrorText(state.userIdStatus),
+                supportingText = userIdSupportingText(state.userIdStatus),
+                trailing = { UserIdStatusIcon(state.userIdStatus) }
+            )
+
+            AppTextField(
                 value = state.email,
                 onValueChange = onEmailChange,
                 label = stringResource(R.string.auth_register_email),
@@ -111,7 +130,8 @@ private fun RegisterContent(
                 label = stringResource(R.string.auth_register_password),
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                supportingText = stringResource(R.string.auth_password_hint)
             )
 
             AppTextField(
@@ -163,8 +183,14 @@ private fun RegisterContent(
 private fun RegisterContentPreview() {
     FoodTrackerTheme {
         RegisterContent(
-            state = RegisterUiState(displayName = "An Nguyễn", email = "an@example.com"),
+            state = RegisterUiState(
+                displayName = "An Nguyễn",
+                userId = "an.nguyen",
+                userIdStatus = UserIdStatus.Available,
+                email = "an@example.com"
+            ),
             onDisplayNameChange = {},
+            onUserIdChange = {},
             onEmailChange = {},
             onPasswordChange = {},
             onConfirmPasswordChange = {},

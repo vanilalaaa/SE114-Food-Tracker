@@ -2,10 +2,15 @@ package com.SE114.food_tracker.feature.stats.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,15 +25,20 @@ import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.stats.TrendForecast
 import com.SE114.food_tracker.core.util.*
+import kotlinx.datetime.LocalDate
 
 @Composable
 fun LocalLineTrendChartCard(
     title: String,
     forecast: TrendForecast,
+    budgetLimit: Double?,
+    timeFrame: TimeFrame,
+    anchorDate: LocalDate,
     modifier: Modifier = Modifier
 ) {
     val points = forecast.points
     val axisLabels = listOf("Kỳ trước", "Hiện tại", "Dự báo cuối kỳ")
+    val isExceeded = budgetLimit != null && forecast.projectedTotal > budgetLimit
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -60,7 +70,7 @@ fun LocalLineTrendChartCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${forecast.currentActual.formatVndShort()} đ",
+                        text = LocalCurrencyDisplay.current.formatShort(forecast.currentActual),
                         fontSize = 18.sp,
                         color = TextPrimaryStat,
                         fontWeight = FontWeight.Bold
@@ -74,9 +84,9 @@ fun LocalLineTrendChartCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${forecast.projectedTotal.formatVndShort()} đ",
+                        text = LocalCurrencyDisplay.current.formatShort(forecast.projectedTotal),
                         fontSize = 18.sp,
-                        color = StatPinkDark,
+                        color = if (isExceeded) AlertRed else StatPinkDark,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -94,7 +104,6 @@ fun LocalLineTrendChartCard(
                 fun xFor(i: Int) = i * widthInterval
                 fun yFor(value: Float) = size.height - (value / maxVal * chartHeight)
 
-                // ── Segment 0: previous → current actual (solid, observed) ──────────
                 drawLine(
                     color = ChartLineObserved,
                     start = Offset(xFor(0), yFor(points[0])),
@@ -103,7 +112,6 @@ fun LocalLineTrendChartCard(
                     cap = StrokeCap.Round
                 )
 
-                // ── Segment 1: current actual → projected (dashed, forecast) ────────
                 val startX = xFor(1)
                 val startY = yFor(points[1])
                 val endX = xFor(2)
@@ -120,7 +128,7 @@ fun LocalLineTrendChartCard(
                 var currentY = startY
                 repeat(segments) {
                     drawLine(
-                        color = StatPinkDark,
+                        color = if (isExceeded) AlertRed else StatPinkDark,
                         start = Offset(currentX, currentY),
                         end = Offset(currentX + stepX * 0.5f, currentY + stepY * 0.5f),
                         strokeWidth = 5f,
@@ -130,9 +138,8 @@ fun LocalLineTrendChartCard(
                     currentY += stepY
                 }
 
-                // ── Point markers at all 3 nodes ─────────────────────────────────────
                 points.forEachIndexed { i, value ->
-                    val markerColor = if (i == 2) StatPinkDark else ChartMarkerNormal
+                    val markerColor = if (i == 2) (if (isExceeded) AlertRed else StatPinkDark) else ChartMarkerNormal
                     drawCircle(
                         color = markerColor,
                         radius = 6f,
@@ -141,7 +148,6 @@ fun LocalLineTrendChartCard(
                 }
             }
 
-            // ── Axis labels under each node ───────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -151,11 +157,11 @@ fun LocalLineTrendChartCard(
                         Text(
                             text = label,
                             fontSize = 11.sp,
-                            color = if (i == 2) StatPinkDark else TextLabelGray,
+                            color = if (i == 2) (if (isExceeded) AlertRed else StatPinkDark) else TextLabelGray,
                             fontWeight = if (i == 2) FontWeight.Bold else FontWeight.Normal
                         )
                         Text(
-                            text = "${points[i].toDouble().formatVndShort()} đ",
+                            text = LocalCurrencyDisplay.current.formatShort(points[i].toDouble()),
                             fontSize = 11.sp,
                             color = TextPrimaryStat
                         )
@@ -163,12 +169,105 @@ fun LocalLineTrendChartCard(
                 }
             }
 
-            Text(
-                text = "👉 Đường nét đứt màu hồng biểu thị xu hướng dự báo tuyến tính kỳ này" +
-                        if (forecast.remainingCycles > 0) " (còn ${forecast.remainingCycles} kỳ con)." else ".",
-                fontSize = 11.sp,
-                color = TextLabelGray
-            )
+            // ── ✅ DYNAMIC ALERT BOX (Đã sửa thuật toán đa chu kỳ thích ứng) ──────────
+            if (isExceeded && budgetLimit != null) {
+                val remaining = forecast.remainingCycles
+                val cycleAverage = if (remaining > 0) {
+                    (forecast.projectedTotal - forecast.currentActual) / remaining
+                } else {
+                    0.0
+                }
+
+                // Xác định vị trí mốc thời gian hiện tại trong chu kỳ nền
+                val currentUnitIndex = when (timeFrame) {
+                    TimeFrame.WEEK  -> anchorDate.dayOfWeek.ordinal + 1 // Trả về 1..7 (Thứ 2 -> Chủ Nhật)
+                    TimeFrame.MONTH -> anchorDate.dayOfMonth            // Trả về 1..31
+                    TimeFrame.YEAR  -> anchorDate.monthNumber           // Trả về 1..12
+                    TimeFrame.DAY   -> 1
+                }
+
+                val alertText = if (forecast.currentActual > budgetLimit) {
+                    // Trường hợp 1: Ngay lúc này chi tiêu thực tế đã vượt ngân sách đặt ra
+                    when (timeFrame) {
+                        TimeFrame.WEEK  -> "Chi tiêu thực tế hiện tại đã vượt quá giới hạn ngân sách tuần này!"
+                        TimeFrame.MONTH -> "Chi tiêu thực tế hiện tại đã vượt quá giới hạn ngân sách tháng này!"
+                        TimeFrame.YEAR  -> "Chi tiêu thực tế hiện tại đã vượt quá giới hạn ngân sách năm nay!"
+                        else            -> "Chi tiêu thực tế hiện tại đã vượt quá ngân sách hôm nay!"
+                    }
+                } else {
+                    // Trường hợp 2: Hiện tại chưa vượt, nhưng đà dự báo tương lai sẽ vượt. Mô phỏng tìm điểm gãy.
+                    var accumulated = forecast.currentActual
+                    var depletionUnit = currentUnitIndex
+                    for (i in 1..remaining) {
+                        accumulated += cycleAverage
+                        if (accumulated > budgetLimit) {
+                            depletionUnit = currentUnitIndex + i
+                            break
+                        }
+                    }
+
+                    when (timeFrame) {
+                        TimeFrame.WEEK -> {
+                            val dayNames = listOf("Hai", "Ba", "Tư", "Năm", "Sáu", "Bảy", "Chủ Nhật")
+                            val dayName = dayNames.getOrNull((depletionUnit - 1).coerceIn(0, 6)) ?: ""
+                            "Đà này thì đến ngày thứ $depletionUnit trong tuần (Thứ $dayName) là bạn sẽ hết sạch tiền ăn tuần này."
+                        }
+                        TimeFrame.MONTH -> {
+                            "Đà này thì đến ngày $depletionUnit của tháng là bạn sẽ hết sạch tiền ăn tháng này."
+                        }
+                        TimeFrame.YEAR -> {
+                            "Đà này thì đến Tháng $depletionUnit là bạn sẽ hết sạch tiền ăn năm nay."
+                        }
+                        else -> "Đà này bạn sẽ sớm chi vượt ngân sách đặt ra."
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(color = AlertRedBg, shape = RoundedCornerShape(12.dp))
+                        .border(width = 1.dp, color = AlertRedBorder, shape = RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Vượt ngân sách",
+                        tint = AlertRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = alertText,
+                        color = AlertRed,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(color = AlertGreenBg, shape = RoundedCornerShape(12.dp))
+                        .border(width = 1.dp, color = AlertGreenBorder, shape = RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Trong ngân sách",
+                        tint = AlertGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Tốt lắm! Dự kiến tiêu trong ngân sách.",
+                        color = AlertGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }
@@ -186,11 +285,14 @@ fun LocalLineTrendChartCardPreview() {
             LocalLineTrendChartCard(
                 title = "Dự báo xu hướng kỳ tới",
                 forecast = TrendForecast(
-                    previousTotal = 850_000.0,
-                    currentActual = 420_000.0,
-                    projectedTotal = 910_000.0,
-                    remainingCycles = 12
-                )
+                    previousTotal = 162_000.0,
+                    currentActual = 302_000.0,
+                    projectedTotal = 417_000.0,
+                    remainingCycles = 4
+                ),
+                budgetLimit = 350_000.0,
+                timeFrame = TimeFrame.WEEK,
+                anchorDate = LocalDate(2026, 6, 24)
             )
         }
     }

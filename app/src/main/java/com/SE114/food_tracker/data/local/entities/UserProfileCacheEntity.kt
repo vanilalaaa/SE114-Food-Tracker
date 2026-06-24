@@ -13,6 +13,9 @@ data class UserProfileCacheEntity(
     @ColumnInfo(name = "display_name")
     val displayName: String,
 
+    @ColumnInfo(name = "profile_user_id")
+    val profileUserId: String = "",
+
     @ColumnInfo(name = "avatar_url")
     val avatarUrl: String?,
 
