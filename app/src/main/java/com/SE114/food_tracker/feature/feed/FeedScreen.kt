@@ -40,6 +40,7 @@ import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.feature.diary.components.AddActionButton
 import com.SE114.food_tracker.feature.feed.components.FeedComposerSheet
 import com.SE114.food_tracker.feature.feed.components.FeedGridContent
+import com.SE114.food_tracker.feature.feed.components.FeedImageCropDialog
 import com.SE114.food_tracker.feature.feed.components.FeedPagingEffect
 import com.SE114.food_tracker.feature.feed.components.FeedPostDetailOverlay
 import java.io.File
@@ -53,6 +54,7 @@ fun FeedScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -62,8 +64,7 @@ fun FeedScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            viewModel.onImagePicked(uri)
-            viewModel.openCreateSheet()
+            pendingCropUri = uri
         }
     }
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -71,8 +72,7 @@ fun FeedScreen(
     ) { isSuccess ->
         if (isSuccess) {
             pendingCameraUri?.let { uri ->
-                viewModel.onImagePicked(uri)
-                viewModel.openCreateSheet()
+                pendingCropUri = uri
             }
         }
     }
@@ -107,6 +107,22 @@ fun FeedScreen(
         onDeletePost = viewModel::deletePost,
         onAddComment = viewModel::addComment
     )
+
+    pendingCropUri?.let { uri ->
+        FeedImageCropDialog(
+            imageUri = uri,
+            onDismiss = {
+                pendingCropUri = null
+                pendingCameraUri = null
+            },
+            onConfirm = { croppedUri ->
+                pendingCropUri = null
+                pendingCameraUri = null
+                viewModel.onImagePicked(croppedUri)
+                viewModel.openCreateSheet()
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

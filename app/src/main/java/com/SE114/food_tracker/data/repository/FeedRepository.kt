@@ -49,9 +49,13 @@ class FeedRepository @Inject constructor(
     fun currentDisplayName(): String =
         supabaseClient.auth.currentUserOrNull()?.email?.substringBefore("@") ?: "Thao Uyen"
 
-    fun observePosts(pageSize: Int, page: Int): Flow<List<FeedPostDto>> =
+    fun observePosts(
+        pageSize: Int,
+        page: Int,
+        currentUserId: String = currentUserId()
+    ): Flow<List<FeedPostDto>> =
         feedDao.observePosts(
-            currentUserId = currentUserId(),
+            currentUserId = currentUserId,
             limit = pageSize * page.coerceAtLeast(1),
             offset = 0
         )
@@ -59,11 +63,12 @@ class FeedRepository @Inject constructor(
     fun observePostsByAuthor(
         ownerId: String,
         pageSize: Int,
-        page: Int
+        page: Int,
+        currentUserId: String = currentUserId()
     ): Flow<List<FeedPostDto>> =
         feedDao.observePostsByOwner(
             ownerId = ownerId,
-            currentUserId = currentUserId(),
+            currentUserId = currentUserId,
             limit = pageSize * page.coerceAtLeast(1),
             offset = 0
         )
@@ -83,7 +88,7 @@ class FeedRepository @Inject constructor(
         item: FeedSourceItemDto,
         caption: String,
         visibility: String
-    ) {
+    ): String =
         createPost(
             itemId = item.itemId,
             imageUrl = item.imageUrl?.takeIf { it.isNotBlank() }
@@ -92,20 +97,18 @@ class FeedRepository @Inject constructor(
             caption = caption.ifBlank { item.name },
             visibility = visibility
         )
-    }
 
     suspend fun createPostFromImage(
         imageUrl: String,
         caption: String,
         visibility: String
-    ) {
+    ): String =
         createPost(
             itemId = null,
             imageUrl = imageUrl,
             caption = caption,
             visibility = visibility
         )
-    }
 
     suspend fun toggleLike(postId: String) {
         feedDao.toggleLike(postId, currentUserId())
@@ -223,11 +226,8 @@ class FeedRepository @Inject constructor(
                     ownerName = profiles[dto.authorId].displayNameOrFallback(dto.authorId)
                 )
             }
-            val remotePostIds = visibleRemotePosts.map { it.id }
-            if (remotePostIds.isEmpty()) {
-                feedDao.deleteAllSyncedPosts()
-            } else {
-                feedDao.deleteSyncedPostsMissingFromRemote(remotePostIds)
+            if (visibleRemotePosts.isEmpty()) {
+                Timber.w("[FeedSync] remote visible posts empty; keeping local synced feed cache")
             }
             if (postEntities.isNotEmpty()) {
                 feedDao.insertPosts(postEntities)
@@ -268,12 +268,13 @@ class FeedRepository @Inject constructor(
         imageUrl: String,
         caption: String,
         visibility: String
-    ) {
+    ): String {
         val now = System.currentTimeMillis()
+        val ownerId = currentAuthenticatedUserId()
         feedDao.insertPost(
             FeedPost(
                 postId = UUID.randomUUID().toString(),
-                ownerId = currentUserId(),
+                ownerId = ownerId,
                 ownerName = currentDisplayName(),
                 itemId = itemId,
                 imageUrl = imageUrl,
@@ -283,6 +284,7 @@ class FeedRepository @Inject constructor(
                 updatedAt = now
             )
         )
+        return ownerId
     }
 
     private suspend fun pushPost(post: FeedPost, ownerId: String) {
