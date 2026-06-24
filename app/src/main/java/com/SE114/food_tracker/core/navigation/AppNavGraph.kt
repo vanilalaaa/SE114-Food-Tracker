@@ -27,10 +27,14 @@ import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
 import com.SE114.food_tracker.feature.chat.GroupWalletScreen
 import com.SE114.food_tracker.feature.profile.ProfileScreen
+import com.SE114.food_tracker.feature.admin.AdminDashboardScreen
+import com.SE114.food_tracker.feature.admin.AdminReportsScreen
+import com.SE114.food_tracker.feature.admin.AdminUsersScreen
 
 object NavGraphs {
     const val AUTH = "auth_graph"
     const val MAIN = "main_graph"
+    const val ADMIN = "admin_graph"
 }
 
 @Composable
@@ -53,9 +57,16 @@ fun AppNavGraph(
         }
     }
 
+    fun enterAdmin() {
+        navController.navigate(NavGraphs.ADMIN) {
+            popUpTo(navController.graph.id) { inclusive = true }
+        }
+    }
+
     fun navigatePostAuth(destination: PostAuthDestination) = when (destination) {
         PostAuthDestination.Diary -> enterMain()
         PostAuthDestination.CompleteProfile -> goToCompleteProfile()
+        PostAuthDestination.Admin -> enterAdmin()
     }
 
     NavHost(
@@ -192,6 +203,22 @@ fun AppNavGraph(
 
             composable(AppDestinations.CategoryManagement.route) {
                 CategoryManagementScreen(onBack = { navController.popBackStack() })
+            }
+        }
+
+        navigation(startDestination = AppDestinations.AdminDashboard.route, route = NavGraphs.ADMIN) {
+            composable(AppDestinations.AdminDashboard.route) {
+                AdminDashboardScreen(
+                    onNavigateToUsers = { navController.navigate(AppDestinations.AdminUsers.route) },
+                    onNavigateToReports = { navController.navigate(AppDestinations.AdminReports.route) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(AppDestinations.AdminUsers.route) {
+                AdminUsersScreen(onBack = { navController.popBackStack() })
+            }
+            composable(AppDestinations.AdminReports.route) {
+                AdminReportsScreen(onBack = { navController.popBackStack() })
             }
         }
     }

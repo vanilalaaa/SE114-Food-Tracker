@@ -56,7 +56,13 @@ private val AUTH_ROUTES = setOf(
 
 // complete_profile is post-auth but pre-onboarding: no bottom bar, but a dropped
 // session there should still bounce to login (so it stays out of the guard skip set).
-private val NO_BOTTOM_BAR_ROUTES = AUTH_ROUTES + AppDestinations.CompleteProfile.route
+// The admin graph is a separate area with its own back navigation — no bottom bar.
+private val NO_BOTTOM_BAR_ROUTES = AUTH_ROUTES + setOf(
+    AppDestinations.CompleteProfile.route,
+    AppDestinations.AdminDashboard.route,
+    AppDestinations.AdminUsers.route,
+    AppDestinations.AdminReports.route
+)
 
 @Composable
 fun MainScaffold() {

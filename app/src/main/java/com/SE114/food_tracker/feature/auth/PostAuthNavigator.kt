@@ -5,7 +5,7 @@ import com.SE114.food_tracker.data.repository.ProfileRepository
 import com.SE114.food_tracker.data.repository.ProfileStatus
 import javax.inject.Inject
 
-enum class PostAuthDestination { Diary, CompleteProfile }
+enum class PostAuthDestination { Diary, CompleteProfile, Admin }
 
 /**
  * Single source of truth for "where do I go once authenticated?". Resolves the

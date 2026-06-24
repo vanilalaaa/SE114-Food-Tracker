@@ -188,6 +188,15 @@ class SupabaseProfileRepository @Inject constructor(
         return ((totalSeconds + 86_399L) / 86_400L).toInt()
     }
 
+    override suspend fun amIAdmin(): AuthOutcome<Boolean> = withContext(Dispatchers.IO) {
+        runCatching {
+            db.rpc("am_i_admin").decodeAs<Boolean>()
+        }.fold(
+            onSuccess = { AuthOutcome.Success(it) },
+            onFailure = { AuthOutcome.Failure(it.toAuthError()) }
+        )
+    }
+
     private fun requireUid(): String =
         auth.currentUserOrNull()?.id ?: error("No authenticated session")
 }

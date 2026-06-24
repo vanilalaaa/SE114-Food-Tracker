@@ -31,6 +31,8 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL") ?: ""}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("SUPABASE_ANON_KEY") ?: ""}\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
+        // UI gate only (reveals the admin entrance); is_admin on the server is the real authority.
+        buildConfigField("String", "ADMIN_UNLOCK_CODE", "\"${localProperties.getProperty("ADMIN_UNLOCK_CODE") ?: ""}\"")
     }
 
     buildTypes {

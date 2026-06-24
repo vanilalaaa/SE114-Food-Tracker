@@ -24,4 +24,9 @@ sealed class AppDestinations(val route: String) {
     data object MyProfile : AppDestinations("my_profile")
     data object CategoryManagement : AppDestinations("category_management")
     data object ChangePassword : AppDestinations("change_password")
+
+    // Admin graph (hidden; reached only via the Login secret code + an is_admin session).
+    data object AdminDashboard : AppDestinations("admin/dashboard")
+    data object AdminUsers : AppDestinations("admin/users")
+    data object AdminReports : AppDestinations("admin/reports")
 }

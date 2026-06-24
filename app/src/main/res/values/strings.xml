@@ -187,4 +187,14 @@
     <string name="report_reason_inappropriate">Nội dung không phù hợp</string>
     <string name="report_reason_harassment">Quấy rối</string>
     <string name="report_reason_other">Khác</string>
+
+    <!-- Admin -->
+    <string name="admin_login_hint">Đăng nhập bằng tài khoản quản trị</string>
+    <string name="admin_access_denied">Tài khoản này không có quyền quản trị</string>
+    <string name="admin_back">Quay lại</string>
+    <string name="admin_dashboard_title">Quản trị</string>
+    <string name="admin_dashboard_users">Người dùng</string>
+    <string name="admin_dashboard_reports">Báo cáo</string>
+    <string name="admin_users_title">Quản lý người dùng</string>
+    <string name="admin_reports_title">Báo cáo</string>
 </resources>

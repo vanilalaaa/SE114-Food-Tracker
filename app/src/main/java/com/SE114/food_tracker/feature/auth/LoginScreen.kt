@@ -90,6 +90,22 @@ private fun LoginContent(
                 modifier = Modifier.padding(vertical = 24.dp)
             )
 
+            if (state.adminMode) {
+                Text(
+                    text = stringResource(R.string.admin_login_hint),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            if (state.adminAccessDenied) {
+                Text(
+                    text = stringResource(R.string.admin_access_denied),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
             AppTextField(
                 value = state.identifier,
                 onValueChange = onIdentifierChange,
