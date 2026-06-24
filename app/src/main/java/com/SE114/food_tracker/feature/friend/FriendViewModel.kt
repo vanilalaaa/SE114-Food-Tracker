@@ -6,6 +6,8 @@ import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.FriendRepository
+import com.SE114.food_tracker.data.repository.ReportRepository
+import com.SE114.food_tracker.feature.report.ReportReason
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
 import javax.inject.Inject
@@ -17,12 +19,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @HiltViewModel
 class FriendViewModel @Inject constructor(
     private val repository: FriendRepository,
     private val feedRepository: FeedRepository,
+    private val reportRepository: ReportRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -49,17 +53,27 @@ class FriendViewModel @Inject constructor(
     private val _profileLoadError = MutableStateFlow<String?>(null)
     val profileLoadError = _profileLoadError.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing = _isRefreshing.asStateFlow()
+
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage = _actionMessage.asStateFlow()
+
+    private val _isReportSubmitting = MutableStateFlow(false)
+    val isReportSubmitting = _isReportSubmitting.asStateFlow()
 
     private val _busyFriendshipIds = MutableStateFlow<Set<String>>(emptySet())
     val busyFriendshipIds = _busyFriendshipIds.asStateFlow()
 
     private var loadFriendDataJob: Job? = null
     private var searchJob: Job? = null
+    private var realtimeFriendshipRefreshJob: Job? = null
+    private var autoFriendshipRefreshJob: Job? = null
 
     init {
         loadFriendData()
+        subscribeToFriendshipRealtime()
+        startAutoFriendshipRefresh()
 
         viewModelScope.launch {
             authRepository.currentSessionFlow()
@@ -69,6 +83,55 @@ class FriendViewModel @Inject constructor(
                 }
         }
     }
+
+    private fun subscribeToFriendshipRealtime() {
+        repository.subscribeToFriendshipRealtime()
+        viewModelScope.launch {
+            repository.friendshipRealtimeEvents.collect {
+                scheduleRealtimeFriendshipRefresh()
+            }
+        }
+    }
+
+    private fun scheduleRealtimeFriendshipRefresh() {
+        realtimeFriendshipRefreshJob?.cancel()
+        realtimeFriendshipRefreshJob = viewModelScope.launch {
+            delay(500)
+            refreshFriendDataFromRealtime()
+        }
+    }
+
+    private suspend fun refreshFriendDataFromRealtime() {
+        _profileLoadError.value = null
+        repository.refreshCurrentProfile()
+            .onSuccess {
+                repository.refreshFriendships()
+                    .onSuccess {
+                        refreshSearchRelationship()
+                        runCatching { feedRepository.refreshVisibleFromSupabase() }
+                            .onFailure { reportActionError(it) }
+                    }
+                    .onFailure { reportActionError(it) }
+            }
+            .onFailure { e ->
+                _profileLoadError.value = e.message ?: "Không lấy được ID"
+            }
+    }
+
+    private fun startAutoFriendshipRefresh() {
+        if (autoFriendshipRefreshJob != null) return
+
+        autoFriendshipRefreshJob = viewModelScope.launch {
+            while (isActive) {
+                delay(AUTO_REFRESH_INTERVAL_MS)
+                if (_busyFriendshipIds.value.isEmpty() && !_isRefreshing.value) {
+                    refreshFriendDataFromRealtime()
+                }
+            }
+        }
+    }
+
+    fun refresh() = loadFriendData(showRefreshing = true)
 
     fun retryLoadProfile() = loadFriendData()
 
@@ -124,17 +187,35 @@ class FriendViewModel @Inject constructor(
     fun cancelOutgoingRequest(friendshipId: String) =
         runFriendAction(friendshipId) { repository.cancelOutgoingRequest(friendshipId) }
 
-    private fun loadFriendData() {
+    fun submitReport(targetId: String, reason: ReportReason) {
+        if (_isReportSubmitting.value) return
+
+        viewModelScope.launch {
+            _isReportSubmitting.value = true
+            reportRepository.submitProfileReport(
+                targetId = targetId,
+                reason = reason.remoteValue
+            ).onSuccess {
+                _actionMessage.value = "Đã gửi báo cáo, admin sẽ xem xét"
+            }.onFailure { reportActionError(it) }
+            _isReportSubmitting.value = false
+        }
+    }
+
+    private fun loadFriendData(showRefreshing: Boolean = false) {
         loadFriendDataJob?.cancel()
         loadFriendDataJob = viewModelScope.launch {
+            if (showRefreshing) _isRefreshing.value = true
             _profileLoadError.value = null
             repository.refreshCurrentProfile()
                 .onSuccess {
                     repository.refreshFriendships()
+                        .onSuccess { refreshSearchRelationship() }
                 }
                 .onFailure { e ->
                     _profileLoadError.value = e.message ?: "Không lấy được ID"
                 }
+            if (showRefreshing) _isRefreshing.value = false
         }
     }
 
@@ -146,6 +227,9 @@ class FriendViewModel @Inject constructor(
             try {
                 action()
                     .onSuccess {
+                        repository.refreshFriendships()
+                            .onSuccess { refreshSearchRelationship() }
+                            .onFailure { reportActionError(it) }
                         runCatching { feedRepository.refreshVisibleFromSupabase() }
                             .onFailure { reportActionError(it) }
                     }
@@ -175,9 +259,21 @@ class FriendViewModel @Inject constructor(
         _isLoadingSearch.value = false
     }
 
+    private suspend fun refreshSearchRelationship() {
+        val currentSearch = _searchResult.value?.getOrNull() ?: return
+        _searchResult.value = Result.success(
+            currentSearch.copy(
+                relationship = FriendRelationship.fromStatus(
+                    repository.friendshipStatusWith(currentSearch.profile.id)
+                )
+            )
+        )
+    }
+
     private companion object {
         const val MIN_SEARCH_ID_LENGTH = 3
         const val SEARCH_DEBOUNCE_MS = 450L
+        const val AUTO_REFRESH_INTERVAL_MS = 5_000L
     }
 }
 

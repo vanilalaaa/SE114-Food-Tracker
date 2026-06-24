@@ -1,6 +1,5 @@
 package com.SE114.food_tracker.feature.friend.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,9 +39,7 @@ fun SearchResultItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .background(CardWhite, RoundedCornerShape(12.dp))
-            .padding(12.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ProfileAvatar(avatarUrl = profile.avatarUrl)

@@ -40,7 +40,7 @@ fun OutgoingRequestItem(
                 fontSize = 16.sp
             )
             Text(
-                text = "Đang chờ phản hồi",
+                text = "@${request.searchUserId}",
                 color = TextLabelGray,
                 fontSize = 12.sp
             )

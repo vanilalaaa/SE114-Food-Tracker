@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
@@ -49,6 +50,7 @@ fun ProfileScreen(
         onTabSelected = viewModel::selectTab,
         onPostClick = {},
         onReportClick = viewModel::submitReport,
+        onFriendshipActionClick = viewModel::performFriendshipAction,
         onReportMessageShown = viewModel::clearReportMessage
     )
 }
@@ -62,10 +64,12 @@ fun ProfileScreenContent(
     onTabSelected: (ProfileTab) -> Unit,
     onPostClick: (String) -> Unit,
     onReportClick: (ReportReason) -> Unit,
+    onFriendshipActionClick: () -> Unit,
     onReportMessageShown: () -> Unit
 ) {
     val context = LocalContext.current
     var isReportDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var isFriendshipActionConfirmOpen by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(uiState.reportMessage) {
         val message = uiState.reportMessage
@@ -87,7 +91,8 @@ fun ProfileScreenContent(
                 uiState = uiState,
                 onNavigateBack = onNavigateBack,
                 onRetry = onRetry,
-                onReportClick = { isReportDialogOpen = true }
+                onReportClick = { isReportDialogOpen = true },
+                onFriendshipActionClick = { isFriendshipActionConfirmOpen = true }
             )
 
             if (!uiState.isLoading && uiState.error == null) {
@@ -127,6 +132,21 @@ fun ProfileScreenContent(
                 }
             )
         }
+        if (isFriendshipActionConfirmOpen) {
+            val actionLabel = uiState.friendshipActionLabel.orEmpty()
+            ConfirmDialog(
+                title = "$actionLabel?",
+                body = "Bạn có chắc muốn $actionLabel với ${uiState.displayName} không?",
+                confirmLabel = actionLabel,
+                cancelLabel = "Hủy",
+                destructive = true,
+                onConfirm = {
+                    isFriendshipActionConfirmOpen = false
+                    onFriendshipActionClick()
+                },
+                onDismiss = { isFriendshipActionConfirmOpen = false }
+            )
+        }
     }
 }
 
@@ -162,6 +182,7 @@ private fun ProfileScreenDiaryPreview() {
             onTabSelected = {},
             onPostClick = {},
             onReportClick = {},
+            onFriendshipActionClick = {},
             onReportMessageShown = {}
         )
     }
@@ -205,6 +226,7 @@ private fun ProfileScreenPostsPreview() {
             onTabSelected = {},
             onPostClick = {},
             onReportClick = {},
+            onFriendshipActionClick = {},
             onReportMessageShown = {}
         )
     }
@@ -222,6 +244,7 @@ private fun ProfileScreenLoadingPreview() {
             onTabSelected = {},
             onPostClick = {},
             onReportClick = {},
+            onFriendshipActionClick = {},
             onReportMessageShown = {}
         )
     }
@@ -241,6 +264,7 @@ private fun ProfileScreenErrorPreview() {
             onTabSelected = {},
             onPostClick = {},
             onReportClick = {},
+            onFriendshipActionClick = {},
             onReportMessageShown = {}
         )
     }
