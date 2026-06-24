@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -50,6 +51,9 @@ class FriendViewModel @Inject constructor(
 
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage = _actionMessage.asStateFlow()
+
+    private val _busyFriendshipIds = MutableStateFlow<Set<String>>(emptySet())
+    val busyFriendshipIds = _busyFriendshipIds.asStateFlow()
 
     private var loadFriendDataJob: Job? = null
     private var searchJob: Job? = null
@@ -108,13 +112,17 @@ class FriendViewModel @Inject constructor(
         }
     }
 
-    fun acceptRequest(friendshipId: String) = runFriendAction { repository.acceptRequest(friendshipId) }
+    fun acceptRequest(friendshipId: String) =
+        runFriendAction(friendshipId) { repository.acceptRequest(friendshipId) }
 
-    fun declineRequest(friendshipId: String) = runFriendAction { repository.declineRequest(friendshipId) }
+    fun declineRequest(friendshipId: String) =
+        runFriendAction(friendshipId) { repository.declineRequest(friendshipId) }
 
-    fun unfriend(friendshipId: String) = runFriendAction { repository.unfriend(friendshipId) }
+    fun unfriend(friendshipId: String) =
+        runFriendAction(friendshipId) { repository.unfriend(friendshipId) }
 
-    fun cancelOutgoingRequest(friendshipId: String) = runFriendAction { repository.cancelOutgoingRequest(friendshipId) }
+    fun cancelOutgoingRequest(friendshipId: String) =
+        runFriendAction(friendshipId) { repository.cancelOutgoingRequest(friendshipId) }
 
     private fun loadFriendData() {
         loadFriendDataJob?.cancel()
@@ -130,11 +138,21 @@ class FriendViewModel @Inject constructor(
         }
     }
 
-    private fun runFriendAction(action: suspend () -> Result<Unit>) {
+    private fun runFriendAction(friendshipId: String, action: suspend () -> Result<Unit>) {
+        if (friendshipId in _busyFriendshipIds.value) return
+        _busyFriendshipIds.update { it + friendshipId }
+
         viewModelScope.launch {
-            action()
-                .onSuccess { runCatching { feedRepository.refreshVisibleFromSupabase() } }
-                .onFailure { reportActionError(it) }
+            try {
+                action()
+                    .onSuccess {
+                        runCatching { feedRepository.refreshVisibleFromSupabase() }
+                            .onFailure { reportActionError(it) }
+                    }
+                    .onFailure { reportActionError(it) }
+            } finally {
+                _busyFriendshipIds.update { it - friendshipId }
+            }
         }
     }
 

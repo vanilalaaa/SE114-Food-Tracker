@@ -93,6 +93,83 @@ interface FeedDAO {
     @Query(
         """
         SELECT
+            p.post_id AS postId,
+            p.owner_id AS ownerId,
+            COALESCE(u.display_name, p.owner_name) AS ownerName,
+            u.avatar_url AS ownerAvatarUrl,
+            p.item_id AS itemId,
+            CASE
+                WHEN p.item_id IS NULL AND instr(p.caption, char(10)) > 0
+                    THEN trim(substr(p.caption, 1, instr(p.caption, char(10)) - 1))
+                WHEN p.item_id IS NULL
+                    THEN p.caption
+                ELSE i.name
+            END AS itemName,
+            c.icon_url AS categoryIconUrl,
+            p.image_url AS imageUrl,
+            CASE
+                WHEN p.item_id IS NULL AND instr(p.caption, char(10)) > 0
+                    THEN trim(substr(p.caption, instr(p.caption, char(10)) + 1))
+                WHEN p.item_id IS NULL
+                    THEN ''
+                ELSE p.caption
+            END AS caption,
+            p.visibility AS visibility,
+            (
+                SELECT COUNT(*)
+                FROM feed_like l
+                WHERE l.post_id = p.post_id AND l.is_deleted = 0
+            ) AS likeCount,
+            (
+                SELECT COUNT(*)
+                FROM feed_comment c
+                WHERE c.post_id = p.post_id AND c.is_deleted = 0
+            ) AS commentCount,
+            EXISTS(
+                SELECT 1
+                FROM feed_like ml
+                WHERE ml.post_id = p.post_id
+                    AND ml.user_id = :currentUserId
+                    AND ml.is_deleted = 0
+            ) AS isLikedByMe,
+            p.created_at AS createdAt
+        FROM feed_post p
+        LEFT JOIN item i ON i.item_id = p.item_id
+        LEFT JOIN category c ON c.category_id = i.category_id
+        LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
+        WHERE p.is_deleted = 0
+        AND p.owner_id = :ownerId
+        AND (
+            p.owner_id = :currentUserId
+            OR p.visibility = 'public'
+            OR (
+                p.visibility = 'friends'
+                AND EXISTS(
+                    SELECT 1
+                    FROM friendship f
+                    WHERE f.status = 'accepted'
+                        AND f.is_deleted = 0
+                        AND (
+                            (f.sender_id = :currentUserId AND f.receiver_id = p.owner_id)
+                            OR (f.receiver_id = :currentUserId AND f.sender_id = p.owner_id)
+                        )
+                )
+            )
+        )
+        ORDER BY p.created_at DESC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    fun observePostsByOwner(
+        ownerId: String,
+        currentUserId: String,
+        limit: Int,
+        offset: Int
+    ): Flow<List<FeedPostDto>>
+
+    @Query(
+        """
+        SELECT
             c.comment_id AS commentId,
             c.post_id AS postId,
             c.user_id AS userId,

@@ -56,6 +56,18 @@ class FeedRepository @Inject constructor(
             offset = 0
         )
 
+    fun observePostsByAuthor(
+        ownerId: String,
+        pageSize: Int,
+        page: Int
+    ): Flow<List<FeedPostDto>> =
+        feedDao.observePostsByOwner(
+            ownerId = ownerId,
+            currentUserId = currentUserId(),
+            limit = pageSize * page.coerceAtLeast(1),
+            offset = 0
+        )
+
     fun observeComments(postId: String): Flow<List<FeedCommentDto>> =
         feedDao.observeComments(postId)
 

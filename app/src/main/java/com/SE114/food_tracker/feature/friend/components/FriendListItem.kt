@@ -20,6 +20,7 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 fun FriendListItem(
     friend: FriendItemDto,
     onOpenProfile: () -> Unit,
+    isBusy: Boolean,
     onUnfriend: (String) -> Unit
 ) {
     Row(
@@ -40,7 +41,10 @@ fun FriendListItem(
             modifier = Modifier.weight(1f)
         )
 
-        IconButton(onClick = { onUnfriend(friend.friendshipId) }) {
+        IconButton(
+            onClick = { onUnfriend(friend.friendshipId) },
+            enabled = !isBusy
+        ) {
             Icon(Icons.Default.Clear, contentDescription = "Xóa", tint = HintGray)
         }
     }
