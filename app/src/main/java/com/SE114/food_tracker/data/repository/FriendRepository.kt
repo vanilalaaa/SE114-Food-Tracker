@@ -126,12 +126,15 @@ class FriendRepository @Inject constructor(
         if (existing != null && existing.status != "declined") {
             error("Đã có lời mời hoặc đã là bạn bè.")
         }
+        if (existing != null) {
+            deleteRemoteFriendship(existing.friendshipId).getOrThrow()
+        }
 
         val targetProfile = fetchProfileById(targetProfileId)
             ?: error("Không tìm thấy người dùng này!")
         friendDao.insertUserCache(targetProfile.toCacheEntity())
 
-        val friendshipId = existing?.friendshipId ?: UUID.randomUUID().toString()
+        val friendshipId = UUID.randomUUID().toString()
         val entity = FriendshipEntity(
             friendshipId = friendshipId,
             senderId = me.id,
@@ -139,11 +142,11 @@ class FriendRepository @Inject constructor(
             status = "pending",
             syncStatus = "SYNCED",
             isDeleted = false,
-            createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+            createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()
         )
 
-        supabaseClient.postgrest.from("friendship").upsert(entity.toWriteDto())
+        supabaseClient.postgrest.from("friendship").insert(entity.toWriteDto())
         friendDao.insertFriendship(entity)
     }
 
