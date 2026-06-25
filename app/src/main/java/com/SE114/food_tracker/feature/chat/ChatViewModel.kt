@@ -111,7 +111,19 @@ class ChatViewModel @Inject constructor(
 
     fun connectToConversation(conversationId: String) {
         viewModelScope.launch {
+            // subscribeToChatRealtime is idempotent (guarded by activeChannels check).
             chatRepository.subscribeToChatRealtime(conversationId)
+            // FIX: Run initial REST back-fill AFTER subscribe so that any message arriving
+            // during the REST fetch is still caught by Realtime and not lost.
+            // Fire-and-forget — does NOT block the Flow from reaching the UI.
+            try {
+                chatRepository.syncMessagesFromServer(conversationId)
+                chatRepository.fetchGroupMembersFromServer(conversationId).also { members ->
+                    _groupMembers.value = members
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -136,18 +148,9 @@ class ChatViewModel @Inject constructor(
 
 
     fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
-
+        // connectToConversation handles subscribe + REST back-fill in one shot.
+        // Called once; idempotent on repeated recompositions thanks to activeChannels guard.
         connectToConversation(conversationId)
-        viewModelScope.launch {
-            try {
-                // Kéo tin nhắn cũ về trước để Room có dữ liệu gốc
-                chatRepository.syncMessagesFromServer(conversationId)
-                // Kéo tiếp profile thành viên về để map đè lên
-                chatRepository.fetchGroupMembersFromServer(conversationId)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
 
         return chatRepository.getMessagesWithProfileStream(conversationId).map { joinEntities ->
             joinEntities.map { entity ->

@@ -63,11 +63,105 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND (
+            p.owner_id = :currentUserId
+            OR p.visibility = 'public'
+            OR (
+                p.visibility = 'friends'
+                AND EXISTS(
+                    SELECT 1
+                    FROM friendship f
+                    WHERE f.status = 'accepted'
+                        AND f.is_deleted = 0
+                        AND (
+                            (f.sender_id = :currentUserId AND f.receiver_id = p.owner_id)
+                            OR (f.receiver_id = :currentUserId AND f.sender_id = p.owner_id)
+                        )
+                )
+            )
+        )
         ORDER BY p.created_at DESC
         LIMIT :limit OFFSET :offset
         """
     )
     fun observePosts(
+        currentUserId: String,
+        limit: Int,
+        offset: Int
+    ): Flow<List<FeedPostDto>>
+
+    @Query(
+        """
+        SELECT
+            p.post_id AS postId,
+            p.owner_id AS ownerId,
+            COALESCE(u.display_name, p.owner_name) AS ownerName,
+            u.avatar_url AS ownerAvatarUrl,
+            p.item_id AS itemId,
+            CASE
+                WHEN p.item_id IS NULL AND instr(p.caption, char(10)) > 0
+                    THEN trim(substr(p.caption, 1, instr(p.caption, char(10)) - 1))
+                WHEN p.item_id IS NULL
+                    THEN p.caption
+                ELSE i.name
+            END AS itemName,
+            c.icon_url AS categoryIconUrl,
+            p.image_url AS imageUrl,
+            CASE
+                WHEN p.item_id IS NULL AND instr(p.caption, char(10)) > 0
+                    THEN trim(substr(p.caption, instr(p.caption, char(10)) + 1))
+                WHEN p.item_id IS NULL
+                    THEN ''
+                ELSE p.caption
+            END AS caption,
+            p.visibility AS visibility,
+            (
+                SELECT COUNT(*)
+                FROM feed_like l
+                WHERE l.post_id = p.post_id AND l.is_deleted = 0
+            ) AS likeCount,
+            (
+                SELECT COUNT(*)
+                FROM feed_comment c
+                WHERE c.post_id = p.post_id AND c.is_deleted = 0
+            ) AS commentCount,
+            EXISTS(
+                SELECT 1
+                FROM feed_like ml
+                WHERE ml.post_id = p.post_id
+                    AND ml.user_id = :currentUserId
+                    AND ml.is_deleted = 0
+            ) AS isLikedByMe,
+            p.created_at AS createdAt
+        FROM feed_post p
+        LEFT JOIN item i ON i.item_id = p.item_id
+        LEFT JOIN category c ON c.category_id = i.category_id
+        LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
+        WHERE p.is_deleted = 0
+        AND p.owner_id = :ownerId
+        AND (
+            p.owner_id = :currentUserId
+            OR p.visibility = 'public'
+            OR (
+                p.visibility = 'friends'
+                AND EXISTS(
+                    SELECT 1
+                    FROM friendship f
+                    WHERE f.status = 'accepted'
+                        AND f.is_deleted = 0
+                        AND (
+                            (f.sender_id = :currentUserId AND f.receiver_id = p.owner_id)
+                            OR (f.receiver_id = :currentUserId AND f.sender_id = p.owner_id)
+                        )
+                )
+            )
+        )
+        ORDER BY p.created_at DESC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    fun observePostsByOwner(
+        ownerId: String,
         currentUserId: String,
         limit: Int,
         offset: Int
@@ -82,6 +176,7 @@ interface FeedDAO {
             COALESCE(u.display_name, c.display_name) AS displayName,
             u.avatar_url AS avatarUrl,
             c.body AS body,
+            c.parent_comment_id AS parentCommentId,
             c.created_at AS createdAt
         FROM feed_comment c
         LEFT JOIN user_profile_cache u ON u.user_id = c.user_id
@@ -142,6 +237,15 @@ interface FeedDAO {
     )
     suspend fun getPendingDeletedPostIds(): List<String>
 
+    @Query(
+        """
+        SELECT post_id
+        FROM feed_post
+        WHERE is_deleted = 1
+        """
+    )
+    suspend fun getDeletedPostIds(): List<String>
+
     @Query("SELECT * FROM feed_like WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getPendingLikes(): List<FeedLike>
 
@@ -150,6 +254,9 @@ interface FeedDAO {
 
     @Query("SELECT * FROM feed_like WHERE post_id = :postId AND user_id = :userId LIMIT 1")
     suspend fun getLike(postId: String, userId: String): FeedLike?
+
+    @Query("SELECT * FROM feed_post WHERE post_id = :postId LIMIT 1")
+    suspend fun getPostById(postId: String): FeedPost?
 
     @Query("UPDATE feed_post SET image_url = :imageUrl, updated_at = :updatedAt WHERE post_id = :postId")
     suspend fun updatePostImageUrl(postId: String, imageUrl: String, updatedAt: Long = System.currentTimeMillis())
@@ -198,7 +305,7 @@ interface FeedDAO {
         postId: String,
         ownerId: String,
         updatedAt: Long = System.currentTimeMillis()
-    )
+    ): Int
 
     @Transaction
     suspend fun toggleLike(postId: String, userId: String) {

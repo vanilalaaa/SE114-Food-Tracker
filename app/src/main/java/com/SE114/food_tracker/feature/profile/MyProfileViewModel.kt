@@ -31,6 +31,7 @@ data class MyProfileUiState(
     val userIdStatus: UserIdCheckStatus = UserIdCheckStatus.Idle,
     val isUploadingAvatar: Boolean = false,
     val isSaving: Boolean = false,
+    val saveSucceeded: Boolean = false,
     val error: AuthError? = null
 ) {
     val displayNameValid: Boolean get() = displayName.isNotBlank()
@@ -88,6 +89,8 @@ class MyProfileViewModel @Inject constructor(
 
     fun onDisplayNameChange(value: String) = _state.update { it.copy(displayName = value, error = null) }
 
+    fun consumeSaveSuccess() = _state.update { it.copy(saveSucceeded = false) }
+
     fun onUserIdChange(value: String) {
         if (!_state.value.userIdEditable) return
         _state.update {
@@ -127,7 +130,12 @@ class MyProfileViewModel @Inject constructor(
                 is AuthOutcome.Success -> {
                     pendingAvatarUrl = null
                     _state.update {
-                        it.copy(isSaving = false, originalUserId = it.userId.trim(), userIdStatus = UserIdCheckStatus.Idle)
+                        it.copy(
+                            isSaving = false,
+                            originalUserId = it.userId.trim(),
+                            userIdStatus = UserIdCheckStatus.Idle,
+                            saveSucceeded = true
+                        )
                     }
                     refreshCooldown()
                 }

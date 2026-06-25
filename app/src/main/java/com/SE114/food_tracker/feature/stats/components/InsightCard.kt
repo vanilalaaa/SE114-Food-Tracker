@@ -1,10 +1,11 @@
 package com.SE114.food_tracker.feature.stats.components
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,9 +19,11 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
 fun InsightCard(
-    insightText: String,
+    insights: List<String>,
     modifier: Modifier = Modifier
 ) {
+    if (insights.isEmpty()) return
+
     Column(
         modifier = modifier.fillMaxWidth()
     ) {
@@ -32,33 +35,43 @@ fun InsightCard(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = Color(0xFFBDC3C7),
-                    shape = RoundedCornerShape(50.dp)
-                )
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = CardWhite),
+            elevation = CardDefaults.cardElevation(2.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = Color(0xFFD2EBD9),
-                modifier = Modifier.size(20.dp)
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                insights.forEach { text ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MintGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
 
-            Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
 
-            Text(
-                text = insightText,
-                style = StatLabelStyle,
-                color = TextPrimaryStat,
-                fontSize = 16.sp
-            )
+                        Text(
+                            text = text,
+                            style = StatLabelStyle,
+                            color = TextPrimaryStat,
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -73,7 +86,11 @@ fun InsightCardPreview() {
                 .padding(16.dp)
         ) {
             InsightCard(
-                insightText = "Thử 1 món mới"
+                insights = listOf(
+                    "Trung bình 1K đ / món",
+                    "🍧 Chè chiếm nhiều nhất (1 món)",
+                    "Buổi Trưa là thời điểm chi nhiều tiền nhất"
+                )
             )
         }
     }

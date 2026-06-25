@@ -80,6 +80,19 @@ class SupabaseAuthRepository @Inject constructor(
         Unit
     }
 
+    override suspend fun changePassword(currentPassword: String, newPassword: String): AuthOutcome<Unit> = runAuth {
+        val email = auth.currentUserOrNull()?.email
+            ?: error("No email on the current session")
+        // Verify the current password by re-authenticating (config: require current password when
+        // updating). Wrong password throws → mapped to InvalidCredentials.
+        auth.signInWith(Email) {
+            this.email = email
+            this.password = currentPassword
+        }
+        auth.updateUser { password = newPassword }
+        Unit
+    }
+
     override suspend fun signOut(): AuthOutcome<Unit> = runAuth {
         auth.signOut()
     }
