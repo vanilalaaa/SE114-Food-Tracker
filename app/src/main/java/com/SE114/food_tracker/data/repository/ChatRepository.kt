@@ -90,9 +90,9 @@ class ChatRepository @Inject constructor(
 
     @Serializable
     data class WalletRpcArgs(
-        @SerialName("wallet_id") val walletId: String,
-        @SerialName("amount") val amount: Double,
-        @SerialName("note") val note: String
+        @SerialName("p_wallet_id") val walletId: String,
+        @SerialName("p_amount") val amount: Double,
+        @SerialName("p_note") val note: String
     )
 
     @Serializable
