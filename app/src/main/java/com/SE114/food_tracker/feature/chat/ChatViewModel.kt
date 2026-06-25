@@ -104,7 +104,10 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private var connectedConversationId: String? = null
+
     fun connectToConversation(conversationId: String) {
+        connectedConversationId = conversationId
         viewModelScope.launch {
             chatRepository.subscribeToChatRealtime(conversationId)
             try {
@@ -116,6 +119,13 @@ class ChatViewModel @Inject constructor(
                 e.printStackTrace()
             }
         }
+    }
+
+    // This VM is keyed per conversation (hiltViewModel(key = id)), so onCleared fires when
+    // the chat is popped — the point to release its realtime channel and collectors.
+    override fun onCleared() {
+        super.onCleared()
+        connectedConversationId?.let { chatRepository.unsubscribeFromChatRealtime(it) }
     }
 
     fun createGroup(name: String, members: List<String>) {

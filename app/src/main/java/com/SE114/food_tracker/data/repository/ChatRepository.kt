@@ -23,6 +23,9 @@ import io.github.jan.supabase.storage.storage
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -48,6 +51,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import timber.log.Timber
@@ -141,14 +145,20 @@ class ChatRepository @Inject constructor(
         @SerialName("avatar_url") val avatarUrl: String? = null
     )
 
-    private val repositoryScope = CoroutineScope(Dispatchers.IO)
-    private val activeChannels = mutableMapOf<String, RealtimeChannel>()
-    private val reconnectingChannels = mutableSetOf<String>()
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** A subscribed realtime channel plus the scope its collectors run on, so one
+     *  conversation can be torn down without affecting any other. */
+    private class ChannelHandle(val channel: RealtimeChannel, val scope: CoroutineScope)
+
+    private val activeChannels = ConcurrentHashMap<String, ChannelHandle>()
+    private val reconnectingChannels = ConcurrentHashMap.newKeySet<String>()
+    private val reconnectBackoff = ConcurrentHashMap<String, Long>()
     private val _memberUpdateSignal = MutableSharedFlow<String>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
-    private val subscribeDeferreds = mutableMapOf<String, CompletableDeferred<Unit>>()
+    private val subscribeDeferreds = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
     val memberUpdateSignal = _memberUpdateSignal.asSharedFlow()
     private val _walletUpdateSignal = MutableSharedFlow<String>(
         extraBufferCapacity = 1,
@@ -241,6 +251,11 @@ class ChatRepository @Inject constructor(
             val deferred = CompletableDeferred<Unit>()
             subscribeDeferreds[conversationId] = deferred
             try {
+                // Collectors run on a child scope tied to this channel so leaving the chat
+                // (unsubscribeFromChatRealtime) cancels exactly these collectors, nothing else.
+                val channelScope = CoroutineScope(
+                    SupervisorJob(repositoryScope.coroutineContext[Job]) + Dispatchers.IO
+                )
                 val channel = supabaseClient.channel("chat_channel_$conversationId")
 
                 // ── Broadcast flow (PRIMARY path — ~50–200 ms) ────────────────────────────
@@ -296,7 +311,7 @@ class ChatRepository @Inject constructor(
                 // handshake. Launching after subscribe() causes flows to never emit.
 
                 // ── BROADCAST collector — instant delivery ─────────────────────────────
-                repositoryScope.launch {
+                channelScope.launch {
                     broadcastMessageFlow.collect { dto ->
                         // Tránh trùng lặp trên chính máy người gửi: nếu id người gửi trùng với mình thì bỏ qua
                         if (dto.senderId == getAuthenticatedUserId()) return@collect
@@ -321,14 +336,13 @@ class ChatRepository @Inject constructor(
                                     messageAt      = incomingMessage.createdAt,
                                     snippet        = if (incomingMessage.isSystem) "📢 Tin nhắn hệ thống" else incomingMessage.body
                                 )
-                                println("Broadcast: Nhận live tin nhắn siêu tốc từ đối phương: ${dto.body}")
                             }
                         }
                     }
                 }
 
                 // ── CDC fallback collector — deduplication via serverId ─────────────────
-                repositoryScope.launch {
+                channelScope.launch {
                     changeFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
                         // Cũng chặn trùng lặp cho chính người gửi tại luồng CDC luôn
@@ -354,27 +368,26 @@ class ChatRepository @Inject constructor(
                                     messageAt      = incomingMessage.createdAt,
                                     snippet        = if (incomingMessage.isSystem) "📢 Tin nhắn hệ thống" else incomingMessage.body
                                 )
-                                println("CDC Fallback: Nhận tin nhắn qua WAL dự phòng: ${dto.body}")
                             }
                         }
                     }
                 }
 
                 // Bắn tín hiệu nạp lại thành viên khi có người vào
-                repositoryScope.launch {
+                channelScope.launch {
                     participantInsert.collect {
                         _memberUpdateSignal.tryEmit(conversationId)
                     }
                 }
 
                 // Bắn tín hiệu nạp lại thành viên khi có người ra
-                repositoryScope.launch {
+                channelScope.launch {
                     participantDelete.collect {
                         _memberUpdateSignal.tryEmit(conversationId)
                     }
                 }
 
-                repositoryScope.launch {
+                channelScope.launch {
                     conversationUpdateFlow.collect { action ->
                         val updatedDto = action.decodeRecord<SupabaseConversationDto>()
                         if (updatedDto.id == conversationId) {
@@ -392,28 +405,39 @@ class ChatRepository @Inject constructor(
                     }
                 }
 
-                repositoryScope.launch {
+                channelScope.launch {
                     walletUpdateFlow.collect {
                         _walletUpdateSignal.tryEmit(conversationId)
                     }
                 }
 
-                repositoryScope.launch {
+                channelScope.launch {
                     transactionInsertFlow.collect {
                         _walletUpdateSignal.tryEmit(conversationId)
                     }
                 }
 
                 channel.subscribe()
-                activeChannels[conversationId] = channel
+                activeChannels[conversationId] = ChannelHandle(channel, channelScope)
+                reconnectBackoff.remove(conversationId)
                 deferred.complete(Unit)
-                println("Supabase Realtime: Đã mở cổng đồng bộ cho phòng $conversationId")
             } catch (e: Exception) {
                 deferred.completeExceptionally(e)
-                println("Supabase Realtime Lỗi kết nối ban đầu: ${e.localizedMessage}")
+                Timber.tag("Chat").e(e, "subscribe failed for $conversationId")
                 handleRealtimeReconnect(conversationId)
             }
         }
+    }
+
+    /** Cancels this conversation's collectors and unsubscribes its channel. Safe to call
+     *  when leaving ChatScreen; a no-op if the conversation was never subscribed. */
+    fun unsubscribeFromChatRealtime(conversationId: String) {
+        reconnectingChannels.remove(conversationId)
+        reconnectBackoff.remove(conversationId)
+        subscribeDeferreds.remove(conversationId)
+        val handle = activeChannels.remove(conversationId) ?: return
+        handle.scope.cancel()
+        repositoryScope.launch { runCatching { handle.channel.unsubscribe() } }
     }
 
     fun subscribeToGlobalConversationsRealtime() {
@@ -473,26 +497,26 @@ class ChatRepository @Inject constructor(
         }
     }
 
-    private suspend fun handleRealtimeReconnect(conversationId: String) {
-        if (reconnectingChannels.contains(conversationId)) return
-        reconnectingChannels.add(conversationId)
-
-        var isConnected = false
-        var retryDelay = 2000L
-
-        while (!isConnected) {
-            delay(retryDelay)
+    private fun handleRealtimeReconnect(conversationId: String) {
+        // newKeySet().add returns false when already present — one reconnect at a time.
+        if (!reconnectingChannels.add(conversationId)) return
+        repositoryScope.launch {
+            val backoff = reconnectBackoff.getOrDefault(conversationId, 2000L)
             try {
-                val channel = activeChannels[conversationId]
-                    ?: supabaseClient.channel("chat_channel_$conversationId")
-                channel.subscribe()
-                activeChannels[conversationId] = channel
-                isConnected = true
+                delay(backoff)
+                // Drop any stale channel + collectors before re-subscribing so activeChannels
+                // never holds two channels for the same conversation.
+                activeChannels.remove(conversationId)?.let { stale ->
+                    stale.scope.cancel()
+                    runCatching { stale.channel.unsubscribe() }
+                }
+                subscribeDeferreds.remove(conversationId)
+                reconnectBackoff[conversationId] = (backoff * 2).coerceAtMost(60000L)
+            } finally {
                 reconnectingChannels.remove(conversationId)
-                println("Supabase Realtime: Đã kết nối lại thành công phòng $conversationId")
-            } catch (e: Exception) {
-                retryDelay = (retryDelay * 2).coerceAtMost(60000L)
             }
+            // Re-subscribe from scratch; a fresh subscribe resets the backoff on success.
+            subscribeToChatRealtime(conversationId)
         }
     }
 
@@ -945,7 +969,7 @@ class ChatRepository @Inject constructor(
 
             val channelReady = awaitChannelReady(message.conversationId, 2000)
             if (channelReady) {
-                val channel = activeChannels[message.conversationId]
+                val channel = activeChannels[message.conversationId]?.channel
                 if (channel != null) {
                     runCatching {
                         channel.broadcast(event = BROADCAST_EVENT_NEW_MESSAGE, message = broadcastPayload)
