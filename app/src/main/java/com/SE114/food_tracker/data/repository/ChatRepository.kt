@@ -41,6 +41,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -533,67 +535,40 @@ class ChatRepository @Inject constructor(
     }
 
     suspend fun getOrCreateOneToOneChat(friendUserId: String): String? {
-        println("DEBUG_TRACE: Đã bắt đầu vào hàm!")
         return try {
             val currentUserId = getAuthenticatedUserId()
 
+            // Callers must pass the friend's UUID, not a nickname.
             if (friendUserId.length < 36) {
-                println("LỖI: Bạn đang truyền Nickname '$friendUserId' thay vì UUID. Phải lấy UUID từ memberList!")
+                Timber.tag("Chat").e("getOrCreateOneToOneChat needs a UUID, got '$friendUserId'")
                 return null
             }
 
             val targetFriendId = friendUserId.lowercase()
 
-            val myParticipations = supabaseClient.from("conversation_participant")
-                .select { filter { eq("user_id", currentUserId) } }
-                .decodeList<SupabaseParticipantDto>()
-
-            val myConvIds = myParticipations.map { it.conversationId }
-
-            if (myConvIds.isNotEmpty()) {
-                val potentialParticipants = supabaseClient.from("conversation_participant")
-                    .select { filter { eq("user_id", targetFriendId) } }
-                    .decodeList<SupabaseParticipantDto>()
-
-                for (part in potentialParticipants) {
-                    if (myConvIds.contains(part.conversationId)) {
-                        val conv = supabaseClient.from("conversation")
-                            .select { filter { eq("id", part.conversationId) } }
-                            .decodeSingleOrNull<SupabaseConversationDto>()
-
-                        if (conv != null && !conv.isGroup) return part.conversationId
-                    }
-                }
-            }
+            // Single server-side lookup for an existing direct conversation between the
+            // two users, replacing the per-participation scan (2 queries per row).
+            val existingId = runCatching {
+                supabaseClient.postgrest.rpc(
+                    function   = "find_direct_conversation",
+                    parameters = buildJsonObject { put("p_friend", targetFriendId) }
+                ).decodeAsOrNull<String>()
+            }.getOrNull()
+            if (!existingId.isNullOrBlank()) return existingId
 
             val newChatUuid = UUID.randomUUID().toString()
-
-            println("DEBUG_: Đang insert conv với UUID: $newChatUuid và user: $targetFriendId")
-
             supabaseClient.from("conversation").insert(mapOf(
                 "id"       to newChatUuid,
                 "is_group" to false,
                 "name"     to null
             ))
-
-            val verify = supabaseClient.from("conversation")
-                .select { filter { eq("id", newChatUuid) } }
-                .decodeSingleOrNull<SupabaseConversationDto>()
-            if (verify == null) {
-                println("DEBUG_CRITICAL: Insert xong nhưng DB không tìm thấy ID vừa insert!")
-            } else {
-                println("DEBUG: Insert thành công, đã thấy ID trong DB")
-            }
-
             supabaseClient.from("conversation_participant").insert(listOf(
                 SupabaseParticipantDto(newChatUuid, currentUserId, false),
                 SupabaseParticipantDto(newChatUuid, targetFriendId, false)
             ))
-
-            return newChatUuid
+            newChatUuid
         } catch (e: Exception) {
-            println("LỖI CHI TIẾT TẠO CHAT: ${e.message}")
-            e.printStackTrace()
+            Timber.tag("Chat").e(e, "getOrCreateOneToOneChat failed")
             null
         }
     }
