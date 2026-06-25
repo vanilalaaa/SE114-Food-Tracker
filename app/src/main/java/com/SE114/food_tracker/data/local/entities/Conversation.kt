@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "conversations")
 data class Conversation(
     @PrimaryKey
-    val id: String, // Chuỗi UUID từ Supabase
+    val id: String,
 
     @ColumnInfo(name = "is_group")
     val isGroup: Boolean = false,
@@ -15,7 +15,13 @@ data class Conversation(
     val name: String?,
 
     @ColumnInfo(name = "wallet_id")
-    val walletId: String?, // ID liên kết ví nhóm
+    val walletId: String?,
+
+    @ColumnInfo(name = "last_message_at")
+    val lastMessageAt: Long = 0L,
+
+    @ColumnInfo(name = "last_message_snippet")
+    val lastMessageSnippet: String? = null,
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis()
