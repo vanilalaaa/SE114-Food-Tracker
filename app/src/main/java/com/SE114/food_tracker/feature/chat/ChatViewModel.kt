@@ -103,17 +103,21 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-
+    fun setActiveConversationId(id: String) {
+        _activeConversationId.value = id
+    }
+    private val syncedConversations = mutableSetOf<String>()
     fun connectToConversation(conversationId: String) {
+        if (conversationId.isBlank()) return
         viewModelScope.launch {
             chatRepository.subscribeToChatRealtime(conversationId)
-            try {
+            if (!syncedConversations.contains(conversationId)) {
+                println("DEBUG: Bắt đầu sync lần đầu cho $conversationId")
                 chatRepository.syncMessagesFromServer(conversationId)
-                chatRepository.fetchGroupMembersFromServer(conversationId).also { members ->
-                    _groupMembers.value = members
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+                syncedConversations.add(conversationId)
+            }
+            chatRepository.fetchGroupMembersFromServer(conversationId).also { members ->
+                _groupMembers.value = members
             }
         }
     }
@@ -137,6 +141,33 @@ class ChatViewModel @Inject constructor(
         return chatRepository.getLocalConversation(conversationId)
     }
 
+    // 1. Tạo một StateFlow để UI lắng nghe ID hiện tại
+    private val _activeConversationId = MutableStateFlow<String?>(null)
+    val activeConversationId = _activeConversationId.asStateFlow()
+    fun sendTextMessage(
+        conversationId: String,
+        text: String,
+        isOneToOne: Boolean = false,
+        friendUserId: String? = null
+    ) {
+        viewModelScope.launch {
+            var targetConvId = conversationId
+            if (isOneToOne && !friendUserId.isNullOrBlank()) {
+                val existingId = chatRepository.getOrCreateOneToOneChat(friendUserId)
+                if (existingId != null) {
+                    targetConvId = existingId
+                    // CẬP NHẬT ID MỚI VÀO ĐÂY
+                    _activeConversationId.value = targetConvId
+                }
+            }
+            if (targetConvId.isBlank()) {
+                println("LỖI: Không lấy được targetConvId!")
+                return@launch
+            }
+            chatRepository.sendMessage(targetConvId, currentUserId, body = text, imageUrl = null)
+           // connectToConversation(targetConvId)
+        }
+    }
     fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
         connectToConversation(conversationId)
 
@@ -162,27 +193,6 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-
-    fun sendTextMessage(
-        conversationId: String,
-        text: String,
-        isOneToOne: Boolean = false,
-        friendUserId: String? = null
-    ) {
-        viewModelScope.launch {
-            var targetConvId = conversationId
-            if (isOneToOne && !friendUserId.isNullOrBlank()) {
-                val existingId = chatRepository.getOrCreateOneToOneChat(friendUserId)
-                if (existingId != null) targetConvId = existingId
-            }
-            if (targetConvId.isBlank()) {
-                println("LỖI: Không lấy được targetConvId!")
-                return@launch
-            }
-            chatRepository.sendMessage(targetConvId, currentUserId, body = text, imageUrl = null)
-        }
-    }
-
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
             chatRepository.sendMessage(conversationId, currentUserId, body = null, imageUrl = imageUri)

@@ -135,7 +135,12 @@ class ChatRepository @Inject constructor(
         @SerialName("display_name") val displayName: String,
         @SerialName("avatar_url") val avatarUrl: String? = null
     )
-
+    @Serializable
+    data class NewConversationDto(
+        @SerialName("id") val id: String,
+        @SerialName("is_group") val isGroup: Boolean = false,
+        @SerialName("name") val name: String? = null
+    )
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
     private val activeChannels = mutableMapOf<String, RealtimeChannel>()
     private val reconnectingChannels = mutableSetOf<String>()
@@ -203,11 +208,13 @@ class ChatRepository @Inject constructor(
                         .select {
                             filter { eq("id", convId) }
                         }.decodeSingle<SupabaseConversationDto>()
-
+                    // Khi fetch từ Supabase về
+                    val profile = supabaseClient.from("profiles")
+                        .select { filter { eq("id", targetFriendId) } }.decodeSingleOrNull<ProfileNameDto>()
                     val localConversation = LocalConversation(
-                        id = response.id,
-                        name = response.name ?: "Trò chuyện 1-1",
-                        isGroup = response.isGroup,
+                        id = convId,
+                        name = profile?.displayName ?: "Bạn mới",
+                        isGroup = false,
                         walletId = response.walletId ?: "wallet_default"
                     )
                     chatDAO.insertConversation(localConversation)
@@ -512,6 +519,7 @@ class ChatRepository @Inject constructor(
         imageUrl: String?,
         isSystem: Boolean = false
     ) {
+        println("DEBUG_SEND: Đang gửi tin vào ID: $conversationId")
         val localId = UUID.randomUUID().toString()
         val pendingMessage = Message(
             localId        = localId,
@@ -535,67 +543,78 @@ class ChatRepository @Inject constructor(
 
     suspend fun getOrCreateOneToOneChat(friendUserId: String): String? {
         println("DEBUG_TRACE: Đã bắt đầu vào hàm!")
-        return try {
+        try {
             val currentUserId = getAuthenticatedUserId()
 
             if (friendUserId.length < 36) {
-                println("LỖI: Bạn đang truyền Nickname '$friendUserId' thay vì UUID. Phải lấy UUID từ memberList!")
+                println("LỖI: Bạn đang truyền Nickname thay vì UUID.")
                 return null
             }
 
             val targetFriendId = friendUserId.lowercase()
+            val friendProfile = supabaseClient.from("profiles")
+                .select { filter { eq("id", targetFriendId) } }
+                .decodeSingleOrNull<SupabaseProfileDto>()
 
+            val friendName = friendProfile?.displayName ?: "Bạn mới"
+            // 1. Tìm các phòng mà mình tham gia
             val myParticipations = supabaseClient.from("conversation_participant")
                 .select { filter { eq("user_id", currentUserId) } }
                 .decodeList<SupabaseParticipantDto>()
 
             val myConvIds = myParticipations.map { it.conversationId }
 
+            // 2. Kiểm tra xem người kia có nằm trong phòng nào đó mà mình cũng tham gia không
             if (myConvIds.isNotEmpty()) {
                 val potentialParticipants = supabaseClient.from("conversation_participant")
-                    .select { filter { eq("user_id", targetFriendId) } }
+                    .select {
+                        filter {
+                            eq("user_id", targetFriendId)
+                            isIn("conversation_id", myConvIds) // <--- Đã sửa thành isIn
+                        }
+                    }
                     .decodeList<SupabaseParticipantDto>()
 
                 for (part in potentialParticipants) {
-                    if (myConvIds.contains(part.conversationId)) {
-                        val conv = supabaseClient.from("conversation")
-                            .select { filter { eq("id", part.conversationId) } }
-                            .decodeSingleOrNull<SupabaseConversationDto>()
+                    val conv = supabaseClient.from("conversation")
+                        .select { filter { eq("id", part.conversationId) } }
+                        .decodeSingleOrNull<SupabaseConversationDto>()
 
-                        if (conv != null && !conv.isGroup) return part.conversationId
-                    }
+                    if (conv != null && !conv.isGroup) return part.conversationId
                 }
             }
 
+            // 3. Tạo mới nếu chưa tìm thấy
             val newChatUuid = UUID.randomUUID().toString()
+            // Lưu vào DB với tên thật thay vì null/Chat 1-1
+            val newConv = LocalConversation(
+                id = newChatUuid,
+                name = friendName, // <--- Đã lấy được tên thật!
+                isGroup = false,
+                walletId = "wallet_default"
+            )
+            chatDAO.insertConversation(newConv)
 
-            println("DEBUG_: Đang insert conv với UUID: $newChatUuid và user: $targetFriendId")
+            supabaseClient.from("conversation").insert(NewConversationDto(newChatUuid, false, friendName))
+            /* val newConv = NewConversationDto(
+                id = newChatUuid,
+                isGroup = false,
+                name = null
+            )
+            supabaseClient.from("conversation").insert(newConv) */
 
-            supabaseClient.from("conversation").insert(mapOf(
-                "id"       to newChatUuid,
-                "is_group" to false,
-                "name"     to null
-            ))
-
-            val verify = supabaseClient.from("conversation")
-                .select { filter { eq("id", newChatUuid) } }
-                .decodeSingleOrNull<SupabaseConversationDto>()
-            if (verify == null) {
-                println("DEBUG_CRITICAL: Insert xong nhưng DB không tìm thấy ID vừa insert!")
-            } else {
-                println("DEBUG: Insert thành công, đã thấy ID trong DB")
-            }
-
-            supabaseClient.from("conversation_participant").insert(listOf(
+            val participantList = listOf(
                 SupabaseParticipantDto(newChatUuid, currentUserId, false),
                 SupabaseParticipantDto(newChatUuid, targetFriendId, false)
-            ))
+            )
+            supabaseClient.from("conversation_participant").insert(participantList)
 
             return newChatUuid
+
         } catch (e: Exception) {
             println("LỖI CHI TIẾT TẠO CHAT: ${e.message}")
             e.printStackTrace()
-            null
+            return null
         }
     }
 
@@ -899,13 +918,16 @@ class ChatRepository @Inject constructor(
     }
 
     suspend fun syncMessagesFromServer(conversationId: String) {
+        println("DEBUG_CHECK_SYNC_ID: ConvID truyền vào: '$conversationId'")
         try {
+            println("DEBUG_SYNC: Bắt đầu sync ID: $conversationId")
             val remoteMessages = supabaseClient.from("message")
                 .select {
                     filter { eq("conversation_id", conversationId) }
                 }.decodeList<SupabaseMessageDto>()
-
+            println("DEBUG_SYNC: Lấy được ${remoteMessages.size} tin nhắn từ server")
             remoteMessages.forEach { dto ->
+                println("DEBUG_SYNC: Processing message: ${dto.body}")
                 val existingLocalMessage = dto.id?.let { chatDAO.getMessageByServerId(it) }
 
                 if (existingLocalMessage != null) {
@@ -930,6 +952,7 @@ class ChatRepository @Inject constructor(
                         createdAt      = parseServerTimeToLong(dto.createdAt)
                     )
                     chatDAO.insertMessage(newLocalMessage)
+                    println("DEBUG_SYNC: Đã insert thành công message vào DB: ${newLocalMessage.body}")
                     chatDAO.updateLastMessage(
                         conversationId = newLocalMessage.conversationId,
                         messageAt      = newLocalMessage.createdAt,
@@ -938,6 +961,8 @@ class ChatRepository @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            println("DEBUG_SYNC_ERROR: Lỗi rồi: ${e.localizedMessage}")
+            e.printStackTrace() // Rất quan trọng để biết lỗi do đâu
         }
     }
 
