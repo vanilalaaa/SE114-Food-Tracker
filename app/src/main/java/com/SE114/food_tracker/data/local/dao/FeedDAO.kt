@@ -297,6 +297,19 @@ interface FeedDAO {
     @Query("DELETE FROM feed_post WHERE sync_status = 'SYNCED' AND post_id NOT IN (:remotePostIds)")
     suspend fun deleteSyncedPostsMissingFromRemote(remotePostIds: List<String>)
 
+    @Query(
+        """
+        UPDATE feed_post
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND post_id IN (:remotePostIds)
+        """
+    )
+    suspend fun softDeleteSyncedPostsByRemoteIds(
+        remotePostIds: List<String>,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
     @Query("UPDATE feed_post SET sync_status = 'SYNCED' WHERE post_id = :postId")
     suspend fun markPostSynced(postId: String)
 
@@ -308,6 +321,45 @@ interface FeedDAO {
 
     @Query("UPDATE feed_like SET sync_status = 'FAILED' WHERE like_id = :likeId")
     suspend fun markLikeFailed(likeId: String)
+
+    @Query(
+        """
+        UPDATE feed_like
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND is_deleted = 0
+        """
+    )
+    suspend fun softDeleteAllSyncedLikes(updatedAt: Long = System.currentTimeMillis())
+
+    @Query(
+        """
+        UPDATE feed_like
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND is_deleted = 0
+        AND like_id NOT IN (:remoteLikeIds)
+        """
+    )
+    suspend fun softDeleteSyncedLikesMissingFromRemote(
+        remoteLikeIds: List<String>,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query(
+        """
+        UPDATE feed_like
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE post_id = :postId
+        AND user_id = :userId
+        AND sync_status = 'SYNCED'
+        """
+    )
+    suspend fun softDeleteSyncedLikeByRemoteKey(
+        postId: String,
+        userId: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
 
     @Query("UPDATE feed_comment SET sync_status = 'SYNCED' WHERE comment_id = :commentId")
     suspend fun markCommentSynced(commentId: String)

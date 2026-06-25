@@ -195,6 +195,23 @@
     <string name="report_reason_inappropriate">Nội dung không phù hợp</string>
     <string name="report_reason_harassment">Quấy rối</string>
     <string name="report_reason_other">Khác</string>
+    <string name="report_group_post_diary">Báo cáo bài đăng / nhật ký</string>
+    <string name="report_group_user">Báo cáo người dùng</string>
+    <string name="report_group_message_wallet">Báo cáo tin nhắn / quỹ nhóm</string>
+    <string name="report_group_other">Khác</string>
+    <string name="report_reason_post_spam_ads">Đây là spam hoặc quảng cáo</string>
+    <string name="report_reason_post_sensitive_content">Hình ảnh/Nội dung phản cảm, nhạy cảm</string>
+    <string name="report_reason_post_disordered_eating">Cổ xúy ăn uống thất thường / Rối loạn ăn uống</string>
+    <string name="report_reason_post_bullying_defamation">Bắt nạt hoặc bôi nhọ</string>
+    <string name="report_reason_user_impersonation">Họ đang mạo danh người khác</string>
+    <string name="report_reason_user_bad_avatar_name">Avatar hoặc tên hiển thị không phù hợp</string>
+    <string name="report_reason_user_repeated_friend_requests">Gửi lời mời kết bạn liên tục</string>
+    <string name="report_reason_message_money_scam">Lừa đảo hoặc gian lận tiền bạc</string>
+    <string name="report_reason_message_harassment">Bắt nạt hoặc quấy rối trong tin nhắn</string>
+    <string name="report_reason_message_malicious_links">Tin nhắn chứa link/nội dung độc hại</string>
+    <string name="report_group_label">Loại báo cáo</string>
+    <string name="report_reason_label">Lý do</string>
+    <string name="report_other_details_label">Nhập lý do báo cáo</string>
 
     <!-- Admin -->
     <string name="admin_back">Quay lại</string>
