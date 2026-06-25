@@ -38,7 +38,7 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         FeedComment::class,
         FeedHiddenPost::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -99,6 +99,23 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_14_15 = object : Migration(14, 15) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                db.createFeedHiddenPostTable()
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!db.hasColumn("feed_comment", "parent_comment_id")) {
+                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN parent_comment_id TEXT")
+                }
+                if (!db.hasColumn("feed_comment", "is_hidden")) {
+                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!db.hasColumn("feed_comment", "hidden_at")) {
+                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN hidden_at INTEGER")
+                }
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
                 db.createFeedHiddenPostTable()
             }
         }
@@ -176,4 +193,14 @@ private fun SupportSQLiteDatabase.createFeedHiddenPostTable() {
         """.trimIndent()
     )
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_hidden_post_user_id ON feed_hidden_post(user_id)")
+}
+
+private fun SupportSQLiteDatabase.hasColumn(tableName: String, columnName: String): Boolean {
+    query("PRAGMA table_info(`$tableName`)").use { cursor ->
+        val nameIndex = cursor.getColumnIndex("name")
+        while (cursor.moveToNext()) {
+            if (cursor.getString(nameIndex) == columnName) return true
+        }
+    }
+    return false
 }

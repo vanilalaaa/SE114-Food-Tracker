@@ -191,14 +191,14 @@ class FriendViewModel @Inject constructor(
     fun cancelOutgoingRequest(friendshipId: String) =
         runFriendAction(friendshipId) { repository.cancelOutgoingRequest(friendshipId) }
 
-    fun submitReport(targetId: String, reason: ReportReason) {
+    fun submitReport(targetId: String, reason: ReportReason, details: String?) {
         if (_isReportSubmitting.value) return
 
         viewModelScope.launch {
             _isReportSubmitting.value = true
             reportRepository.submitProfileReport(
                 targetId = targetId,
-                reason = reason.remoteValue
+                reason = reason.toRemoteValue(details)
             ).onSuccess {
                 _actionMessage.value = "Đã gửi báo cáo, admin sẽ xem xét"
             }.onFailure { reportActionError(it) }

@@ -148,7 +148,7 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(selectedTab = tab) }
     }
 
-    fun submitReport(reason: ReportReason) {
+    fun submitReport(reason: ReportReason, details: String?) {
         if (profileId.isBlank() || _uiState.value.isSelf || _uiState.value.isReportSubmitting) return
 
         viewModelScope.launch {
@@ -156,7 +156,7 @@ class ProfileViewModel @Inject constructor(
 
             reportRepository.submitProfileReport(
                 targetId = profileId,
-                reason = reason.remoteValue
+                reason = reason.toRemoteValue(details)
             ).onSuccess {
                 _uiState.update {
                     it.copy(
