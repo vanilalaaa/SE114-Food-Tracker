@@ -139,8 +139,8 @@ fun FriendScreen(
             ReportDialog(
                 isSubmitting = isReportSubmitting,
                 onDismissRequest = { friendPendingReport = null },
-                onConfirmReport = { reason ->
-                    viewModel.submitReport(friend.userId, reason)
+                onConfirmReport = { reason, details ->
+                    viewModel.submitReport(friend.userId, reason, details)
                     friendPendingReport = null
                 }
             )

@@ -12,7 +12,8 @@ import java.util.UUID
         Index("post_id"),
         Index("parent_comment_id"),
         Index("user_id"),
-        Index("sync_status")
+        Index("sync_status"),
+        Index("is_hidden")
     ]
 )
 data class FeedComment(
