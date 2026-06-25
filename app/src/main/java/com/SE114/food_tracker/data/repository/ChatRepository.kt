@@ -52,6 +52,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import timber.log.Timber
@@ -78,7 +79,16 @@ class ChatRepository @Inject constructor(
         @SerialName("id") val id: String,
         @SerialName("name") val name: String? = null,
         @SerialName("is_group") val isGroup: Boolean = false,
-        @SerialName("wallet_id") val walletId: String? = null
+        @SerialName("wallet_id") val walletId: String? = null,
+        @SerialName("last_message_at") val lastMessageAt: Long = 0L,
+        @SerialName("last_message_snippet") val lastMessageSnippet: String? = null
+    )
+
+    @Serializable
+    data class PeerProfileDto(
+        @SerialName("id") val id: String,
+        @SerialName("display_name") val displayName: String? = null,
+        @SerialName("avatar_url") val avatarUrl: String? = null
     )
 
     @Serializable
@@ -154,6 +164,7 @@ class ChatRepository @Inject constructor(
     private val activeChannels = ConcurrentHashMap<String, ChannelHandle>()
     private val reconnectingChannels = ConcurrentHashMap.newKeySet<String>()
     private val reconnectBackoff = ConcurrentHashMap<String, Long>()
+    private val globalChannelStarted = AtomicBoolean(false)
     private val _memberUpdateSignal = MutableSharedFlow<String>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -203,7 +214,8 @@ class ChatRepository @Inject constructor(
             if (convIds.isEmpty()) return
 
             // One round-trip for every conversation the user belongs to, replacing the
-            // old per-row select loop (N+1).
+            // old per-row select loop (N+1). last_message_at/snippet come from the server
+            // (maintained by trigger) so the list keeps its newest-first order after a fetch.
             val conversations = supabaseClient.from("conversation")
                 .select { filter { isIn("id", convIds) } }
                 .decodeList<SupabaseConversationDto>()
@@ -211,13 +223,52 @@ class ChatRepository @Inject constructor(
             chatDAO.insertConversations(
                 conversations.map { dto ->
                     LocalConversation(
-                        id       = dto.id,
-                        name     = dto.name ?: "Trò chuyện 1-1",
-                        isGroup  = dto.isGroup,
-                        walletId = dto.walletId ?: "wallet_default"
+                        id                 = dto.id,
+                        name               = dto.name ?: "Trò chuyện 1-1",
+                        isGroup            = dto.isGroup,
+                        walletId           = dto.walletId ?: "wallet_default",
+                        lastMessageAt      = dto.lastMessageAt,
+                        lastMessageSnippet = dto.lastMessageSnippet
                     )
                 }
             )
+
+            // Persist the participant graph + peer profiles in two batched queries so the
+            // list can render the 1-1 peer's name/avatar without a per-conversation round-trip.
+            // The current user's own row is left to markAsRead so we never clobber last_read_at.
+            val peers = supabaseClient.from("conversation_participant")
+                .select { filter { isIn("conversation_id", convIds) } }
+                .decodeList<SupabaseParticipantDto>()
+                .filter { it.userId.lowercase() != currentUserId }
+
+            chatDAO.insertParticipants(
+                peers.map {
+                    ConversationParticipant(
+                        conversationId = it.conversationId,
+                        userId         = it.userId.lowercase(),
+                        isAdmin        = it.isAdmin
+                    )
+                }
+            )
+
+            val peerIds = peers.map { it.userId.lowercase() }.distinct()
+            if (peerIds.isNotEmpty()) {
+                val profiles = supabaseClient.from("profile")
+                    .select(
+                        io.github.jan.supabase.postgrest.query.Columns.raw("id, display_name, avatar_url")
+                    ) { filter { isIn("id", peerIds) } }
+                    .decodeList<PeerProfileDto>()
+
+                chatDAO.insertProfilesToCache(
+                    profiles.map {
+                        UserProfileCacheEntity(
+                            userId      = it.id.lowercase(),
+                            displayName = it.displayName ?: "Thành viên",
+                            avatarUrl   = it.avatarUrl
+                        )
+                    }
+                )
+            }
         } catch (e: Exception) {
             Timber.tag("Chat").e(e, "fetchAndSaveConversationsToLocal failed")
         }
@@ -443,56 +494,101 @@ class ChatRepository @Inject constructor(
     fun subscribeToGlobalConversationsRealtime() {
         val currentUserId = getAuthenticatedUserId()
         if (currentUserId.isBlank()) return
+        // The repo is a singleton but every ChatViewModel calls this; keep exactly one
+        // global channel so message inserts aren't processed by several collectors.
+        if (!globalChannelStarted.compareAndSet(false, true)) return
 
         repositoryScope.launch {
             try {
                 val globalChannel = supabaseClient.channel("global_conv_channel_$currentUserId")
 
-                val insertFlow =
-                    globalChannel.postgresChangeFlow<PostgresAction.Insert>(
-                        schema = "public"
-                    ) {
+                val participantInsertFlow =
+                    globalChannel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
                         table = "conversation_participant"
                     }
-
-                val deleteFlow =
-                    globalChannel.postgresChangeFlow<PostgresAction.Delete>(
-                        schema = "public"
-                    ) {
+                val participantDeleteFlow =
+                    globalChannel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
                         table = "conversation_participant"
+                    }
+                val participantUpdateFlow =
+                    globalChannel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                        table = "conversation_participant"
+                    }
+                // Listening to every message insert (RLS scopes it to the user's conversations)
+                // and writing it to Room is what lets the list — a Room Flow — react to new
+                // messages in ANY conversation, reordering newest-first and recomputing unread,
+                // not just the conversation currently open.
+                val messageInsertFlow =
+                    globalChannel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                        table = "message"
                     }
 
                 repositoryScope.launch {
-                    insertFlow.collect { action ->
+                    participantInsertFlow.collect { action ->
                         val userIdStr =
                             action.record["user_id"]?.toString()?.replace("\"", "")?.lowercase()
+                        if (userIdStr == currentUserId) fetchAndSaveConversationsToLocal()
+                    }
+                }
+
+                repositoryScope.launch {
+                    participantDeleteFlow.collect { action ->
+                        val userIdStr = action.oldRecord["user_id"]?.toString()?.replace("\"", "")?.lowercase()
+                        val convIdStr = action.oldRecord["conversation_id"]?.toString()?.replace("\"", "")
                         if (userIdStr == currentUserId) {
-                            println("Realtime Global: Được mời vào nhóm mới!")
+                            if (convIdStr != null) chatDAO.deleteConversationById(convIdStr)
                             fetchAndSaveConversationsToLocal()
                         }
                     }
                 }
 
+                // Read elsewhere: another device advanced last_read_at — mirror it locally so
+                // the list de-emphasises a conversation the user already read.
                 repositoryScope.launch {
-                    deleteFlow.collect { action ->
-                        val userIdStr = action.oldRecord["user_id"]?.toString()?.replace("\"", "")?.lowercase()
-                        val convIdStr = action.oldRecord["conversation_id"]?.toString()?.replace("\"", "")
-
+                    participantUpdateFlow.collect { action ->
+                        val rec = action.record
+                        val userIdStr = rec["user_id"]?.toString()?.replace("\"", "")?.lowercase()
                         if (userIdStr == currentUserId) {
-                            println("Realtime Global: Bị kick khỏi nhóm!")
-                            if (convIdStr != null) {
-                                chatDAO.deleteConversationById(convIdStr)
+                            val convIdStr = rec["conversation_id"]?.toString()?.replace("\"", "")
+                            val lastRead = rec["last_read_at"]?.toString()?.replace("\"", "")?.toLongOrNull()
+                            if (convIdStr != null && lastRead != null) {
+                                chatDAO.markConversationRead(convIdStr, currentUserId, lastRead)
                             }
-                            fetchAndSaveConversationsToLocal()
+                        }
+                    }
+                }
+
+                repositoryScope.launch {
+                    messageInsertFlow.collect { action ->
+                        val dto = action.decodeRecord<SupabaseMessageDto>()
+                        val exist = chatDAO.getMessageByServerId(dto.id ?: "")
+                        if (exist == null) {
+                            val incoming = Message(
+                                localId        = dto.id ?: UUID.randomUUID().toString(),
+                                serverId       = dto.id,
+                                conversationId = dto.conversationId,
+                                senderId       = dto.senderId.lowercase(),
+                                body           = dto.body,
+                                imageUrl       = dto.imageUrl,
+                                isSystem       = dto.isSystem,
+                                syncStatus     = MessageSyncStatus.SENT,
+                                createdAt      = parseServerTimeToLong(dto.createdAt)
+                            )
+                            chatDAO.insertMessage(incoming)
+                            chatDAO.updateLastMessage(
+                                conversationId = incoming.conversationId,
+                                messageAt      = incoming.createdAt,
+                                snippet        = if (incoming.isSystem) "📢 Tin nhắn hệ thống" else incoming.body
+                            )
                         }
                     }
                 }
 
                 // subscribe() after collectors — same rule as the chat channel above.
                 globalChannel.subscribe()
-                println("Supabase Realtime: Kích hoạt lắng nghe biến động nhóm toàn cục hoàn tất!")
             } catch (e: Exception) {
-                println("Lỗi kích hoạt kênh toàn cục: ${e.localizedMessage}")
+                globalChannelStarted.set(false)
+                Timber.tag("Chat").e(e, "global channel subscribe failed")
             }
         }
     }

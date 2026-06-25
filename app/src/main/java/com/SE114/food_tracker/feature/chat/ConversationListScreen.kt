@@ -210,7 +210,7 @@ fun ConversationListScreenContent(
     val filteredConversations = remember(searchQuery, conversationList) {
         if (searchQuery.isBlank()) conversationList
         else conversationList.filter {
-            (it.name ?: "Người dùng").contains(searchQuery, ignoreCase = true)
+            (it.displayName ?: "Người dùng").contains(searchQuery, ignoreCase = true)
         }
     }
 
@@ -334,7 +334,7 @@ fun ConversationListScreenContent(
                                         lastMessageAt = 0L,
                                         lastMessageSnippet = "Bắt đầu trò chuyện...",
                                         createdAt = System.currentTimeMillis(),
-                                        isUnread = false
+                                        unreadCount = 0
                                     )
                                 }
                                 ConversationItem(
@@ -359,12 +359,12 @@ fun ConversationListScreenPreview() {
                 ConversationWithUnread(
                     id = "1", isGroup = false, name = "Azun (Data)", walletId = "w1",
                     lastMessageAt = System.currentTimeMillis(), lastMessageSnippet = "Ăn bún bò Huế đi!",
-                    createdAt = System.currentTimeMillis(), isUnread = true
+                    createdAt = System.currentTimeMillis(), unreadCount = 5
                 ),
                 ConversationWithUnread(
                     id = "2", isGroup = true, name = "Quỹ Nhóm 4 Food Tracker", walletId = "w2",
                     lastMessageAt = 0L, lastMessageSnippet = null,
-                    createdAt = System.currentTimeMillis(), isUnread = false
+                    createdAt = System.currentTimeMillis(), unreadCount = 0
                 )
             ),
             friendList = listOf(Pair("3", "Thúy Vy"), Pair("4", "Hải Đăng")),

@@ -22,10 +22,9 @@ data class MessageWithProfile(
 )
 
 /**
- * Conversation with the current user's unread status pre-computed.
- * isUnread = lastMessageAt > lastReadAt (from conversation_participants).
- *
- * Used by ConversationListScreen so UI never has to do timestamp math.
+ * Conversation row plus the current user's unread state and (for 1-1 chats) the other
+ * participant's name/avatar, all pre-computed in SQL so the UI never does timestamp math
+ * or extra lookups.
  */
 data class ConversationWithUnread(
     @ColumnInfo(name = "id") val id: String,
@@ -35,12 +34,17 @@ data class ConversationWithUnread(
     @ColumnInfo(name = "last_message_at") val lastMessageAt: Long,
     @ColumnInfo(name = "last_message_snippet") val lastMessageSnippet: String?,
     @ColumnInfo(name = "created_at") val createdAt: Long,
-    /**
-     * true when there is at least one message newer than the user's last read timestamp.
-     * SQLite: (lastMessageAt > lastReadAt) is returned as 1/0 from the CASE expression.
-     */
-    @ColumnInfo(name = "is_unread") val isUnread: Boolean
-)
+    /** Count of messages newer than the user's last read time and not sent by the user. */
+    @ColumnInfo(name = "unread_count") val unreadCount: Int = 0,
+    /** The 1-1 peer's display name; null for groups (use [name] there). */
+    @ColumnInfo(name = "peer_name") val peerName: String? = null,
+    /** The 1-1 peer's avatar url; null for groups or when not cached yet. */
+    @ColumnInfo(name = "peer_avatar") val peerAvatar: String? = null
+) {
+    val isUnread: Boolean get() = unreadCount > 0
+    /** Name to show in the list: the resolved 1-1 peer name, else the stored conversation name. */
+    val displayName: String? get() = peerName ?: name
+}
 
 @Dao
 interface ChatDAO {
@@ -95,12 +99,23 @@ interface ChatDAO {
             c.last_message_at,
             c.last_message_snippet,
             c.created_at,
-            CASE WHEN EXISTS (
-                SELECT 1 FROM messages m
+            (SELECT COUNT(*) FROM messages m
                 WHERE m.conversation_id = c.id
                   AND m.created_at > COALESCE(cp.last_read_at, 0)
                   AND m.sender_id <> :currentUserId
-            ) THEN 1 ELSE 0 END AS is_unread
+            ) AS unread_count,
+            CASE WHEN c.is_group = 0 THEN (
+                SELECT prof.display_name FROM conversation_participants other
+                JOIN user_profile_cache prof ON prof.user_id = other.user_id
+                WHERE other.conversation_id = c.id AND other.user_id <> :currentUserId
+                LIMIT 1
+            ) ELSE NULL END AS peer_name,
+            CASE WHEN c.is_group = 0 THEN (
+                SELECT prof.avatar_url FROM conversation_participants other
+                JOIN user_profile_cache prof ON prof.user_id = other.user_id
+                WHERE other.conversation_id = c.id AND other.user_id <> :currentUserId
+                LIMIT 1
+            ) ELSE NULL END AS peer_avatar
         FROM conversations c
         LEFT JOIN conversation_participants cp
             ON cp.conversation_id = c.id AND cp.user_id = :currentUserId
