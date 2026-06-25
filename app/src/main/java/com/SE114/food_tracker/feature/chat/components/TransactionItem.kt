@@ -25,6 +25,7 @@ fun TransactionItem(
     modifier: Modifier = Modifier
 ) {
     val isPositive = amount > 0
+    val absAmount = Math.abs(amount)
 
     val chipContainerColor = when (type) {
         "deposit" -> LightGreenStat
@@ -87,12 +88,8 @@ fun TransactionItem(
             }
 
             Text(
-                text = if (isPositive) "+${
-                    String.format(
-                        "%,.0f",
-                        amount
-                    )
-                }" else String.format("%,.0f", amount),
+                text = if (isPositive) "+${String.format("%,.0f", absAmount)}"
+                else "-${String.format("%,.0f", absAmount)}",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (isPositive) Color(0xFF2E7D32) else StatPinkDark

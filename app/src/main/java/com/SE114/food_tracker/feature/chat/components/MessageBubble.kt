@@ -55,17 +55,49 @@ fun MessageBubble(
                 .padding(vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
-            Surface(
-                color = Color(0xFFECEFF1),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = message.body ?: "",
-                    color = Color(0xFF546E7A),
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    textAlign = TextAlign.Center
-                )
+            if (message.imageUrl != null) {
+                // Purchase system message: food photo card + caption
+                Surface(
+                    color = Color(0xFFECEFF1),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(0.72f)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(10.dp)
+                    ) {
+                        AsyncImage(
+                            model = message.imageUrl,
+                            contentDescription = "Ảnh món ăn",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = message.body ?: "",
+                            color = Color(0xFF546E7A),
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                // Plain system message (deposit, withdrawal, group events)
+                Surface(
+                    color = Color(0xFFECEFF1),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = message.body ?: "",
+                        color = Color(0xFF546E7A),
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
         return
