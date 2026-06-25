@@ -64,6 +64,12 @@ fun ChatScreen(
         viewModel.loadGroupMembers(conversationId)
     }
 
+    // Mark read on open and again whenever a newer message lands while the chat is on screen.
+    val latestMessageId = messages.lastOrNull()?.localId
+    LaunchedEffect(conversationId, latestMessageId) {
+        viewModel.markAsRead(conversationId)
+    }
+
     val memberList by viewModel.groupMembers.collectAsState()
     val isAdmin by viewModel.isCurrentAdmin.collectAsState()
     val friendId = memberList.firstOrNull { it.first != currentUserId }?.first

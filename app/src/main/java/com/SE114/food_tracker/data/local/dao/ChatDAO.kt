@@ -95,10 +95,12 @@ interface ChatDAO {
             c.last_message_at,
             c.last_message_snippet,
             c.created_at,
-            CASE
-                WHEN c.last_message_at > COALESCE(cp.last_read_at, 0) THEN 1
-                ELSE 0
-            END AS is_unread
+            CASE WHEN EXISTS (
+                SELECT 1 FROM messages m
+                WHERE m.conversation_id = c.id
+                  AND m.created_at > COALESCE(cp.last_read_at, 0)
+                  AND m.sender_id <> :currentUserId
+            ) THEN 1 ELSE 0 END AS is_unread
         FROM conversations c
         LEFT JOIN conversation_participants cp
             ON cp.conversation_id = c.id AND cp.user_id = :currentUserId

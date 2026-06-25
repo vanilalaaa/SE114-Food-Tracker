@@ -1027,15 +1027,13 @@ class ChatRepository @Inject constructor(
         )
         chatDAO.markConversationRead(conversationId, currentUserId, now)
 
+        // Server marker advances via a gated RPC (security definer) so clients never need
+        // direct UPDATE access to conversation_participant.
         runCatching {
-            supabaseClient.from("conversation_participant").update(
-                mapOf("last_read_at" to now)
-            ) {
-                filter {
-                    eq("conversation_id", conversationId)
-                    eq("user_id", currentUserId)
-                }
-            }
+            supabaseClient.postgrest.rpc(
+                function   = "mark_conversation_read",
+                parameters = buildJsonObject { put("p_conversation", conversationId) }
+            )
         }
     }
 
