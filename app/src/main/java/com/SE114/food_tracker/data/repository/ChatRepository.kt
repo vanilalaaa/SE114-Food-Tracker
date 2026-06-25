@@ -32,6 +32,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonObject
@@ -204,8 +205,11 @@ class ChatRepository @Inject constructor(
                 val channel = supabaseClient.channel("chat_channel_$conversationId")
 
                 val changeFlow =
-                    channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    channel.postgresChangeFlow<PostgresAction.Insert>(
+                        schema = "public"
+                    ) {
                         table = "message"
+                        filter("conversation_id", FilterOperator.EQ, conversationId)
                     }
 
                 val conversationUpdateFlow =
@@ -235,6 +239,14 @@ class ChatRepository @Inject constructor(
                     ) {
                         table = "conversation_participant"
                     }
+
+                // FIX: subscribe() MUST come before launching collectors.
+                // Collectors registered on a channel that hasn't subscribed yet miss events
+                // that arrive during the WebSocket handshake, causing the ~8-10s delay.
+                channel.subscribe()
+                activeChannels[conversationId] = channel
+                println("Supabase Realtime: Đã mở cổng đồng bộ cho phòng $conversationId")
+
                 // Bắn tín hiệu nạp lại thành viên khi có người vào
                 repositoryScope.launch {
                     participantInsert.collect {
@@ -251,7 +263,8 @@ class ChatRepository @Inject constructor(
                 repositoryScope.launch {
                     changeFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
-
+                        // conversationId filter is now enforced server-side; no client-side
+                        // if-check needed, but kept as a cheap safety guard.
                         if (dto.conversationId == conversationId) {
                             val exist = chatDAO.getMessageByServerId(dto.id ?: "")
                             if (exist == null) {
@@ -262,7 +275,7 @@ class ChatRepository @Inject constructor(
                                     senderId = dto.senderId.lowercase(),
                                     body = dto.body,
                                     imageUrl = dto.imageUrl,
-                                    isSystem = dto.isSystem, // Giữ cờ system để UI nhận diện tin nhắn ví/quỹ
+                                    isSystem = dto.isSystem,
                                     syncStatus = MessageSyncStatus.SENT,
                                     createdAt = parseServerTimeToLong(dto.createdAt)
                                 )
@@ -293,21 +306,15 @@ class ChatRepository @Inject constructor(
 
                 repositoryScope.launch {
                     walletUpdateFlow.collect {
-
                         _walletUpdateSignal.tryEmit(conversationId)
                     }
                 }
 
                 repositoryScope.launch {
                     transactionInsertFlow.collect {
-
                         _walletUpdateSignal.tryEmit(conversationId)
                     }
                 }
-
-                channel.subscribe()
-                activeChannels[conversationId] = channel
-                println("Supabase Realtime: Đã mở cổng đồng bộ cho phòng $conversationId")
             } catch (e: Exception) {
                 println("Supabase Realtime Lỗi kết nối ban đầu: ${e.localizedMessage}")
                 handleRealtimeReconnect(conversationId)
