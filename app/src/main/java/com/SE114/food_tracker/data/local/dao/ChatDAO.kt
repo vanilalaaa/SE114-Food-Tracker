@@ -76,6 +76,9 @@ interface ChatDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConversation(conversation: Conversation)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertConversations(conversations: List<Conversation>)
+
     /**
      * All conversations the user participates in, joined with their read timestamp
      * so the UI can show the unread dot without extra computation.

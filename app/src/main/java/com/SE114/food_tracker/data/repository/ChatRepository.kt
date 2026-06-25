@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.withTimeout
+import timber.log.Timber
 
 @Singleton
 class ChatRepository @Inject constructor(
@@ -190,33 +191,31 @@ class ChatRepository @Inject constructor(
             val currentUserId = getAuthenticatedUserId()
             if (currentUserId.isBlank()) return
 
-            val myParticipations = supabaseClient.from("conversation_participant")
-                .select {
-                    filter { eq("user_id", currentUserId) }
-                }.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>()
+            val convIds = supabaseClient.from("conversation_participant")
+                .select { filter { eq("user_id", currentUserId) } }
+                .decodeList<SupabaseParticipantDto>()
+                .map { it.conversationId }
+                .distinct()
+            if (convIds.isEmpty()) return
 
-            myParticipations.forEach { part ->
-                val convId =
-                    part["conversation_id"]?.toString()?.replace("\"", "") ?: return@forEach
-                try {
-                    val response = supabaseClient.from("conversation")
-                        .select {
-                            filter { eq("id", convId) }
-                        }.decodeSingle<SupabaseConversationDto>()
+            // One round-trip for every conversation the user belongs to, replacing the
+            // old per-row select loop (N+1).
+            val conversations = supabaseClient.from("conversation")
+                .select { filter { isIn("id", convIds) } }
+                .decodeList<SupabaseConversationDto>()
 
-                    val localConversation = LocalConversation(
-                        id = response.id,
-                        name = response.name ?: "Trò chuyện 1-1",
-                        isGroup = response.isGroup,
-                        walletId = response.walletId ?: "wallet_default"
+            chatDAO.insertConversations(
+                conversations.map { dto ->
+                    LocalConversation(
+                        id       = dto.id,
+                        name     = dto.name ?: "Trò chuyện 1-1",
+                        isGroup  = dto.isGroup,
+                        walletId = dto.walletId ?: "wallet_default"
                     )
-                    chatDAO.insertConversation(localConversation)
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
-            }
+            )
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.tag("Chat").e(e, "fetchAndSaveConversationsToLocal failed")
         }
     }
 
