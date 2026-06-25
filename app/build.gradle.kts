@@ -100,7 +100,8 @@ dependencies {
     implementation(libs.supabase.auth)
     implementation(libs.supabase.realtime)
     implementation(libs.supabase.storage)
-    implementation(libs.ktor.client.android)
+    implementation(libs.supabase.functions)
+    implementation(libs.ktor.client.okhttp)
 
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
