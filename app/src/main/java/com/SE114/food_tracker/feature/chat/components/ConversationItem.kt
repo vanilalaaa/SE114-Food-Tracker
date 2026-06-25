@@ -1,5 +1,7 @@
 package com.SE114.food_tracker.feature.chat.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,14 +20,32 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.*
-import com.SE114.food_tracker.data.local.entities.Conversation
+import com.SE114.food_tracker.data.local.dao.ConversationWithUnread
 
 @Composable
 fun ConversationItem(
-    conversation: Conversation,
+    conversation: ConversationWithUnread,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isUnread = conversation.isUnread
+
+    // Animate the dot color so the transition feels smooth
+    val dotAlpha by animateColorAsState(
+        targetValue = if (isUnread) StatPinkDark else Color.Transparent,
+        animationSpec = tween(durationMillis = 300),
+        label = "unread_dot"
+    )
+
+    val snippetColor = if (isUnread) TextPrimary else TextLabelGray
+    val snippetWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal
+    val nameWeight = if (isUnread) FontWeight.Bold else FontWeight.SemiBold
+
+    val snippet = when {
+        conversation.lastMessageSnippet.isNullOrBlank() -> "Nhấp để xem tin nhắn..."
+        else -> conversation.lastMessageSnippet
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -32,7 +53,7 @@ fun ConversationItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Avatar tròn tone màu pastel xinh xắn
+        // Avatar
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -50,32 +71,36 @@ fun ConversationItem(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // 2. Phần nội dung Tên và Snippet tin nhắn cuối cùng
+        // Name + snippet
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = conversation.name ?: "Không có tên",
                 fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = nameWeight,
                 color = Color.Black
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
-                text =  "Nhấp để xem tin nhắn...",
+                text = snippet,
                 fontSize = 13.sp,
-                color = TextLabelGray,
+                color = snippetColor,
+                fontWeight = snippetWeight,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
 
-        // 3. Dấu chấm tròn nhỏ màu hồng pastel báo trạng thái tin nhắn
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Unread dot — always sized, color animates to transparent when read
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(9.dp)
                 .clip(CircleShape)
-                .background(StatPinkDark)
+                .background(dotAlpha)
         )
     }
+
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp),
         thickness = 0.5.dp,
@@ -83,16 +108,36 @@ fun ConversationItem(
     )
 }
 
+// ── Previews ─────────────────────────────────────────────────────────────────
+
+private fun fakeConversation(
+    id: String,
+    name: String,
+    isGroup: Boolean,
+    isUnread: Boolean,
+    snippet: String? = null
+) = ConversationWithUnread(
+    id = id,
+    isGroup = isGroup,
+    name = name,
+    walletId = null,
+    lastMessageAt = if (isUnread) System.currentTimeMillis() else 0L,
+    lastMessageSnippet = snippet,
+    createdAt = System.currentTimeMillis(),
+    isUnread = isUnread
+)
+
 @Preview(showBackground = true)
 @Composable
-fun ConversationItem1On1Preview() {
+fun ConversationItemUnreadPreview() {
     FoodTrackerTheme {
         ConversationItem(
-            conversation = Conversation(
+            conversation = fakeConversation(
                 id = "1",
-                isGroup = false,
                 name = "Azun (Data)",
-                walletId = "w1"
+                isGroup = false,
+                isUnread = true,
+                snippet = "Ăn bún bò Huế đi!"
             ),
             onClick = {}
         )
@@ -101,14 +146,15 @@ fun ConversationItem1On1Preview() {
 
 @Preview(showBackground = true)
 @Composable
-fun ConversationItemGroupPreview() {
+fun ConversationItemReadPreview() {
     FoodTrackerTheme {
         ConversationItem(
-            conversation = Conversation(
+            conversation = fakeConversation(
                 id = "2",
+                name = "Quỹ Nhóm Food Tracker",
                 isGroup = true,
-                name = "Quỹ Nhóm 4 Food Tracker",
-                walletId = "w2"
+                isUnread = false,
+                snippet = "Hệ thống: Azun đã nộp 100,000 VND"
             ),
             onClick = {}
         )

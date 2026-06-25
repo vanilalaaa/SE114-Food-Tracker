@@ -60,6 +60,7 @@ fun ChatScreen(
             conversationState?.walletId?.isNotBlank() == true
 
     LaunchedEffect(conversationId) {
+        viewModel.connectToConversation(conversationId)
         viewModel.loadGroupMembers(conversationId)
     }
 
@@ -96,13 +97,10 @@ fun ChatScreen(
         },
 
         onSendMessage = { text ->
-            val realFriendId = conversationId
-
             viewModel.sendTextMessage(
-                conversationId = "", // Ép nó về rỗng để buộc hệ thống tạo phòng mới
+                conversationId = conversationId,
                 text = text,
-                isOneToOne = true,
-                friendUserId = realFriendId // Đẩy cái ID bị nhầm đó vào đúng chỗ
+                isOneToOne = false
             )
         },
         onSendImage = { imageUri ->
