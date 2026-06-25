@@ -1,7 +1,10 @@
 package com.SE114.food_tracker.feature.feed
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,6 +19,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,10 +29,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
+import java.net.URL
 import java.util.UUID
 import javax.inject.Inject
 
@@ -52,6 +59,8 @@ class FeedViewModel @Inject constructor(
     private val _isCreatingPost = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
     private val _currentUserId = MutableStateFlow(feedRepository.currentUserId())
+    private var realtimeRefreshJob: Job? = null
+    private var autoRefreshJob: Job? = null
 
     private val posts = combine(_page, _currentUserId) { page, currentUserId -> page to currentUserId }
         .flatMapLatest { (page, currentUserId) ->
@@ -62,8 +71,10 @@ class FeedViewModel @Inject constructor(
             )
         }
 
-    private val selectedComments = _selectedPostId.flatMapLatest { postId ->
-        if (postId == null) flowOf(emptyList()) else feedRepository.observeComments(postId)
+    private val selectedComments = combine(_selectedPostId, _currentUserId) { postId, currentUserId ->
+        postId to currentUserId
+    }.flatMapLatest { (postId, currentUserId) ->
+        if (postId == null) flowOf(emptyList()) else feedRepository.observeComments(postId, currentUserId)
     }
 
     val uiState: StateFlow<FeedUiState> =
@@ -115,6 +126,11 @@ class FeedViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = FeedUiState(isLoading = true)
             )
+
+    init {
+        subscribeToRealtimePosts()
+        startAutoRefresh()
+    }
 
     fun loadNextPage() {
         if (_isLoading.value || !uiState.value.canLoadMore) return
@@ -283,23 +299,92 @@ class FeedViewModel @Inject constructor(
     }
 
     private suspend fun refreshVisibleFeedAfterCreate() {
+        refreshVisibleFeedSilently("[FeedVM] Silent feed refresh after create failed")
+    }
+
+    private fun subscribeToRealtimePosts() {
+        feedRepository.subscribeToFeedRealtime()
+        viewModelScope.launch {
+            feedRepository.postRealtimeEvents.collect {
+                scheduleRealtimeRefresh()
+            }
+        }
+    }
+
+    private fun scheduleRealtimeRefresh() {
+        realtimeRefreshJob?.cancel()
+        realtimeRefreshJob = viewModelScope.launch {
+            delay(500)
+            refreshVisibleFeedSilently("[FeedVM] Realtime feed refresh failed")
+        }
+    }
+
+    private fun startAutoRefresh() {
+        if (autoRefreshJob != null) return
+
+        autoRefreshJob = viewModelScope.launch {
+            while (isActive) {
+                delay(AUTO_REFRESH_INTERVAL_MS)
+                if (canAutoRefreshFeed()) {
+                    refreshVisibleFeedSilently("[FeedVM] Auto feed refresh failed")
+                }
+            }
+        }
+    }
+
+    private fun canAutoRefreshFeed(): Boolean =
+        !_isLoading.value &&
+            !_isCreatingPost.value &&
+            !_isCreateSheetOpen.value
+
+    private suspend fun refreshVisibleFeedSilently(errorLogMessage: String) {
         runCatching {
             friendRepository.refreshCurrentProfile().getOrThrow()
             friendRepository.refreshFriendships().getOrThrow()
             syncCurrentUserId()
             feedRepository.refreshVisibleFromSupabase()
         }.onFailure { throwable ->
-            Timber.e(throwable, "[FeedVM] Silent feed refresh after create failed")
+            Timber.e(throwable, errorLogMessage)
         }
     }
 
     fun toggleLike(postId: String) {
         viewModelScope.launch {
             runCatching { feedRepository.toggleLike(postId) }
-                .onSuccess { SyncScheduler.triggerImmediateSync(context) }
+                .onSuccess {
+                    SyncScheduler.triggerImmediateSync(context)
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after like failed")
+                }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Toggle like failed")
                     _error.value = throwable.message ?: "Không cập nhật được lượt thích"
+                }
+        }
+    }
+
+    fun hidePost(postId: String) {
+        viewModelScope.launch {
+            runCatching { feedRepository.hidePost(postId) }
+                .onSuccess {
+                    closePostDetail()
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after post hide failed")
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Hide post failed")
+                    _error.value = throwable.message ?: "Không ẩn được bài viết"
+                }
+        }
+    }
+
+    fun downloadPostImage(post: FeedPostDto) {
+        viewModelScope.launch {
+            runCatching { savePostImageToGallery(post) }
+                .onSuccess {
+                    _error.value = "Đã tải ảnh về thư viện"
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Download post image failed")
+                    _error.value = throwable.message ?: "Không tải được ảnh"
                 }
         }
     }
@@ -316,6 +401,49 @@ class FeedViewModel @Inject constructor(
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Add comment failed")
                     _error.value = throwable.message ?: "Không gửi được bình luận"
+                }
+        }
+    }
+
+    fun editComment(commentId: String, body: String) {
+        if (body.isBlank()) return
+        viewModelScope.launch {
+            runCatching { feedRepository.editComment(commentId, body) }
+                .onSuccess {
+                    SyncScheduler.triggerImmediateSync(context)
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after comment edit failed")
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Edit comment failed")
+                    _error.value = throwable.message ?: "Không sửa được bình luận"
+                }
+        }
+    }
+
+    fun deleteComment(commentId: String) {
+        viewModelScope.launch {
+            runCatching { feedRepository.deleteComment(commentId) }
+                .onSuccess {
+                    SyncScheduler.triggerImmediateSync(context)
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after comment delete failed")
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Delete comment failed")
+                    _error.value = throwable.message ?: "Không xóa được bình luận"
+                }
+        }
+    }
+
+    fun setCommentHidden(commentId: String, isHidden: Boolean) {
+        viewModelScope.launch {
+            runCatching { feedRepository.setCommentHidden(commentId, isHidden) }
+                .onSuccess {
+                    SyncScheduler.triggerImmediateSync(context)
+                    refreshVisibleFeedSilently("[FeedVM] Refresh after comment visibility failed")
+                }
+                .onFailure { throwable ->
+                    Timber.e(throwable, "[FeedVM] Toggle comment visibility failed")
+                    _error.value = throwable.message ?: "KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c bÃ¬nh luáº­n"
                 }
         }
     }
@@ -371,4 +499,53 @@ class FeedViewModel @Inject constructor(
 
             Uri.fromFile(target).toString()
         }
+
+    private suspend fun savePostImageToGallery(post: FeedPostDto) {
+        val imageModel = post.imageUrl.feedImageModelOrNull()
+            ?: error("Bài viết này không có ảnh để tải.")
+
+        withContext(Dispatchers.IO) {
+            val bytes = when {
+                imageModel.startsWith("http", ignoreCase = true) ->
+                    URL(imageModel).openStream().use { it.readBytes() }
+
+                else -> {
+                    val uri = Uri.parse(imageModel)
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: error("Không đọc được ảnh bài viết.")
+                }
+            }
+
+            val filename = "food_tracker_${post.postId}.jpg"
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/FoodTracker")
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                }
+            }
+
+            val resolver = context.contentResolver
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: error("Không tạo được file ảnh trong thư viện.")
+
+            runCatching {
+                resolver.openOutputStream(uri)?.use { output -> output.write(bytes) }
+                    ?: error("Không ghi được ảnh vào thư viện.")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    values.clear()
+                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+                }
+            }.onFailure { throwable ->
+                resolver.delete(uri, null, null)
+                throw throwable
+            }.getOrThrow()
+        }
+    }
+
+    private companion object {
+        const val AUTO_REFRESH_INTERVAL_MS = 5_000L
+    }
 }

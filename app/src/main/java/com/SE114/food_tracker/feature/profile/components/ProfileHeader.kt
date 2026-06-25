@@ -53,16 +53,19 @@ fun ProfileHeader(
     onNavigateBack: () -> Unit,
     onRetry: () -> Unit,
     onReportClick: () -> Unit = {},
+    onFriendshipActionClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         ProfileHeaderTopBar(
             onNavigateBack = onNavigateBack,
-            showReportAction = !uiState.isSelf &&
+            showMenuAction = !uiState.isSelf &&
                 !uiState.isLoading &&
                 uiState.error == null &&
                 uiState.profile != null,
-            onReportClick = onReportClick
+            friendshipActionLabel = uiState.friendshipActionLabel,
+            onReportClick = onReportClick,
+            onFriendshipActionClick = onFriendshipActionClick
         )
 
         Spacer(Modifier.height(24.dp))
@@ -86,8 +89,10 @@ fun ProfileHeader(
 @Composable
 private fun ProfileHeaderTopBar(
     onNavigateBack: () -> Unit,
-    showReportAction: Boolean,
+    showMenuAction: Boolean,
+    friendshipActionLabel: String?,
     onReportClick: () -> Unit,
+    onFriendshipActionClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
@@ -126,7 +131,7 @@ private fun ProfileHeaderTopBar(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        if (showReportAction) {
+        if (showMenuAction) {
             Box {
                 IconButton(onClick = { isMenuExpanded = true }) {
                     Icon(
@@ -139,11 +144,29 @@ private fun ProfileHeaderTopBar(
                 DropdownMenu(
                     expanded = isMenuExpanded,
                     onDismissRequest = { isMenuExpanded = false },
-                    modifier = Modifier.width(104.dp),
+                    modifier = Modifier.width(156.dp),
                     shape = RoundedCornerShape(12.dp),
                     containerColor = Color.White,
                     shadowElevation = 4.dp
                 ) {
+                    if (friendshipActionLabel != null) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = friendshipActionLabel,
+                                    color = Color.Black,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            colors = MenuDefaults.itemColors(textColor = Color.Black),
+                            contentPadding = PaddingValues(horizontal = 14.dp),
+                            onClick = {
+                                isMenuExpanded = false
+                                onFriendshipActionClick()
+                            }
+                        )
+                    }
                     DropdownMenuItem(
                         text = {
                             Text(

@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.SE114.food_tracker.data.local.entities.FeedComment
+import com.SE114.food_tracker.data.local.entities.FeedHiddenPost
 import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
 import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
@@ -63,6 +64,12 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND NOT EXISTS(
+            SELECT 1
+            FROM feed_hidden_post hp
+            WHERE hp.post_id = p.post_id
+                AND hp.user_id = :currentUserId
+        )
         AND (
             p.owner_id = :currentUserId
             OR p.visibility = 'public'
@@ -138,6 +145,12 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND NOT EXISTS(
+            SELECT 1
+            FROM feed_hidden_post hp
+            WHERE hp.post_id = p.post_id
+                AND hp.user_id = :currentUserId
+        )
         AND p.owner_id = :ownerId
         AND (
             p.owner_id = :currentUserId
@@ -177,14 +190,25 @@ interface FeedDAO {
             u.avatar_url AS avatarUrl,
             c.body AS body,
             c.parent_comment_id AS parentCommentId,
+            c.is_hidden AS isHidden,
             c.created_at AS createdAt
         FROM feed_comment c
         LEFT JOIN user_profile_cache u ON u.user_id = c.user_id
-        WHERE c.post_id = :postId AND c.is_deleted = 0
+        WHERE c.post_id = :postId
+            AND c.is_deleted = 0
+            AND (
+                c.is_hidden = 0
+                OR EXISTS(
+                    SELECT 1
+                    FROM feed_post p
+                    WHERE p.post_id = c.post_id
+                        AND p.owner_id = :currentUserId
+                )
+            )
         ORDER BY c.created_at ASC
         """
     )
-    fun observeComments(postId: String): Flow<List<FeedCommentDto>>
+    fun observeComments(postId: String, currentUserId: String): Flow<List<FeedCommentDto>>
 
     @Query(
         """
@@ -215,6 +239,9 @@ interface FeedDAO {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComment(comment: FeedComment)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHiddenPost(hiddenPost: FeedHiddenPost)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComments(comments: List<FeedComment>)
@@ -258,6 +285,9 @@ interface FeedDAO {
     @Query("SELECT * FROM feed_post WHERE post_id = :postId LIMIT 1")
     suspend fun getPostById(postId: String): FeedPost?
 
+    @Query("SELECT * FROM feed_comment WHERE comment_id = :commentId LIMIT 1")
+    suspend fun getCommentById(commentId: String): FeedComment?
+
     @Query("UPDATE feed_post SET image_url = :imageUrl, updated_at = :updatedAt WHERE post_id = :postId")
     suspend fun updatePostImageUrl(postId: String, imageUrl: String, updatedAt: Long = System.currentTimeMillis())
 
@@ -266,6 +296,19 @@ interface FeedDAO {
 
     @Query("DELETE FROM feed_post WHERE sync_status = 'SYNCED' AND post_id NOT IN (:remotePostIds)")
     suspend fun deleteSyncedPostsMissingFromRemote(remotePostIds: List<String>)
+
+    @Query(
+        """
+        UPDATE feed_post
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND post_id IN (:remotePostIds)
+        """
+    )
+    suspend fun softDeleteSyncedPostsByRemoteIds(
+        remotePostIds: List<String>,
+        updatedAt: Long = System.currentTimeMillis()
+    )
 
     @Query("UPDATE feed_post SET sync_status = 'SYNCED' WHERE post_id = :postId")
     suspend fun markPostSynced(postId: String)
@@ -279,11 +322,142 @@ interface FeedDAO {
     @Query("UPDATE feed_like SET sync_status = 'FAILED' WHERE like_id = :likeId")
     suspend fun markLikeFailed(likeId: String)
 
+    @Query(
+        """
+        UPDATE feed_like
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND is_deleted = 0
+        """
+    )
+    suspend fun softDeleteAllSyncedLikes(updatedAt: Long = System.currentTimeMillis())
+
+    @Query(
+        """
+        UPDATE feed_like
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND is_deleted = 0
+        AND like_id NOT IN (:remoteLikeIds)
+        """
+    )
+    suspend fun softDeleteSyncedLikesMissingFromRemote(
+        remoteLikeIds: List<String>,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query(
+        """
+        UPDATE feed_like
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE post_id = :postId
+        AND user_id = :userId
+        AND sync_status = 'SYNCED'
+        """
+    )
+    suspend fun softDeleteSyncedLikeByRemoteKey(
+        postId: String,
+        userId: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
     @Query("UPDATE feed_comment SET sync_status = 'SYNCED' WHERE comment_id = :commentId")
     suspend fun markCommentSynced(commentId: String)
 
     @Query("UPDATE feed_comment SET sync_status = 'FAILED' WHERE comment_id = :commentId")
     suspend fun markCommentFailed(commentId: String)
+
+    @Query(
+        """
+        UPDATE feed_comment
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        """
+    )
+    suspend fun softDeleteAllSyncedComments(updatedAt: Long = System.currentTimeMillis())
+
+    @Query(
+        """
+        UPDATE feed_comment
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND comment_id NOT IN (:remoteCommentIds)
+        """
+    )
+    suspend fun softDeleteSyncedCommentsMissingFromRemote(
+        remoteCommentIds: List<String>,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query(
+        """
+        UPDATE feed_comment
+        SET body = :body, sync_status = 'PENDING', updated_at = :updatedAt
+        WHERE comment_id = :commentId AND user_id = :userId AND is_deleted = 0
+        """
+    )
+    suspend fun updateCommentBody(
+        commentId: String,
+        userId: String,
+        body: String,
+        updatedAt: Long = System.currentTimeMillis()
+    ): Int
+
+    @Query(
+        """
+        WITH RECURSIVE comment_tree(comment_id) AS (
+            SELECT comment_id
+            FROM feed_comment
+            WHERE comment_id = :commentId
+                AND user_id = :currentUserId
+                AND is_deleted = 0
+
+            UNION ALL
+
+            SELECT child.comment_id
+            FROM feed_comment child
+            INNER JOIN comment_tree parent ON child.parent_comment_id = parent.comment_id
+            WHERE child.is_deleted = 0
+        )
+        UPDATE feed_comment
+        SET is_deleted = 1,
+            sync_status = CASE
+                WHEN comment_id = :commentId THEN 'PENDING'
+                ELSE 'SYNCED'
+            END,
+            updated_at = :updatedAt
+        WHERE comment_id IN (SELECT comment_id FROM comment_tree)
+        """
+    )
+    suspend fun softDeleteCommentThread(
+        commentId: String,
+        currentUserId: String,
+        updatedAt: Long = System.currentTimeMillis()
+    ): Int
+
+    @Query(
+        """
+        UPDATE feed_comment
+        SET is_hidden = :isHidden,
+            hidden_at = CASE WHEN :isHidden THEN :updatedAt ELSE NULL END,
+            sync_status = 'SYNCED',
+            updated_at = :updatedAt
+        WHERE comment_id = :commentId
+        AND is_deleted = 0
+        AND EXISTS(
+            SELECT 1
+            FROM feed_post p
+            WHERE p.post_id = feed_comment.post_id
+                AND p.owner_id = :currentUserId
+        )
+        """
+    )
+    suspend fun setCommentHidden(
+        commentId: String,
+        currentUserId: String,
+        isHidden: Boolean,
+        updatedAt: Long = System.currentTimeMillis()
+    ): Int
 
     @Query(
         """

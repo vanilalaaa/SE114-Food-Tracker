@@ -12,16 +12,27 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.RealtimeChannel
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -32,6 +43,11 @@ class FriendRepository @Inject constructor(
     private val friendDao: FriendDAO,
     private val supabaseClient: SupabaseClient
 ) {
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var friendshipRealtimeChannel: RealtimeChannel? = null
+    private val _friendshipRealtimeEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val friendshipRealtimeEvents: SharedFlow<Unit> = _friendshipRealtimeEvents.asSharedFlow()
+
     private val _currentProfile = MutableStateFlow<ProfileDTO?>(null)
     val currentProfile: StateFlow<ProfileDTO?> = _currentProfile
 
@@ -47,6 +63,39 @@ class FriendRepository @Inject constructor(
 
     fun getOutgoingRequests(): Flow<List<FriendItemDto>> =
         currentProfileScoped { profile -> friendDao.getOutgoingRequests(profile.id) }
+
+    fun subscribeToFriendshipRealtime() {
+        repositoryScope.launch {
+            if (friendshipRealtimeChannel != null) return@launch
+
+            runCatching {
+                val channel = supabaseClient.channel("friendship_realtime")
+
+                val insertFlow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                    table = "friendship"
+                }
+                val updateFlow = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                    table = "friendship"
+                }
+                val deleteFlow = channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+                    table = "friendship"
+                }
+
+                repositoryScope.launch {
+                    insertFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    updateFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
+                }
+                repositoryScope.launch {
+                    deleteFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
+                }
+
+                channel.subscribe()
+                friendshipRealtimeChannel = channel
+            }
+        }
+    }
 
     suspend fun refreshCurrentProfile(): Result<ProfileDTO> = runCatching {
         val profile = fetchCurrentProfile()
@@ -68,15 +117,36 @@ class FriendRepository @Inject constructor(
             }
             .decodeList<FriendshipDTO>()
 
-        remoteFriendships.forEach { dto ->
+        val latestRemoteFriendships = remoteFriendships
+            .groupBy { friendshipPairKey(it.senderId, it.receiverId) }
+            .values
+            .mapNotNull { friendships ->
+                friendships.maxWithOrNull(
+                    compareBy<FriendshipDTO> { parseCreatedAt(it.createdAt) }
+                        .thenBy { it.id }
+                )
+            }
+
+        latestRemoteFriendships.forEach { dto ->
             val otherProfileId = if (dto.senderId == me.id) dto.receiverId else dto.senderId
             fetchProfileById(otherProfileId)?.let { friendDao.insertUserCache(it.toCacheEntity()) }
             friendDao.insertFriendship(dto.toEntity())
+            friendDao.softDeleteOtherFriendshipsBetween(
+                firstUserId = dto.senderId,
+                secondUserId = dto.receiverId,
+                keepFriendshipId = dto.id
+            )
         }
 
-        // A transient empty/incomplete friendship response should not hide every
-        // friends-only feed post from the local cache. Explicit unfriend/cancel
-        // actions still update the affected friendship immediately.
+        val remoteFriendshipIds = latestRemoteFriendships.map { it.id }
+        if (remoteFriendshipIds.isEmpty()) {
+            friendDao.softDeleteAllFriendshipsForUser(myUserId = me.id)
+        } else {
+            friendDao.softDeleteFriendshipsMissingFromRemote(
+                myUserId = me.id,
+                remoteFriendshipIds = remoteFriendshipIds
+            )
+        }
     }
 
     suspend fun acceptRequest(friendshipId: String): Result<Unit> =
@@ -86,10 +156,10 @@ class FriendRepository @Inject constructor(
         updateRemoteStatus(friendshipId, "declined")
 
     suspend fun unfriend(friendshipId: String): Result<Unit> =
-        deleteRemoteFriendship(friendshipId)
+        deleteRemoteFriendshipOptimistic(friendshipId)
 
     suspend fun cancelOutgoingRequest(friendshipId: String): Result<Unit> =
-        deleteRemoteFriendship(friendshipId)
+        deleteRemoteFriendshipOptimistic(friendshipId)
 
     suspend fun searchUser(searchUserId: String): Result<ProfileDTO> = runCatching {
         val me = requireCurrentProfile()
@@ -116,6 +186,11 @@ class FriendRepository @Inject constructor(
         return friendDao.getFriendshipBetween(me.id, profileId)?.status
     }
 
+    suspend fun friendshipWith(profileId: String): FriendshipEntity? {
+        val me = requireCurrentProfile()
+        return friendDao.getFriendshipBetween(me.id, profileId)
+    }
+
     suspend fun sendFriendRequest(targetProfileId: String): Result<Unit> = runCatching {
         val me = requireCurrentProfile()
         if (targetProfileId == me.id) {
@@ -126,25 +201,35 @@ class FriendRepository @Inject constructor(
         if (existing != null && existing.status != "declined") {
             error("Đã có lời mời hoặc đã là bạn bè.")
         }
+        if (existing != null) {
+            deleteRemoteFriendship(existing.friendshipId).getOrThrow()
+        }
 
         val targetProfile = fetchProfileById(targetProfileId)
             ?: error("Không tìm thấy người dùng này!")
         friendDao.insertUserCache(targetProfile.toCacheEntity())
 
-        val friendshipId = existing?.friendshipId ?: UUID.randomUUID().toString()
+        val reusableFriendship = friendDao.getFriendshipByDirection(me.id, targetProfileId)
+        val friendshipId = reusableFriendship?.friendshipId ?: UUID.randomUUID().toString()
         val entity = FriendshipEntity(
             friendshipId = friendshipId,
             senderId = me.id,
             receiverId = targetProfileId,
             status = "pending",
-            syncStatus = "SYNCED",
+            syncStatus = "PENDING",
             isDeleted = false,
-            createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+            createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()
         )
 
-        supabaseClient.postgrest.from("friendship").upsert(entity.toWriteDto())
         friendDao.insertFriendship(entity)
+        runCatching {
+            supabaseClient.postgrest.from("friendship").upsert(entity.toWriteDto())
+            friendDao.updateFriendshipStatus(friendshipId, "pending", syncStatus = "SYNCED")
+        }.onFailure { throwable ->
+            friendDao.softDeleteFriendship(friendshipId, syncStatus = "FAILED")
+            throw throwable
+        }.getOrThrow()
     }
 
     private fun currentProfileScoped(
@@ -184,6 +269,24 @@ class FriendRepository @Inject constructor(
             .select(profileColumns) { filter { eq("id", profileId) } }
             .decodeSingleOrNull<ProfileDTO>()
 
+    private suspend fun fetchFriendshipsBetween(firstUserId: String, secondUserId: String): List<FriendshipDTO> =
+        supabaseClient.postgrest.from("friendship")
+            .select {
+                filter {
+                    or {
+                        and {
+                            eq("sender_id", firstUserId)
+                            eq("receiver_id", secondUserId)
+                        }
+                        and {
+                            eq("sender_id", secondUserId)
+                            eq("receiver_id", firstUserId)
+                        }
+                    }
+                }
+            }
+            .decodeList<FriendshipDTO>()
+
     private suspend fun updateRemoteStatus(friendshipId: String, status: String): Result<Unit> =
         runCatching {
             val friendship = friendDao.getFriendshipById(friendshipId)
@@ -194,14 +297,56 @@ class FriendRepository @Inject constructor(
                 error("Không thể cập nhật lời mời này.")
             }
 
-            supabaseClient.postgrest.from("friendship").update(
-                {
-                    set("status", status)
+            friendDao.updateFriendshipStatus(friendshipId, status, syncStatus = "PENDING")
+            runCatching {
+                supabaseClient.postgrest.from("friendship").update(
+                    {
+                        set("status", status)
+                    }
+                ) {
+                    filter { eq("id", friendshipId) }
                 }
-            ) {
-                filter { eq("id", friendshipId) }
+                friendDao.updateFriendshipStatus(friendshipId, status, syncStatus = "SYNCED")
+            }.onFailure { throwable ->
+                friendDao.updateFriendshipStatus(friendshipId, friendship.status, syncStatus = "FAILED")
+                throw throwable
+            }.getOrThrow()
+        }
+
+    private suspend fun deleteRemoteFriendshipOptimistic(friendshipId: String): Result<Unit> =
+        runCatching {
+            val friendship = friendDao.getFriendshipById(friendshipId)
+                ?: error("Không tìm thấy kết bạn.")
+            val me = requireCurrentProfile()
+            if (friendship.senderId != me.id && friendship.receiverId != me.id) {
+                error("Không thể xóa kết bạn này.")
             }
-            friendDao.updateFriendshipStatus(friendshipId, status, syncStatus = "SYNCED")
+
+            friendDao.softDeleteFriendship(friendshipId, syncStatus = "PENDING")
+            val pairFriendships = fetchFriendshipsBetween(friendship.senderId, friendship.receiverId)
+            runCatching {
+                pairFriendships.forEach { remoteFriendship ->
+                    supabaseClient.postgrest.from("friendship").delete {
+                        filter { eq("id", remoteFriendship.id) }
+                    }
+                }
+                val stillExists = fetchFriendshipsBetween(friendship.senderId, friendship.receiverId).isNotEmpty()
+                if (stillExists) {
+                    error("Chưa xóa được kết bạn trên server.")
+                }
+                friendDao.softDeleteFriendshipsBetween(
+                    firstUserId = friendship.senderId,
+                    secondUserId = friendship.receiverId,
+                    syncStatus = "SYNCED"
+                )
+            }.onFailure { throwable ->
+                friendDao.restoreFriendshipStatus(
+                    friendshipId = friendship.friendshipId,
+                    newStatus = friendship.status,
+                    syncStatus = "FAILED"
+                )
+                throw throwable
+            }.getOrThrow()
         }
 
     private suspend fun deleteRemoteFriendship(friendshipId: String): Result<Unit> =
@@ -213,19 +358,21 @@ class FriendRepository @Inject constructor(
                 error("Không thể xóa kết bạn này.")
             }
 
-            supabaseClient.postgrest.from("friendship").delete {
-                filter { eq("id", friendshipId) }
-            }
-            val stillExists = supabaseClient.postgrest.from("friendship")
-                .select {
-                    filter { eq("id", friendshipId) }
+            val pairFriendships = fetchFriendshipsBetween(friendship.senderId, friendship.receiverId)
+            pairFriendships.forEach { remoteFriendship ->
+                supabaseClient.postgrest.from("friendship").delete {
+                    filter { eq("id", remoteFriendship.id) }
                 }
-                .decodeList<FriendshipDTO>()
-                .isNotEmpty()
+            }
+            val stillExists = fetchFriendshipsBetween(friendship.senderId, friendship.receiverId).isNotEmpty()
             if (stillExists) {
                 error("Chưa xóa được kết bạn trên server.")
             }
-            friendDao.softDeleteFriendship(friendshipId, syncStatus = "SYNCED")
+            friendDao.softDeleteFriendshipsBetween(
+                firstUserId = friendship.senderId,
+                secondUserId = friendship.receiverId,
+                syncStatus = "SYNCED"
+            )
         }
 
     private fun ProfileDTO.toCacheEntity(): UserProfileCacheEntity =
@@ -260,6 +407,13 @@ class FriendRepository @Inject constructor(
     private fun parseCreatedAt(value: String): Long =
         runCatching { Instant.parse(value).toEpochMilliseconds() }
             .getOrDefault(Clock.System.now().toEpochMilliseconds())
+
+    private fun friendshipPairKey(firstUserId: String, secondUserId: String): String =
+        if (firstUserId <= secondUserId) {
+            "$firstUserId:$secondUserId"
+        } else {
+            "$secondUserId:$firstUserId"
+        }
 
     private companion object {
         const val AUTH_SESSION_WAIT_MS = 3_000L
