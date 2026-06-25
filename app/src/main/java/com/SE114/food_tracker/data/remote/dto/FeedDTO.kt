@@ -30,5 +30,9 @@ data class FeedCommentRemoteDTO(
     @SerialName("author_id") val authorId: String,
     @SerialName("body") val body: String,
     @SerialName("parent_comment_id") val parentCommentId: String? = null,
-    @SerialName("created_at") val createdAt: String
+    @SerialName("is_deleted") val isDeleted: Boolean = false,
+    @SerialName("is_hidden") val isHidden: Boolean = false,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("deleted_at") val deletedAt: String? = null,
+    @SerialName("hidden_at") val hiddenAt: String? = null
 )

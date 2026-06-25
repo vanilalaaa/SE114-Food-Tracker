@@ -16,6 +16,7 @@ import com.SE114.food_tracker.data.local.entities.Message
 import com.SE114.food_tracker.data.local.entities.FriendshipEntity
 import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
 import com.SE114.food_tracker.data.local.entities.FeedComment
+import com.SE114.food_tracker.data.local.entities.FeedHiddenPost
 import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
 import com.SE114.food_tracker.data.local.dao.ChatDAO
@@ -34,9 +35,10 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         UserProfileCacheEntity::class,
         FeedPost::class,
         FeedLike::class,
-        FeedComment::class
+        FeedComment::class,
+        FeedHiddenPost::class
     ],
-    version = 13,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -84,6 +86,20 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE user_profile_cache ADD COLUMN profile_user_id TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE feed_comment ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE feed_comment ADD COLUMN hidden_at INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.createFeedHiddenPostTable()
             }
         }
     }
@@ -148,4 +164,20 @@ private fun SupportSQLiteDatabase.createFeedTables() {
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_user_id ON feed_comment(user_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_sync_status ON feed_comment(sync_status)")
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
+    createFeedHiddenPostTable()
+}
+
+private fun SupportSQLiteDatabase.createFeedHiddenPostTable() {
+    execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS feed_hidden_post (
+            post_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            hidden_at INTEGER NOT NULL,
+            PRIMARY KEY(post_id, user_id)
+        )
+        """.trimIndent()
+    )
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_hidden_post_user_id ON feed_hidden_post(user_id)")
 }

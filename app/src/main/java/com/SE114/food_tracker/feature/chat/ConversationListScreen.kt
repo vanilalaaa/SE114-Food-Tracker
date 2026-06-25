@@ -1,5 +1,7 @@
 package com.SE114.food_tracker.feature.chat
 
+import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -14,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -24,6 +28,7 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.Conversation
 import com.SE114.food_tracker.feature.chat.components.ConversationItem
 import com.SE114.food_tracker.feature.friend.FriendViewModel
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import java.util.UUID
 
 @Composable
@@ -33,6 +38,7 @@ fun ConversationListScreen(
     onConversationClick: (id: String, name: String) -> Unit = { _, _ -> },
     onBackClick: (() -> Unit)? = null
 ) {
+    // Luồng dữ liệu hứng Flow liên tục từ Room Local DB -> Tự động recompose vẽ lại UI lập tức khi có biến động Realtime!
     val conversationList by viewModel.getConversationsFlow().collectAsState(initial = emptyList())
 
     // Lắng nghe danh sách bạn bè thật (dạng List<ProfileDTO>) từ StateFlow
@@ -40,32 +46,58 @@ fun ConversationListScreen(
     var showCreateGroupDialog by remember { mutableStateOf(false) }
     var newGroupName by remember { mutableStateOf("") }
     val selectedMembers = remember { mutableStateListOf<String>() }
+
     val friendListCheck = remember(acceptedFriendsList) {
         acceptedFriendsList.map { friend ->
-
             val actualProfile = try {
-
-                friend::class.members.find { it.name == "profile" || it.name == "friendProfile" || it.name == "user" }?.call(friend)
-            } catch(e: Exception) { null }
+                friend::class.members.find { it.name == "profile" || it.name == "friendProfile" || it.name == "user" }
+                    ?.call(friend)
+            } catch (e: Exception) {
+                null
+            }
 
             val finalId = when {
                 actualProfile != null -> {
-
-                    val pId = try { actualProfile::class.members.find { it.name == "userId" }?.call(actualProfile) } catch(e: Exception) { null }
-                    pId ?: try { actualProfile::class.members.find { it.name == "id" }?.call(actualProfile) } catch(e: Exception) { null }
+                    val pId = try {
+                        actualProfile::class.members.find { it.name == "userId" }
+                            ?.call(actualProfile)
+                    } catch (e: Exception) {
+                        null
+                    }
+                    pId ?: try {
+                        actualProfile::class.members.find { it.name == "id" }?.call(actualProfile)
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
-                else -> {
 
-                    try { friend::class.members.find { it.name == "friendId" || it.name == "userId" || it.name == "id" }?.call(friend) } catch(e: Exception) { null }
+                else -> {
+                    try {
+                        friend::class.members.find { it.name == "friendId" || it.name == "userId" || it.name == "id" }
+                            ?.call(friend)
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
             }?.toString() ?: UUID.randomUUID().toString()
 
             val finalName = when {
                 actualProfile != null -> {
-                    try { actualProfile::class.members.find { it.name == "displayName" || it.name == "name" }?.call(actualProfile) } catch(e: Exception) { null }
+                    try {
+                        actualProfile::class.members.find { it.name == "displayName" || it.name == "name" }
+                            ?.call(actualProfile)
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
+
                 else -> {
-                    try { friend::class.members.find { it.name == "friendName" || it.name == "displayName" }?.call(friend) } catch(e: Exception) { null }
+                    try {
+                        friend::class.members.find { it.name == "friendName" || it.name == "displayName" }
+                            ?.call(friend)
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
             }?.toString() ?: "Thành viên nhóm"
 
@@ -80,7 +112,14 @@ fun ConversationListScreen(
                 selectedMembers.clear()
                 newGroupName = ""
             },
-            title = { Text("Nhóm Chat mới", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = StatPinkDark) },
+            title = {
+                Text(
+                    "Nhóm Chat mới",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = StatPinkDark
+                )
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -111,7 +150,11 @@ fun ConversationListScreen(
                                     modifier = Modifier.fillParentMaxSize(),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("Không tìm thấy bạn bè nào để thêm", color = HintGray, fontSize = 13.sp)
+                                    Text(
+                                        "Không tìm thấy bạn bè nào để thêm",
+                                        color = HintGray,
+                                        fontSize = 13.sp
+                                    )
                                 }
                             }
                         } else {
@@ -136,7 +179,11 @@ fun ConversationListScreen(
                                         colors = CheckboxDefaults.colors(checkedColor = StatPinkDark)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(text = friend.second, fontSize = 14.sp, color = TextPrimary)
+                                    Text(
+                                        text = friend.second,
+                                        fontSize = 14.sp,
+                                        color = TextPrimary
+                                    )
                                 }
                             }
                         }
@@ -148,7 +195,10 @@ fun ConversationListScreen(
                 Button(
                     onClick = {
                         if (isValid) {
-                            viewModel.createGroup(name = newGroupName, members = selectedMembers.toList())
+                            viewModel.createGroup(
+                                name = newGroupName,
+                                members = selectedMembers.toList()
+                            )
                             newGroupName = ""
                             selectedMembers.clear()
                             showCreateGroupDialog = false
@@ -181,10 +231,19 @@ fun ConversationListScreen(
 
     ConversationListScreenContent(
         conversationList = conversationList,
+        friendList = friendListCheck,
         onConversationClick = onConversationClick,
         onBackClick = onBackClick,
         onCreateGroupClick = {
             showCreateGroupDialog = true
+        },
+        onRefreshData = { onComplete ->
+            try {
+                viewModel.fetchConversationsFromServer()
+                onComplete()
+            } catch (e: Exception) {
+                onComplete()
+            }
         }
     )
 }
@@ -193,11 +252,42 @@ fun ConversationListScreen(
 @Composable
 fun ConversationListScreenContent(
     conversationList: List<Conversation>,
+    friendList: List<Pair<String, String>> = emptyList(),
     onConversationClick: (id: String, name: String) -> Unit,
     onBackClick: (() -> Unit)?,
     onCreateGroupClick: () -> Unit,
+    onRefreshData: (onComplete: () -> Unit) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var searchQuery by remember { mutableStateOf("") }
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    // Lọc phòng chat cũ đã từng nhắn tin
+    val filteredConversations = remember(searchQuery, conversationList) {
+        if (searchQuery.isBlank()) {
+            conversationList
+        } else {
+            conversationList.filter {
+                (it.name ?: "Người dùng").contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    // Lọc danh sách bạn bè mới CHƯA CÓ phòng chat để làm gợi ý Chat 1-1
+    val filteredNewFriends = remember(searchQuery, friendList, conversationList) {
+        if (searchQuery.isBlank()) {
+            emptyList()
+        } else {
+            val existingIds = conversationList.map { it.id }
+            friendList.filter { friend ->
+                friend.second.contains(searchQuery, ignoreCase = true) && !existingIds.contains(
+                    friend.first
+                )
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -226,37 +316,133 @@ fun ConversationListScreenContent(
         containerColor = MainBackground,
         modifier = modifier
     ) { innerPadding ->
-        if (conversationList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Chưa có cuộc hội thoại nào\n(Bấm nút ➕ góc trên để tạo nhóm)",
-                    color = TextLabelGray,
-                    textAlign = TextAlign.Center,
-                    fontSize = 14.sp
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(conversationList, key = { it.id }) { conversation ->
-                    ConversationItem(
-                        conversation = conversation,
-                        onClick = {
-                            onConversationClick(
-                                conversation.id,
-                                conversation.name ?: "Người dùng"
-                            )
-                        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Tìm kiếm phòng chat hoặc bạn bè...", fontSize = 14.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search Icon",
+                        tint = Color.Gray
                     )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(24.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CardWhite,
+                    unfocusedContainerColor = CardWhite,
+                    focusedBorderColor = StatPinkDark,
+                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                )
+            )
+
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    onRefreshData {
+                        isRefreshing = false
+                        Toast.makeText(
+                            context,
+                            "Đã cập nhật hội thoại mới nhất! 💬",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                if (filteredConversations.isEmpty() && filteredNewFriends.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (searchQuery.isBlank()) {
+                                "Chưa có cuộc hội thoại nào\n(Bấm nút ➕ góc trên để tạo nhóm)"
+                            } else {
+                                "Không tìm thấy phòng chat hay bạn bè nào khớp với \"$searchQuery\""
+                            },
+                            color = TextLabelGray,
+                            textAlign = TextAlign.Center,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        if (filteredConversations.isNotEmpty()) {
+                            if (searchQuery.isNotBlank()) {
+                                item {
+                                    Text(
+                                        text = "Cuộc trò chuyện hiện tại",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = StatPinkDark,
+                                        modifier = Modifier.padding(
+                                            horizontal = 16.dp,
+                                            vertical = 6.dp
+                                        )
+                                    )
+                                }
+                            }
+
+                            items(filteredConversations, key = { it.id }) { conversation ->
+                                ConversationItem(
+                                    conversation = conversation,
+                                    onClick = {
+                                        onConversationClick(
+                                            conversation.id,
+                                            conversation.name ?: "Người dùng"
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        if (filteredNewFriends.isNotEmpty()) {
+                            item {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Gợi ý bạn bè mới",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF4CAF50),
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                )
+                            }
+
+                            items(filteredNewFriends) { friend ->
+                                val mockConversation = remember(friend) {
+                                    Conversation(
+                                        id = friend.first,
+                                        name = friend.second,
+                                        isGroup = false,
+                                        walletId = null
+                                    )
+                                }
+                                ConversationItem(
+                                    conversation = mockConversation,
+                                    onClick = {
+                                        onConversationClick(friend.first, friend.second)
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -277,6 +463,7 @@ fun ConversationListScreenPreview() {
                     walletId = "w2"
                 )
             ),
+            friendList = listOf(Pair("3", "Thúy Vy"), Pair("4", "Hải Đăng")),
             onConversationClick = { _, _ -> },
             onBackClick = {},
             onCreateGroupClick = {}
