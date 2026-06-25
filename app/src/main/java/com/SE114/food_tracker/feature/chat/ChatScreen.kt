@@ -33,6 +33,7 @@ import com.SE114.food_tracker.feature.chat.components.GroupSettingsDialog
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import kotlinx.coroutines.launch
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 @Composable
 fun ChatScreen(
@@ -45,7 +46,6 @@ fun ChatScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Lấy dữ liệu Realtime sống từ Room DB cục bộ
     val conversationState by viewModel.getConversationState(conversationId).collectAsState(initial = null)
     val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
     val currentUserId = viewModel.currentUserId
@@ -59,80 +59,8 @@ fun ChatScreen(
         viewModel.loadGroupMembers(conversationId)
     }
 
-    // Hứng dữ liệu an toàn từ StateFlow tập trung của ViewModel
     val memberList by viewModel.groupMembers.collectAsState()
     val isAdmin by viewModel.isCurrentAdmin.collectAsState()
-
-    // State điều khiển Dialog nhập tên tạo Quỹ nhóm mới
-    var showCreateWalletDialog by remember { mutableStateOf(false) }
-    var walletNameInput by remember { mutableStateOf("") }
-
-    if (showCreateWalletDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateWalletDialog = false },
-            title = {
-                Text(
-                    "Khởi tạo Quỹ Nhóm Mới",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        "Nhập tên cho ví gắn liền với phòng chat này:",
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = walletNameInput,
-                        onValueChange = { walletNameInput = it },
-                        placeholder = { Text("Ví dụ: Quỹ Ăn Trưa $conversationName") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (walletNameInput.isNotBlank()) {
-                            viewModel.createGroupWallet(
-                                conversationId,
-                                walletNameInput
-                            ) { success ->
-                                if (success) {
-                                    Toast.makeText(
-                                        context,
-                                        "Khởi tạo Quỹ Nhóm thành công! 💰",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Lỗi tạo ví, vui lòng thử lại!",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                showCreateWalletDialog = false
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark)
-                ) {
-                    Text("Tạo Quỹ", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateWalletDialog = false }) {
-                    Text("Hủy", color = TextLabelGray)
-                }
-            },
-            containerColor = CardWhite,
-            shape = RoundedCornerShape(24.dp)
-        )
-    }
 
     ChatScreenContent(
         conversationId = conversationId,
@@ -142,12 +70,25 @@ fun ChatScreen(
         isGroup = isGroup,
         hasWallet = hasWallet,
         isAdmin = isAdmin,
-        memberList = memberList,
+        memberList = memberList.map { Pair(it.first, it.second) }, // Map Triple sang Pair cho khớp signature cũ nhe Vy
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {
-            walletNameInput = "Quỹ của ${conversationState?.name ?: conversationName}"
-            showCreateWalletDialog = true
+            viewModel.createGroupWallet(conversationId) { success ->
+                if (success) {
+                    Toast.makeText(
+                        context,
+                        "Khởi tạo Quỹ Nhóm thành công! 💰",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Lỗi tạo ví, vui lòng thử lại!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         },
         onSendMessage = { text ->
             viewModel.sendTextMessage(conversationId, text)
@@ -163,9 +104,13 @@ fun ChatScreen(
             viewModel.kickGroupMember(convId, userId, name)
             Toast.makeText(context, "Đã mời $name rời khỏi nhóm!", Toast.LENGTH_SHORT).show()
         },
+        onKickMemberWithResult = { convId, userId, name ->
+            viewModel.kickGroupMember(convId, userId, name)
+        },
         onRetryMessage = { messageEntity ->
             viewModel.retryFailedMessage(messageEntity)
-        }
+        },
+        viewModel = viewModel
     )
 }
 
@@ -188,18 +133,58 @@ fun ChatScreenContent(
     onRetryMessage: (com.SE114.food_tracker.data.local.entities.Message) -> Unit,
     onRenameGroup: (String, String) -> Unit,
     onKickMember: (String, String, String) -> Unit,
+    onKickMemberWithResult: ((String, String, String) -> Unit)? = null,
+    viewModel: ChatViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var textInput by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    // Ánh xạ danh sách mảng sang Map để tra cứu tên hiển thị động theo ID thần tốc
-    val memberMap = remember(memberList) { memberList.toMap() }
+    var memberToKick by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { onSendImage(it.toString()) }
+    }
+
+    if (memberToKick != null) {
+        AlertDialog(
+            onDismissRequest = { memberToKick = null },
+            title = {
+                Text("Xác nhận mời ra khỏi nhóm", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text("Bạn có chắc chắn muốn mời ${memberToKick?.second} rời khỏi nhóm Quỹ này không?", fontSize = 14.sp)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        memberToKick?.let { (userId, name) ->
+                            if (onKickMemberWithResult != null) {
+                                onKickMemberWithResult(conversationId, userId, name)
+                            } else {
+                                onKickMember(conversationId, userId, name)
+                            }
+                            Toast.makeText(context, "Đã mời $name rời khỏi nhóm!", Toast.LENGTH_SHORT).show()
+                        }
+                        memberToKick = null
+                        showSettingsDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark)
+                ) {
+                    Text("Đồng ý", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { memberToKick = null }) {
+                    Text("Hủy", color = TextLabelGray)
+                }
+            },
+            containerColor = CardWhite,
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 
     if (showSettingsDialog) {
@@ -212,7 +197,7 @@ fun ChatScreenContent(
                 showSettingsDialog = false
             },
             onKickMember = { userId, name ->
-                onKickMember(conversationId, userId, name)
+                memberToKick = Pair(userId, name)
             }
         )
     }
@@ -270,78 +255,87 @@ fun ChatScreenContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(top = innerPadding.calculateTopPadding())
+                .imePadding()
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                reverseLayout = true,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 16.dp, top = 16.dp)
+            var isRefreshing by remember { mutableStateOf(false) }
+
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    viewModel.refreshChatData(conversationId) {
+                        isRefreshing = false
+                    }
+                },
+                modifier = Modifier.weight(1f).fillMaxWidth()
             ) {
-                val reversedList = messageList.reversed()
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    reverseLayout = true,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp, top = 16.dp)
+                ) {
+                    val reversedList = messageList.reversed()
 
-                items(reversedList.size, key = { reversedList[it].localId }) { index ->
-                    val message = reversedList[index]
+                    items(reversedList.size, key = { reversedList[it].localId }) { index ->
+                        val message = reversedList[index]
 
-                    val isMine = message.senderId == myId ||
-                            message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
-                            message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED
+                        val isMine = message.senderId == myId ||
+                                message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
+                                message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED
 
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // Nếu là đối phương gửi và là phòng Chat Nhóm, hiển thị Tên hiển thị phía trên bong bóng
-                        if (!isMine && isGroup && !message.isSystem && message.senderId != "system") {
-                            val senderName = memberMap[message.senderId] ?: "Thành viên nhóm"
-                            Text(
-                                text = senderName,
-                                fontSize = 11.sp,
-                                color = Color.Gray,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 56.dp, bottom = 2.dp)
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
-                            verticalAlignment = Alignment.Bottom
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (!isMine && isGroup && message.senderId == "system") {
-                                Spacer(modifier = Modifier.width(44.dp))
+                            // 🔥 ĐA FIX TRIỆT ĐỂ LUỒNG TRỄ: UI lấy thẳng tên thật đã map hoàn chỉnh trong object tin nhắn truyền xuống
+                            if (!isMine && isGroup && !message.isSystem && message.senderId != "system") {
+                                Text(
+                                    text = message.senderName,
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(start = 56.dp, bottom = 2.dp)
+                                )
                             }
 
-                            // 🔥 ĐÃ FIX: Truyền thêm thuộc tính senderName lấy từ Map ra để MessageBubble tự sinh Avatar xịn
-                            val senderName = memberMap[message.senderId] ?: "Thành viên nhóm"
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                if (!isMine && isGroup && (message.isSystem || message.senderId == "system")) {
+                                    Spacer(modifier = Modifier.width(44.dp))
+                                }
 
-                            MessageBubble(
-                                message = message,
-                                isMine = isMine,
-                                senderName = senderName, // 🔥 TRUYỀN THÊM VÀO ĐÂY
-                                onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
-                            )
+                                MessageBubble(
+                                    message = message,
+                                    isMine = isMine,
+                                    senderName = message.senderName, // Truyền trực tiếp dữ liệu realtime
+                                    onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
+                                )
+                            }
                         }
-                    }
 
-                    val hasOlderMessage = index + 1 < reversedList.size
-                    val olderMessage = if (hasOlderMessage) reversedList[index + 1] else null
+                        val hasOlderMessage = index + 1 < reversedList.size
+                        val olderMessage = if (hasOlderMessage) reversedList[index + 1] else null
 
-                    if (olderMessage == null || message.dateLabel != olderMessage.dateLabel) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "— ${message.dateLabel} —",
-                                color = TextLabelGray,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                        if (olderMessage == null || message.dateLabel != olderMessage.dateLabel) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "— ${message.dateLabel} —",
+                                    color = TextLabelGray,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
@@ -354,9 +348,9 @@ fun ChatScreenContent(
             ) {
                 Row(
                     modifier = Modifier
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .navigationBarsPadding()
-                        .imePadding(),
+                        .fillMaxWidth()
+                        .background(MainBackground)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
@@ -400,7 +394,6 @@ fun ChatScreenContent(
         }
     }
 }
-
 @Preview(showSystemUi = true)
 @Composable
 fun ChatScreenPreview() {
@@ -434,7 +427,8 @@ fun ChatScreenPreview() {
             onSendImage = {},
             onRetryMessage = {},
             onRenameGroup = { _, _ -> },
-            onKickMember = { _, _, _ -> }
+            onKickMember = { _, _, _ -> },
+            viewModel = viewModel()
         )
     }
 }
