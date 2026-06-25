@@ -152,7 +152,6 @@ private fun SupportSQLiteDatabase.createFeedTables() {
             user_id TEXT NOT NULL,
             display_name TEXT NOT NULL,
             body TEXT NOT NULL,
-            parent_comment_id TEXT,
             sync_status TEXT NOT NULL DEFAULT 'PENDING',
             is_deleted INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL,
@@ -161,11 +160,8 @@ private fun SupportSQLiteDatabase.createFeedTables() {
         """.trimIndent()
     )
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_post_id ON feed_comment(post_id)")
-    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_user_id ON feed_comment(user_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_sync_status ON feed_comment(sync_status)")
-    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
-    createFeedHiddenPostTable()
 }
 
 private fun SupportSQLiteDatabase.createFeedHiddenPostTable() {
