@@ -26,6 +26,8 @@ import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.realtime.PostgresAction
 import io.github.jan.supabase.realtime.RealtimeChannel
 import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.decodeOldRecordOrNull
+import io.github.jan.supabase.realtime.decodeRecordOrNull
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.CoroutineScope
@@ -135,10 +137,19 @@ class FeedRepository @Inject constructor(
                     postInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
                 repositoryScope.launch {
-                    postUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                    postUpdateFlow.collect { action ->
+                        action.decodeRecordOrNull<FeedPostRemoteDTO>()
+                            ?.takeIf { it.isDeleted }
+                            ?.let { feedDao.softDeleteSyncedPostsByRemoteIds(listOf(it.id)) }
+                        _postRealtimeEvents.tryEmit(Unit)
+                    }
                 }
                 repositoryScope.launch {
-                    postDeleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                    postDeleteFlow.collect { action ->
+                        action.decodeOldRecordOrNull<FeedPostRemoteDTO>()
+                            ?.let { feedDao.softDeleteSyncedPostsByRemoteIds(listOf(it.id)) }
+                        _postRealtimeEvents.tryEmit(Unit)
+                    }
                 }
                 repositoryScope.launch {
                     commentInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
@@ -156,7 +167,16 @@ class FeedRepository @Inject constructor(
                     likeUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
                 repositoryScope.launch {
-                    likeDeleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
+                    likeDeleteFlow.collect { action ->
+                        action.decodeOldRecordOrNull<FeedLikeRemoteDTO>()
+                            ?.let {
+                                feedDao.softDeleteSyncedLikeByRemoteKey(
+                                    postId = it.postId,
+                                    userId = it.userId
+                                )
+                            }
+                        _postRealtimeEvents.tryEmit(Unit)
+                    }
                 }
 
                 channel.subscribe()
@@ -374,26 +394,23 @@ class FeedRepository @Inject constructor(
             }
 
             val remotePosts = supabaseClient.postgrest.from("post")
-                .select {
-                    filter {
-                        eq("is_deleted", false)
-                    }
-                }
+                .select()
                 .decodeList<FeedPostRemoteDTO>()
             val locallyDeletedPostIds = feedDao.getDeletedPostIds().toSet()
-            val visibleRemotePosts = remotePosts.filterNot { it.id in locallyDeletedPostIds }
+            val remoteDeletedPostIds = remotePosts
+                .filter { it.isDeleted }
+                .map { it.id }
+            val visibleRemotePosts = remotePosts
+                .filterNot { it.isDeleted }
+                .filterNot { it.id in locallyDeletedPostIds }
 
             val postEntities = visibleRemotePosts.map { dto ->
                 dto.toEntity(
                     ownerName = profiles[dto.authorId].displayNameOrFallback(dto.authorId)
                 )
             }
-            if (visibleRemotePosts.isEmpty()) {
-                feedDao.deleteAllSyncedPosts()
-            } else {
-                feedDao.deleteSyncedPostsMissingFromRemote(
-                    remotePostIds = visibleRemotePosts.map { it.id }
-                )
+            if (remoteDeletedPostIds.isNotEmpty()) {
+                feedDao.softDeleteSyncedPostsByRemoteIds(remoteDeletedPostIds)
             }
             if (postEntities.isNotEmpty()) {
                 feedDao.insertPosts(postEntities)
@@ -404,6 +421,13 @@ class FeedRepository @Inject constructor(
                 .decodeList<FeedLikeRemoteDTO>()
 
             val likeEntities = remoteLikes.map { it.toEntity() }
+            if (likeEntities.isEmpty()) {
+                feedDao.softDeleteAllSyncedLikes()
+            } else {
+                feedDao.softDeleteSyncedLikesMissingFromRemote(
+                    remoteLikeIds = likeEntities.map { it.likeId }
+                )
+            }
             if (likeEntities.isNotEmpty()) {
                 feedDao.insertLikes(likeEntities)
             }

@@ -22,6 +22,14 @@ interface FriendDAO {
 
     @Query("""
         SELECT * FROM friendship
+        WHERE sender_id = :senderId AND receiver_id = :receiverId
+        ORDER BY created_at DESC, updated_at DESC
+        LIMIT 1
+    """)
+    suspend fun getFriendshipByDirection(senderId: String, receiverId: String): FriendshipEntity?
+
+    @Query("""
+        SELECT * FROM friendship
         WHERE is_deleted = 0
         AND (
             (sender_id = :firstUserId AND receiver_id = :secondUserId)
@@ -85,6 +93,21 @@ interface FriendDAO {
 
     @Query("UPDATE friendship SET status = :newStatus, sync_status = :syncStatus, updated_at = :updatedAt WHERE friendship_id = :friendshipId")
     suspend fun updateFriendshipStatus(
+        friendshipId: String,
+        newStatus: String,
+        syncStatus: String = "PENDING",
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("""
+        UPDATE friendship
+        SET status = :newStatus,
+            sync_status = :syncStatus,
+            is_deleted = 0,
+            updated_at = :updatedAt
+        WHERE friendship_id = :friendshipId
+    """)
+    suspend fun restoreFriendshipStatus(
         friendshipId: String,
         newStatus: String,
         syncStatus: String = "PENDING",

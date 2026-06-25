@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
@@ -28,12 +29,14 @@ class ProfileViewModel @Inject constructor(
 
     private val profileId: String = savedStateHandle.get<String>("profileId").orEmpty()
     private var postsJob: Job? = null
+    private var realtimePostsJob: Job? = null
 
     private val _uiState = MutableStateFlow(ProfileUiState(isLoading = true))
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     init {
         loadProfile()
+        subscribeToPostRealtime()
     }
 
     fun loadProfile() {
@@ -129,6 +132,18 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    private fun subscribeToPostRealtime() {
+        if (realtimePostsJob != null) return
+
+        feedRepository.subscribeToFeedRealtime()
+        realtimePostsJob = viewModelScope.launch {
+            feedRepository.postRealtimeEvents.collect {
+                runCatching { feedRepository.refreshVisibleFromSupabase() }
+                    .onFailure { Timber.e(it, "[ProfileVM] Realtime profile posts refresh failed") }
+            }
+        }
+    }
+
     fun selectTab(tab: ProfileTab) {
         _uiState.update { it.copy(selectedTab = tab) }
     }
@@ -150,6 +165,7 @@ class ProfileViewModel @Inject constructor(
                     )
                 }
             }.onFailure { error ->
+                loadFriendship(profileId, profileRepository.currentAuthUserId())
                 _uiState.update {
                     it.copy(
                         isReportSubmitting = false,
@@ -167,6 +183,13 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isFriendshipActionSubmitting = true, reportMessage = null) }
+            _uiState.update {
+                it.copy(
+                    friendshipId = null,
+                    friendshipStatus = null,
+                    isFriendshipOutgoing = false
+                )
+            }
 
             val result = when (state.friendshipStatus) {
                 "accepted" -> friendRepository.unfriend(friendshipId)
@@ -183,9 +206,6 @@ class ProfileViewModel @Inject constructor(
             result.onSuccess {
                 _uiState.update {
                     it.copy(
-                        friendshipId = null,
-                        friendshipStatus = null,
-                        isFriendshipOutgoing = false,
                         isFriendshipActionSubmitting = false,
                         reportMessage = "Đã cập nhật lời mời kết bạn"
                     )
