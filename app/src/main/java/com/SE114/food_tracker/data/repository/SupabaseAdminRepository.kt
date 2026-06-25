@@ -32,6 +32,7 @@ class SupabaseAdminRepository @Inject constructor(
         @SerialName("display_name") val displayName: String? = null,
         @SerialName("user_id") val userId: String? = null,
         @SerialName("avatar_url") val avatarUrl: String? = null,
+        @SerialName("is_admin") val isAdmin: Boolean = false,
         @SerialName("is_banned") val isBanned: Boolean = false,
         @SerialName("deleted_at") val deletedAt: String? = null,
         @SerialName("created_at") val createdAt: String? = null
@@ -86,6 +87,7 @@ class SupabaseAdminRepository @Inject constructor(
                     displayName = it.displayName,
                     userId = it.userId,
                     avatarUrl = it.avatarUrl,
+                    isAdmin = it.isAdmin,
                     isBanned = it.isBanned,
                     isDeleted = it.deletedAt != null
                 )
@@ -104,6 +106,23 @@ class SupabaseAdminRepository @Inject constructor(
                     buildJsonObject {
                         put("p_target", targetId)
                         put("p_banned", banned)
+                    }
+                )
+                Unit
+            }.fold(
+                onSuccess = { AuthOutcome.Success(Unit) },
+                onFailure = { AuthOutcome.Failure(it.toAdminError()) }
+            )
+        }
+
+    override suspend fun setAdmin(targetId: String, admin: Boolean): AuthOutcome<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                db.rpc(
+                    "admin_set_admin",
+                    buildJsonObject {
+                        put("p_target", targetId)
+                        put("p_admin", admin)
                     }
                 )
                 Unit

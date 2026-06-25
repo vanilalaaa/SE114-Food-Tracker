@@ -14,6 +14,7 @@ data class AdminUser(
     val displayName: String?,
     val userId: String?,
     val avatarUrl: String?,
+    val isAdmin: Boolean,
     val isBanned: Boolean,
     val isDeleted: Boolean
 )
@@ -40,6 +41,9 @@ interface AdminRepository {
     suspend fun listUsers(search: String, limit: Int, offset: Int): AuthOutcome<List<AdminUser>>
     suspend fun setBanned(targetId: String, banned: Boolean): AuthOutcome<Unit>
     suspend fun setDeleted(targetId: String, deleted: Boolean): AuthOutcome<Unit>
+
+    /** Grant or revoke admin rights on [targetId]. */
+    suspend fun setAdmin(targetId: String, admin: Boolean): AuthOutcome<Unit>
     suspend fun listReports(status: String, limit: Int, offset: Int): AuthOutcome<List<AdminReport>>
 
     /** [status] must be `"resolved"` or `"dismissed"`. */

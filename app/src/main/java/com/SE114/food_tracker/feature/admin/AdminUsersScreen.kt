@@ -51,7 +51,7 @@ import com.SE114.food_tracker.feature.admin.components.AdminTopBar
 import com.SE114.food_tracker.feature.admin.components.AdminUserRow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
-private enum class UserConfirmKind { BAN, DELETE }
+private enum class UserConfirmKind { BAN, DELETE, MAKE_ADMIN, REVOKE_ADMIN }
 private data class UserConfirm(val user: AdminUser, val kind: UserConfirmKind)
 
 @Composable
@@ -93,6 +93,13 @@ fun AdminUsersScreen(
         UserActionSheet(
             user = user,
             onDismiss = { selectedUser = null },
+            onAdminToggle = {
+                selectedUser = null
+                pendingConfirm = UserConfirm(
+                    user,
+                    if (user.isAdmin) UserConfirmKind.REVOKE_ADMIN else UserConfirmKind.MAKE_ADMIN
+                )
+            },
             onBanToggle = {
                 selectedUser = null
                 if (user.isBanned) viewModel.setBanned(user, false)
@@ -125,6 +132,23 @@ fun AdminUsersScreen(
                 cancelLabel = stringResource(R.string.admin_cancel),
                 destructive = true,
                 onConfirm = { pendingConfirm = null; viewModel.setDeleted(confirm.user, true) },
+                onDismiss = { pendingConfirm = null }
+            )
+            UserConfirmKind.MAKE_ADMIN -> ConfirmDialog(
+                title = stringResource(R.string.admin_make_admin_confirm_title),
+                body = stringResource(R.string.admin_make_admin_confirm_body, handle),
+                confirmLabel = stringResource(R.string.admin_confirm_make_admin),
+                cancelLabel = stringResource(R.string.admin_cancel),
+                onConfirm = { pendingConfirm = null; viewModel.setAdmin(confirm.user, true) },
+                onDismiss = { pendingConfirm = null }
+            )
+            UserConfirmKind.REVOKE_ADMIN -> ConfirmDialog(
+                title = stringResource(R.string.admin_revoke_admin_confirm_title),
+                body = stringResource(R.string.admin_revoke_admin_confirm_body, handle),
+                confirmLabel = stringResource(R.string.admin_confirm_revoke_admin),
+                cancelLabel = stringResource(R.string.admin_cancel),
+                destructive = true,
+                onConfirm = { pendingConfirm = null; viewModel.setAdmin(confirm.user, false) },
                 onDismiss = { pendingConfirm = null }
             )
         }
@@ -223,6 +247,7 @@ private fun AdminUsersContent(
 private fun UserActionSheet(
     user: AdminUser,
     onDismiss: () -> Unit,
+    onAdminToggle: () -> Unit,
     onBanToggle: () -> Unit,
     onDeleteToggle: () -> Unit
 ) {
@@ -245,6 +270,14 @@ private fun UserActionSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
+            AppButton(
+                text = stringResource(
+                    if (user.isAdmin) R.string.admin_action_revoke_admin else R.string.admin_action_make_admin
+                ),
+                onClick = onAdminToggle,
+                variant = if (user.isAdmin) AppButtonVariant.Secondary else AppButtonVariant.Primary,
+                modifier = Modifier.fillMaxWidth()
+            )
             AppButton(
                 text = stringResource(
                     if (user.isBanned) R.string.admin_action_unban else R.string.admin_action_ban
@@ -272,9 +305,9 @@ private fun AdminUsersContentPreview() {
         AdminUsersContent(
             state = AdminUsersUiState(
                 users = listOf(
-                    AdminUser("1", "An Nguyễn", "an.nguyen", null, isBanned = false, isDeleted = false),
-                    AdminUser("2", "Bảo Trần", "bao.tran", null, isBanned = true, isDeleted = false),
-                    AdminUser("3", "Chi Lê", "chi.le", null, isBanned = false, isDeleted = true)
+                    AdminUser("1", "An Nguyễn", "an.nguyen", null, isAdmin = true, isBanned = false, isDeleted = false),
+                    AdminUser("2", "Bảo Trần", "bao.tran", null, isAdmin = false, isBanned = true, isDeleted = false),
+                    AdminUser("3", "Chi Lê", "chi.le", null, isAdmin = false, isBanned = false, isDeleted = true)
                 )
             ),
             onBack = {},

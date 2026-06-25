@@ -9,9 +9,7 @@ import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
@@ -27,11 +25,6 @@ class SupabaseAuthRepository @Inject constructor(
     override fun currentSessionFlow(): Flow<SessionStatus> = auth.sessionStatus
 
     override fun hasSession(): Boolean = auth.currentUserOrNull() != null
-
-    override suspend fun awaitActiveSession(): Boolean =
-        withTimeoutOrNull(SESSION_SETTLE_TIMEOUT_MS) {
-            auth.sessionStatus.first { it is SessionStatus.Authenticated }
-        } != null
 
     override suspend fun signIn(email: String, password: String): AuthOutcome<Unit> = runAuth {
         auth.signInWith(Email) {
@@ -113,8 +106,4 @@ class SupabaseAuthRepository @Inject constructor(
                 onFailure = { AuthOutcome.Failure(it.toAuthError()) }
             )
         }
-
-    private companion object {
-        const val SESSION_SETTLE_TIMEOUT_MS = 3000L
-    }
 }

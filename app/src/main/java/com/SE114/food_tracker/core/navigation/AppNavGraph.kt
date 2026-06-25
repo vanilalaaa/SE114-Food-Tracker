@@ -59,16 +59,9 @@ fun AppNavGraph(
         }
     }
 
-    fun enterAdmin() {
-        navController.navigate(NavGraphs.ADMIN) {
-            popUpTo(navController.graph.id) { inclusive = true }
-        }
-    }
-
     fun navigatePostAuth(destination: PostAuthDestination) = when (destination) {
         PostAuthDestination.Diary -> enterMain()
         PostAuthDestination.CompleteProfile -> goToCompleteProfile()
-        PostAuthDestination.Admin -> enterAdmin()
     }
 
     NavHost(
@@ -200,7 +193,8 @@ fun AppNavGraph(
                 SettingsScreen(
                     onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) },
                     onNavigateToCategories = { navController.navigate(AppDestinations.CategoryManagement.route) },
-                    onChangePassword = { navController.navigate(AppDestinations.ChangePassword.route) }
+                    onChangePassword = { navController.navigate(AppDestinations.ChangePassword.route) },
+                    onNavigateToAdmin = { navController.navigate(AppDestinations.AdminDashboard.route) }
                 )
             }
 

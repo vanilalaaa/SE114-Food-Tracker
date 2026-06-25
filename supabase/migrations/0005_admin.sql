@@ -111,6 +111,30 @@ $$;
 revoke execute on function public.admin_set_ban(uuid, boolean) from public;
 grant execute on function public.admin_set_ban(uuid, boolean) to authenticated;
 
+-- Grant / revoke admin rights. is_admin is off the column UPDATE grant, so this
+-- definer RPC is the only way an admin can promote or demote another account.
+create or replace function public.admin_set_admin(p_target uuid, p_admin boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not exists (select 1 from public.profile
+                 where id = auth.uid() and is_admin = true) then
+    raise exception 'not_authorized';
+  end if;
+
+  update public.profile set is_admin = p_admin where id = p_target;
+  if not found then
+    raise exception 'target_not_found';
+  end if;
+end;
+$$;
+
+revoke execute on function public.admin_set_admin(uuid, boolean) from public;
+grant execute on function public.admin_set_admin(uuid, boolean) to authenticated;
+
 -- Soft-delete / restore a user (deleted_at timestamp).
 create or replace function public.admin_set_deleted(p_target uuid, p_deleted boolean)
 returns void
@@ -179,6 +203,7 @@ returns table (
   display_name text,
   user_id text,
   avatar_url text,
+  is_admin boolean,
   is_banned boolean,
   deleted_at timestamptz,
   created_at timestamptz
@@ -189,14 +214,16 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if not exists (select 1 from public.profile
-                 where id = auth.uid() and is_admin = true) then
+  -- Alias profile: the RETURNS TABLE OUT params (id, is_admin, ...) shadow unqualified column
+  -- names, so the gate must qualify its references or Postgres raises 42702 (ambiguous column).
+  if not exists (select 1 from public.profile pr
+                 where pr.id = auth.uid() and pr.is_admin = true) then
     raise exception 'not_authorized';
   end if;
 
   return query
     select p.id, p.display_name, p.user_id, p.avatar_url,
-           coalesce(p.is_banned, false), p.deleted_at, p.created_at
+           coalesce(p.is_admin, false), coalesce(p.is_banned, false), p.deleted_at, p.created_at
     from public.profile p
     where p_search is null
        or btrim(p_search) = ''
@@ -267,8 +294,10 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if not exists (select 1 from public.profile
-                 where id = auth.uid() and is_admin = true) then
+  -- Alias profile: the RETURNS TABLE OUT param `id` shadows an unqualified `id`, so the gate
+  -- must qualify its reference or Postgres raises 42702 (ambiguous column).
+  if not exists (select 1 from public.profile pr
+                 where pr.id = auth.uid() and pr.is_admin = true) then
     raise exception 'not_authorized';
   end if;
 

@@ -1,6 +1,7 @@
 package com.SE114.food_tracker.feature.admin.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,7 +51,16 @@ fun AdminUserRow(
             )
         }
         Spacer(Modifier.width(8.dp))
-        UserStatusBadge(user = user)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (user.isAdmin) {
+                AdminStatusBadge(
+                    text = stringResource(R.string.admin_status_admin),
+                    container = MaterialTheme.colorScheme.primaryContainer,
+                    content = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            UserStatusBadge(user = user)
+        }
     }
 }
 

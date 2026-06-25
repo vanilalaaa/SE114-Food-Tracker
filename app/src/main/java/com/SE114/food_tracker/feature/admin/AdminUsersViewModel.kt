@@ -84,6 +84,14 @@ class AdminUsersViewModel @Inject constructor(
         }
     }
 
+    fun setAdmin(user: AdminUser, admin: Boolean) =
+        runUserAction(user.id) {
+            when (val outcome = adminRepository.setAdmin(user.id, admin)) {
+                is AuthOutcome.Success -> updateUser(user.id) { it.copy(isAdmin = admin) }
+                is AuthOutcome.Failure -> _state.update { it.copy(actionError = outcome.error) }
+            }
+        }
+
     fun setBanned(user: AdminUser, banned: Boolean) =
         runUserAction(user.id) {
             when (val outcome = adminRepository.setBanned(user.id, banned)) {
