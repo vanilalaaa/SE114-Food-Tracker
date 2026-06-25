@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
 
 data class AdminUsersUiState(
     val search: String = "",
@@ -92,10 +94,24 @@ class AdminUsersViewModel @Inject constructor(
             }
         }
 
-    fun setBanned(user: AdminUser, banned: Boolean) =
+    /** [durationSeconds] applies only when [banned] is true; null = permanent. */
+    fun setBanned(user: AdminUser, banned: Boolean, durationSeconds: Long? = null) =
         runUserAction(user.id) {
-            when (val outcome = adminRepository.setBanned(user.id, banned)) {
-                is AuthOutcome.Success -> updateUser(user.id) { it.copy(isBanned = banned) }
+            when (val outcome = adminRepository.setBanned(user.id, banned, durationSeconds)) {
+                is AuthOutcome.Success -> {
+                    val until = if (banned && durationSeconds != null) {
+                        Clock.System.now().plus(durationSeconds.seconds).toString()
+                    } else {
+                        null
+                    }
+                    updateUser(user.id) {
+                        it.copy(
+                            isBanned = banned,
+                            bannedUntil = until,
+                            banCount = if (banned) it.banCount + 1 else it.banCount
+                        )
+                    }
+                }
                 is AuthOutcome.Failure -> _state.update { it.copy(actionError = outcome.error) }
             }
         }

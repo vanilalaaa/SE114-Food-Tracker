@@ -8,7 +8,12 @@ data class AdminDashboardStats(
     val pendingReports: Long
 )
 
-/** A user row as returned by `admin_list_users` (includes admin-only flags). */
+/**
+ * A user row as returned by `admin_list_users` (includes admin-only flags).
+ * [isBanned] is "currently banned" (permanent or a not-yet-expired temporary ban).
+ * [bannedUntil] is the expiry of a temporary ban (null = permanent or not banned);
+ * [banCount] is the lifetime number of bans applied to the account.
+ */
 data class AdminUser(
     val id: String,
     val displayName: String?,
@@ -16,7 +21,9 @@ data class AdminUser(
     val avatarUrl: String?,
     val isAdmin: Boolean,
     val isBanned: Boolean,
-    val isDeleted: Boolean
+    val isDeleted: Boolean,
+    val bannedUntil: String? = null,
+    val banCount: Int = 0
 )
 
 /** A report joined with reporter/target handles, from `admin_list_reports`. */
@@ -28,7 +35,9 @@ data class AdminReport(
     val targetHandle: String?,
     val reason: String,
     val status: String,
-    val createdAt: String?
+    val createdAt: String?,
+    val targetBanCount: Int = 0,
+    val targetBannedUntil: String? = null
 )
 
 /**
@@ -39,7 +48,13 @@ data class AdminReport(
 interface AdminRepository {
     suspend fun dashboardStats(): AuthOutcome<AdminDashboardStats>
     suspend fun listUsers(search: String, limit: Int, offset: Int): AuthOutcome<List<AdminUser>>
-    suspend fun setBanned(targetId: String, banned: Boolean): AuthOutcome<Unit>
+
+    /**
+     * Ban or unban [targetId]. When [banned] is true, [durationSeconds] sets a temporary ban
+     * (null = permanent); when false it lifts the ban ([durationSeconds] ignored). A successful
+     * ban also triggers the `notify-ban` email (best-effort — email failure does not fail the ban).
+     */
+    suspend fun setBanned(targetId: String, banned: Boolean, durationSeconds: Long?): AuthOutcome<Unit>
     suspend fun setDeleted(targetId: String, deleted: Boolean): AuthOutcome<Unit>
 
     /** Grant or revoke admin rights on [targetId]. */

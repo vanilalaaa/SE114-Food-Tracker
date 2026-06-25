@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.admin
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -116,13 +119,12 @@ fun AdminUsersScreen(
     pendingConfirm?.let { confirm ->
         val handle = confirm.user.userId ?: confirm.user.displayName.orEmpty()
         when (confirm.kind) {
-            UserConfirmKind.BAN -> ConfirmDialog(
-                title = stringResource(R.string.admin_ban_confirm_title),
-                body = stringResource(R.string.admin_ban_confirm_body, handle),
-                confirmLabel = stringResource(R.string.admin_confirm_ban),
-                cancelLabel = stringResource(R.string.admin_cancel),
-                destructive = true,
-                onConfirm = { pendingConfirm = null; viewModel.setBanned(confirm.user, true) },
+            UserConfirmKind.BAN -> BanDurationDialog(
+                userHandle = handle,
+                onPick = { duration ->
+                    pendingConfirm = null
+                    viewModel.setBanned(confirm.user, true, duration.seconds)
+                },
                 onDismiss = { pendingConfirm = null }
             )
             UserConfirmKind.DELETE -> ConfirmDialog(
@@ -296,6 +298,42 @@ private fun UserActionSheet(
             )
         }
     }
+}
+
+@Composable
+private fun BanDurationDialog(
+    userHandle: String,
+    onPick: (BanDuration) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.admin_cancel)) }
+        },
+        title = { Text(stringResource(R.string.admin_ban_duration_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.admin_ban_confirm_body, userHandle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                BanDuration.entries.forEach { duration ->
+                    Text(
+                        text = stringResource(duration.labelRes),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(duration) }
+                            .padding(vertical = 12.dp)
+                    )
+                }
+            }
+        }
+    )
 }
 
 @Preview(showBackground = true)

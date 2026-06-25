@@ -85,17 +85,17 @@ class AdminReportsViewModel @Inject constructor(
         }
     }
 
-    /** Resolve or dismiss [report]; when [alsoBanTarget] is set, ban the reported user too. */
-    fun resolve(report: AdminReport, status: String, alsoBanTarget: Boolean) {
+    /** Resolve or dismiss [report]; when [ban] is non-null, ban the reported user for that length first. */
+    fun resolve(report: AdminReport, status: String, ban: BanDuration?) {
         if (report.id in _state.value.busyIds) return
         _state.update { it.copy(busyIds = it.busyIds + report.id) }
         viewModelScope.launch {
             try {
-                if (alsoBanTarget) {
-                    when (val ban = adminRepository.setBanned(report.targetId, true)) {
+                if (ban != null) {
+                    when (val banOutcome = adminRepository.setBanned(report.targetId, true, ban.seconds)) {
                         is AuthOutcome.Success -> Unit
                         is AuthOutcome.Failure -> {
-                            _state.update { it.copy(actionError = ban.error) }
+                            _state.update { it.copy(actionError = banOutcome.error) }
                             return@launch
                         }
                     }

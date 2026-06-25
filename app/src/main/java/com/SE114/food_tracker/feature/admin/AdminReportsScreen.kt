@@ -1,6 +1,8 @@
 package com.SE114.food_tracker.feature.admin
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -87,9 +88,9 @@ fun AdminReportsScreen(
         ReportActionSheet(
             report = report,
             onDismiss = { selectedReport = null },
-            onResolve = { status, alsoBan ->
+            onResolve = { status, ban ->
                 selectedReport = null
-                viewModel.resolve(report, status, alsoBan)
+                viewModel.resolve(report, status, ban)
             }
         )
     }
@@ -222,9 +223,10 @@ private fun FilterChipItem(label: String, selected: Boolean, onClick: () -> Unit
 private fun ReportActionSheet(
     report: AdminReport,
     onDismiss: () -> Unit,
-    onResolve: (status: String, alsoBan: Boolean) -> Unit
+    onResolve: (status: String, ban: BanDuration?) -> Unit
 ) {
-    var alsoBan by remember(report.id) { mutableStateOf(false) }
+    // null = resolve/dismiss without banning; a value = ban the target for that length first.
+    var banDuration by remember(report.id) { mutableStateOf<BanDuration?>(null) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -249,25 +251,46 @@ private fun ReportActionSheet(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (report.targetBanCount > 0) {
+                Text(
+                    text = stringResource(R.string.admin_ban_count, report.targetBanCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
 
+            Text(
+                text = stringResource(R.string.admin_report_ban_label),
+                style = MaterialTheme.typography.titleSmall
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { alsoBan = !alsoBan },
-                verticalAlignment = Alignment.CenterVertically
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Checkbox(checked = alsoBan, onCheckedChange = { alsoBan = it })
-                Text(text = stringResource(R.string.admin_report_also_ban))
+                FilterChipItem(
+                    label = stringResource(R.string.admin_report_ban_none),
+                    selected = banDuration == null,
+                    onClick = { banDuration = null }
+                )
+                BanDuration.entries.forEach { duration ->
+                    FilterChipItem(
+                        label = stringResource(duration.labelRes),
+                        selected = banDuration == duration,
+                        onClick = { banDuration = duration }
+                    )
+                }
             }
 
             AppButton(
                 text = stringResource(R.string.admin_report_resolve),
-                onClick = { onResolve("resolved", alsoBan) },
+                onClick = { onResolve("resolved", banDuration) },
                 modifier = Modifier.fillMaxWidth()
             )
             AppButton(
                 text = stringResource(R.string.admin_report_dismiss),
-                onClick = { onResolve("dismissed", alsoBan) },
+                onClick = { onResolve("dismissed", banDuration) },
                 variant = AppButtonVariant.Secondary,
                 modifier = Modifier.fillMaxWidth()
             )

@@ -58,6 +58,13 @@ fun AdminReportRow(
             text = stringResource(R.string.admin_report_reason, reasonLabel(report.reason)),
             style = MaterialTheme.typography.bodyMedium
         )
+        if (report.targetBanCount > 0) {
+            Text(
+                text = stringResource(R.string.admin_ban_count, report.targetBanCount),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
         Text(
             text = formatReportTime(report.createdAt),
             style = MaterialTheme.typography.labelSmall,

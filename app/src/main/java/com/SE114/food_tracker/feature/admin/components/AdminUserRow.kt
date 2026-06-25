@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.SE114.food_tracker.R
 import com.SE114.food_tracker.data.repository.AdminUser
+import com.SE114.food_tracker.feature.admin.bannedUntilLabel
 
 @Composable
 fun AdminUserRow(
@@ -49,6 +50,7 @@ fun AdminUserRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            BanInfoLine(user = user)
         }
         Spacer(Modifier.width(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -62,6 +64,23 @@ fun AdminUserRow(
             UserStatusBadge(user = user)
         }
     }
+}
+
+@Composable
+private fun BanInfoLine(user: AdminUser) {
+    val parts = buildList {
+        if (user.banCount > 0) add(stringResource(R.string.admin_ban_count, user.banCount))
+        if (user.isBanned) add(bannedUntilLabel(user.bannedUntil))
+    }
+    if (parts.isEmpty()) return
+    Text(
+        text = parts.joinToString(" · "),
+        style = MaterialTheme.typography.labelSmall,
+        color = if (user.isBanned) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable

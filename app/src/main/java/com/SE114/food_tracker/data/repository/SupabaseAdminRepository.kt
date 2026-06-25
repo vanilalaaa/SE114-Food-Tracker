@@ -1,13 +1,17 @@
 package com.SE114.food_tracker.data.repository
 
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.postgrest.postgrest
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,6 +38,8 @@ class SupabaseAdminRepository @Inject constructor(
         @SerialName("avatar_url") val avatarUrl: String? = null,
         @SerialName("is_admin") val isAdmin: Boolean = false,
         @SerialName("is_banned") val isBanned: Boolean = false,
+        @SerialName("banned_until") val bannedUntil: String? = null,
+        @SerialName("ban_count") val banCount: Int = 0,
         @SerialName("deleted_at") val deletedAt: String? = null,
         @SerialName("created_at") val createdAt: String? = null
     )
@@ -47,6 +53,8 @@ class SupabaseAdminRepository @Inject constructor(
         @SerialName("target_id") val targetId: String,
         @SerialName("target_user_id") val targetUserId: String? = null,
         @SerialName("target_display_name") val targetDisplayName: String? = null,
+        @SerialName("target_ban_count") val targetBanCount: Int = 0,
+        @SerialName("target_banned_until") val targetBannedUntil: String? = null,
         @SerialName("reason") val reason: String,
         @SerialName("status") val status: String,
         @SerialName("created_at") val createdAt: String? = null
@@ -89,7 +97,9 @@ class SupabaseAdminRepository @Inject constructor(
                     avatarUrl = it.avatarUrl,
                     isAdmin = it.isAdmin,
                     isBanned = it.isBanned,
-                    isDeleted = it.deletedAt != null
+                    isDeleted = it.deletedAt != null,
+                    bannedUntil = it.bannedUntil,
+                    banCount = it.banCount
                 )
             }
         }.fold(
@@ -98,7 +108,11 @@ class SupabaseAdminRepository @Inject constructor(
         )
     }
 
-    override suspend fun setBanned(targetId: String, banned: Boolean): AuthOutcome<Unit> =
+    override suspend fun setBanned(
+        targetId: String,
+        banned: Boolean,
+        durationSeconds: Long?
+    ): AuthOutcome<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
                 db.rpc(
@@ -106,14 +120,37 @@ class SupabaseAdminRepository @Inject constructor(
                     buildJsonObject {
                         put("p_target", targetId)
                         put("p_banned", banned)
+                        // Omitted for unban / permanent ban → the RPC default (null = permanent).
+                        if (banned && durationSeconds != null) put("p_duration_seconds", durationSeconds)
                     }
                 )
                 Unit
             }.fold(
-                onSuccess = { AuthOutcome.Success(Unit) },
+                onSuccess = {
+                    if (banned) notifyBan(targetId, durationSeconds)
+                    AuthOutcome.Success(Unit)
+                },
                 onFailure = { AuthOutcome.Failure(it.toAdminError()) }
             )
         }
+
+    @Serializable
+    private data class NotifyBanBody(
+        @SerialName("target_id") val targetId: String,
+        @SerialName("duration_seconds") val durationSeconds: Long? = null
+    )
+
+    // Best-effort ban-notification email via the notify-ban Edge Function. A delivery failure is
+    // logged but never fails the ban itself — the account is already banned by the RPC above.
+    private suspend fun notifyBan(targetId: String, durationSeconds: Long?) {
+        runCatching {
+            client.functions.invoke(
+                function = "notify-ban",
+                body = NotifyBanBody(targetId, durationSeconds),
+                headers = Headers.build { append(HttpHeaders.ContentType, "application/json") }
+            )
+        }.onFailure { Timber.tag("Admin").e(it, "notify-ban email failed") }
+    }
 
     override suspend fun setAdmin(targetId: String, admin: Boolean): AuthOutcome<Unit> =
         withContext(Dispatchers.IO) {
@@ -171,7 +208,9 @@ class SupabaseAdminRepository @Inject constructor(
                     targetHandle = it.targetUserId ?: it.targetDisplayName,
                     reason = it.reason,
                     status = it.status,
-                    createdAt = it.createdAt
+                    createdAt = it.createdAt,
+                    targetBanCount = it.targetBanCount,
+                    targetBannedUntil = it.targetBannedUntil
                 )
             }
         }.fold(

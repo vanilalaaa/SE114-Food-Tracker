@@ -259,6 +259,14 @@
     <string name="admin_revoke_admin_confirm_title">Thu hồi quyền quản trị?</string>
     <string name="admin_revoke_admin_confirm_body">Thu hồi quyền quản trị của %1$s?</string>
     <string name="admin_confirm_revoke_admin">Thu hồi</string>
+    <string name="admin_ban_duration_title">Khóa trong bao lâu?</string>
+    <string name="admin_ban_duration_1d">24 giờ</string>
+    <string name="admin_ban_duration_1w">1 tuần</string>
+    <string name="admin_ban_duration_1mo">1 tháng</string>
+    <string name="admin_ban_duration_6mo">6 tháng</string>
+    <string name="admin_ban_duration_permanent">Vĩnh viễn</string>
+    <string name="admin_ban_count">Đã bị khóa %1$d lần</string>
+    <string name="admin_ban_until">Đến %1$s</string>
 
     <!-- Admin: reports -->
     <string name="admin_reports_filter_pending">Chờ xử lý</string>
@@ -275,4 +283,6 @@
     <string name="admin_report_resolve">Giải quyết</string>
     <string name="admin_report_dismiss">Bỏ qua</string>
     <string name="admin_report_also_ban">Đồng thời khóa người bị báo cáo</string>
+    <string name="admin_report_ban_label">Khóa người bị báo cáo</string>
+    <string name="admin_report_ban_none">Không khóa</string>
 </resources>
