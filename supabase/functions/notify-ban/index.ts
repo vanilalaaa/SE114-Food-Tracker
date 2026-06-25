@@ -4,18 +4,24 @@
 // this function only delivers the notification, so it re-checks the caller is an admin and
 // then reads the target's email with the service role (auth.users is not world-readable).
 //
+// Delivery is via Gmail SMTP, so a personal Gmail can be the sender without owning a domain.
+//
 // Deploy:  supabase functions deploy notify-ban
-// Secrets: supabase secrets set RESEND_API_KEY=...  BAN_EMAIL_FROM="Food Tracker <no-reply@your-domain>"
+// Secrets: supabase secrets set GMAIL_USER=you@gmail.com GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
 //   (SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY are injected automatically.)
-// RESEND_API_KEY must come from a verified Resend domain or sends will be rejected.
+// GMAIL_APP_PASSWORD is a Google "App Password" (16 chars), NOT the account password — it
+// requires 2-Step Verification enabled on the Google account. Gmail SMTP allows the `from`
+// to be your own address only (no domain verification needed) and caps at ~500 emails/day.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const BAN_EMAIL_FROM = Deno.env.get("BAN_EMAIL_FROM") ?? "Food Tracker <onboarding@resend.dev>";
+const GMAIL_USER = Deno.env.get("GMAIL_USER")!;
+const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD")!;
+const FROM_NAME = Deno.env.get("GMAIL_FROM_NAME") ?? "Food Tracker";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -65,18 +71,28 @@ Deno.serve(async (req) => {
     `<p>Trong thời gian bị khóa bạn sẽ không thể đăng nhập. Nếu cho rằng đây là nhầm lẫn, vui lòng liên hệ bộ phận hỗ trợ.</p>` +
     `<p>— Đội ngũ Food Tracker</p>`;
 
-  const resp = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
+  const client = new SMTPClient({
+    connection: {
+      hostname: "smtp.gmail.com",
+      port: 465,
+      tls: true,
+      auth: { username: GMAIL_USER, password: GMAIL_APP_PASSWORD },
     },
-    body: JSON.stringify({ from: BAN_EMAIL_FROM, to: email, subject, html }),
   });
 
-  if (!resp.ok) {
-    const detail = await resp.text();
-    return json({ error: "email_send_failed", detail }, 502);
+  try {
+    await client.send({
+      from: `${FROM_NAME} <${GMAIL_USER}>`,
+      to: email,
+      subject,
+      content: `Tài khoản Food Tracker của bạn đã bị khóa ${lockedFor} do vi phạm quy định cộng đồng.`,
+      html,
+    });
+  } catch (e) {
+    return json({ error: "email_send_failed", detail: String(e) }, 502);
+  } finally {
+    await client.close();
   }
+
   return json({ ok: true });
 });
