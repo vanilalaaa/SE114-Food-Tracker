@@ -71,15 +71,10 @@ fun ChatScreen(
 
     val isGroup = conversationState?.isGroup ?: false
     val hasWallet = conversationState?.walletId?.let { it != "wallet_default" && it.isNotBlank() } ?: false
-    // Logic tên: nếu 1-1 thì lấy tên đối phương từ memberList
-    val displayName = if (!isGroup) {
-        memberList.firstOrNull { it.first != currentUserId }?.second ?: conversationName
-    } else {
-        conversationState?.name ?: conversationName
-    }
+
     ChatScreenContent(
         conversationId = finalConvId,
-        conversationName = displayName,//conversationState?.name ?: conversationName,
+        conversationName = conversationState?.name ?: conversationName,
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,

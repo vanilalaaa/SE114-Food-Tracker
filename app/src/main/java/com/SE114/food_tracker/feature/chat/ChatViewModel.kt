@@ -103,12 +103,8 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    fun setActiveConversationId(id: String) {
-        _activeConversationId.value = id
-    }
     private val syncedConversations = mutableSetOf<String>()
     fun connectToConversation(conversationId: String) {
-        if (conversationId.isBlank()) return
         viewModelScope.launch {
             chatRepository.subscribeToChatRealtime(conversationId)
             if (!syncedConversations.contains(conversationId)) {
@@ -141,6 +137,31 @@ class ChatViewModel @Inject constructor(
         return chatRepository.getLocalConversation(conversationId)
     }
 
+    fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
+        connectToConversation(conversationId)
+
+        return chatRepository.getMessagesWithProfileStream(conversationId).map { joinEntities ->
+            joinEntities.map { entity ->
+                val finalName = when {
+                    entity.isSystem || entity.senderId == "system" -> "Hệ thống"
+                    !entity.cacheName.isNullOrBlank() -> entity.cacheName
+                    else -> "Thành viên"
+                }
+                MessageUiModel(
+                    localId = entity.id ?: java.util.UUID.randomUUID().toString(),
+                    senderId = entity.senderId ?: "",
+                    body = entity.body,
+                    imageUrl = entity.imageUrl,
+                    isSystem = entity.isSystem,
+                    syncStatus = entity.syncStatus,
+                    timeLabel = formatToTime(entity.createdAt),
+                    dateLabel = formatToDate(entity.createdAt),
+                    senderName = finalName,
+                    senderAvatarUrl = entity.cacheAvatar ?: ""
+                )
+            }
+        }
+    }
     // 1. Tạo một StateFlow để UI lắng nghe ID hiện tại
     private val _activeConversationId = MutableStateFlow<String?>(null)
     val activeConversationId = _activeConversationId.asStateFlow()
@@ -168,31 +189,7 @@ class ChatViewModel @Inject constructor(
            // connectToConversation(targetConvId)
         }
     }
-    fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
-        connectToConversation(conversationId)
 
-        return chatRepository.getMessagesWithProfileStream(conversationId).map { joinEntities ->
-            joinEntities.map { entity ->
-                val finalName = when {
-                    entity.isSystem || entity.senderId == "system" -> "Hệ thống"
-                    !entity.cacheName.isNullOrBlank() -> entity.cacheName
-                    else -> "Thành viên"
-                }
-                MessageUiModel(
-                    localId = entity.id ?: java.util.UUID.randomUUID().toString(),
-                    senderId = entity.senderId ?: "",
-                    body = entity.body,
-                    imageUrl = entity.imageUrl,
-                    isSystem = entity.isSystem,
-                    syncStatus = entity.syncStatus,
-                    timeLabel = formatToTime(entity.createdAt),
-                    dateLabel = formatToDate(entity.createdAt),
-                    senderName = finalName,
-                    senderAvatarUrl = entity.cacheAvatar ?: ""
-                )
-            }
-        }
-    }
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
             chatRepository.sendMessage(conversationId, currentUserId, body = null, imageUrl = imageUri)

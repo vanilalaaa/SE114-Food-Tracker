@@ -208,13 +208,11 @@ class ChatRepository @Inject constructor(
                         .select {
                             filter { eq("id", convId) }
                         }.decodeSingle<SupabaseConversationDto>()
-                    // Khi fetch từ Supabase về
-                    val profile = supabaseClient.from("profiles")
-                        .select { filter { eq("id", targetFriendId) } }.decodeSingleOrNull<ProfileNameDto>()
+
                     val localConversation = LocalConversation(
-                        id = convId,
-                        name = profile?.displayName ?: "Bạn mới",
-                        isGroup = false,
+                        id = response.id,
+                        name = response.name ?: "Trò chuyện 1-1",
+                        isGroup = response.isGroup,
                         walletId = response.walletId ?: "wallet_default"
                     )
                     chatDAO.insertConversation(localConversation)
@@ -552,11 +550,7 @@ class ChatRepository @Inject constructor(
             }
 
             val targetFriendId = friendUserId.lowercase()
-            val friendProfile = supabaseClient.from("profiles")
-                .select { filter { eq("id", targetFriendId) } }
-                .decodeSingleOrNull<SupabaseProfileDto>()
 
-            val friendName = friendProfile?.displayName ?: "Bạn mới"
             // 1. Tìm các phòng mà mình tham gia
             val myParticipations = supabaseClient.from("conversation_participant")
                 .select { filter { eq("user_id", currentUserId) } }
@@ -586,22 +580,13 @@ class ChatRepository @Inject constructor(
 
             // 3. Tạo mới nếu chưa tìm thấy
             val newChatUuid = UUID.randomUUID().toString()
-            // Lưu vào DB với tên thật thay vì null/Chat 1-1
-            val newConv = LocalConversation(
-                id = newChatUuid,
-                name = friendName, // <--- Đã lấy được tên thật!
-                isGroup = false,
-                walletId = "wallet_default"
-            )
-            chatDAO.insertConversation(newConv)
 
-            supabaseClient.from("conversation").insert(NewConversationDto(newChatUuid, false, friendName))
-            /* val newConv = NewConversationDto(
+            val newConv = NewConversationDto(
                 id = newChatUuid,
                 isGroup = false,
                 name = null
             )
-            supabaseClient.from("conversation").insert(newConv) */
+            supabaseClient.from("conversation").insert(newConv)
 
             val participantList = listOf(
                 SupabaseParticipantDto(newChatUuid, currentUserId, false),
@@ -609,6 +594,7 @@ class ChatRepository @Inject constructor(
             )
             supabaseClient.from("conversation_participant").insert(participantList)
 
+            println("DEBUG_SUCCESS: Insert thành công ID $newChatUuid")
             return newChatUuid
 
         } catch (e: Exception) {

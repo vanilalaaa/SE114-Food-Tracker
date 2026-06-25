@@ -83,7 +83,7 @@ interface ChatDAO {
      * Order: conversations with new messages first (lastMessageAt DESC),
      * then by creation date for conversations with no messages yet.
      */
-    /* @Query("""
+    @Query("""
         SELECT
             c.id,
             c.is_group,
@@ -102,19 +102,8 @@ interface ChatDAO {
         ORDER BY
             CASE WHEN c.last_message_at > 0 THEN c.last_message_at ELSE c.created_at END DESC
     """)
-    fun getAllConversationsWithUnread(currentUserId: String): Flow<List<ConversationWithUnread>> */
-    @Query("""
-    SELECT 
-        c.id, c.is_group, c.name, c.wallet_id, 
-        c.last_message_at, c.last_message_snippet, c.created_at,
-        CASE WHEN c.last_message_at > COALESCE(cp.last_read_at, 0) THEN 1 ELSE 0 END AS is_unread
-    FROM conversations c
-    INNER JOIN conversation_participants cp ON c.id = cp.conversation_id
-    WHERE cp.user_id = :currentUserId
-    GROUP BY c.id -- Tránh trùng lặp
-    ORDER BY c.last_message_at DESC
-""")
     fun getAllConversationsWithUnread(currentUserId: String): Flow<List<ConversationWithUnread>>
+
 
     /**
      * Plain conversation list (no unread info) — kept for backward-compat with
