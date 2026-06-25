@@ -48,6 +48,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.withTimeout
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import timber.log.Timber
 
 @Singleton
@@ -159,21 +161,11 @@ class ChatRepository @Inject constructor(
 
     private fun parseServerTimeToLong(serverTimeStr: String?): Long {
         if (serverTimeStr.isNullOrBlank()) return System.currentTimeMillis()
-        return try {
-            val sdf =
-                java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", java.util.Locale.US)
-            val date = sdf.parse(serverTimeStr)
-            date?.time ?: System.currentTimeMillis()
-        } catch (e: Exception) {
-            try {
-                val sdfBackup =
-                    java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:ssXXX", java.util.Locale.US)
-                val date = sdfBackup.parse(serverTimeStr)
-                date?.time ?: System.currentTimeMillis()
-            } catch (e2: Exception) {
-                System.currentTimeMillis()
-            }
-        }
+        return runCatching { Instant.parse(serverTimeStr).toEpochMilliseconds() }
+            // Postgres may render timestamptz space-separated ("2026-06-26 12:00:00+00")
+            // rather than ISO-8601 with a 'T'; normalise once before giving up.
+            .recoverCatching { Instant.parse(serverTimeStr.replace(' ', 'T')).toEpochMilliseconds() }
+            .getOrDefault(System.currentTimeMillis())
     }
 
     fun getAuthenticatedUserId(): String {
@@ -948,7 +940,7 @@ class ChatRepository @Inject constructor(
                 body           = message.body,
                 imageUrl       = finalImageUrl,
                 isSystem       = message.isSystem,
-                createdAt      = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", java.util.Locale.US).format(java.util.Date())
+                createdAt      = Clock.System.now().toString()
             )
 
             val channelReady = awaitChannelReady(message.conversationId, 2000)
