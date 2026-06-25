@@ -96,6 +96,22 @@ class ChatRepository @Inject constructor(
     )
 
     @Serializable
+    data class PurchaseRpcArgs(
+        @SerialName("p_wallet_id") val walletId: String,
+        @SerialName("p_amount")    val amount: Double,
+        @SerialName("p_note")      val note: String,
+        @SerialName("p_item_id")   @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+        val itemId: String? = null
+    )
+
+    /** Wallet info visible to the current user, with their role. */
+    data class WalletWithRole(
+        val walletId: String,
+        val walletName: String,
+        val role: String
+    )
+
+    @Serializable
     data class ProfileNameDto(
         @SerialName("display_name") val displayName: String? = null,
         @SerialName("avatar_url") val avatarUrl: String? = null
@@ -916,5 +932,108 @@ class ChatRepository @Inject constructor(
         val reloadingMessage = message.copy(syncStatus = MessageSyncStatus.PENDING)
         chatDAO.updateMessage(reloadingMessage)
         performNetworkSend(reloadingMessage)
+    }
+
+    // ── WALLET HELPERS ────────────────────────────────────────────────────────
+
+    /**
+     * Returns all wallets the current user is a member of, with their role.
+     * Used by DiaryViewModel to populate PaymentSourceSelector.
+     */
+    suspend fun getUserWalletsWithRoles(): List<WalletWithRole> {
+        return try {
+            val currentUserId = getAuthenticatedUserId()
+            if (currentUserId.isBlank()) return emptyList()
+
+            val memberships = supabaseClient.from("wallet_membership")
+                .select {
+                    filter { eq("user_id", currentUserId) }
+                }.decodeList<SupabaseWalletMembershipDto>()
+
+            memberships.mapNotNull { membership ->
+                runCatching {
+                    val wallet = supabaseClient.from("group_wallet")
+                        .select { filter { eq("id", membership.walletId) } }
+                        .decodeSingle<SupabaseGroupWalletDto>()
+                    WalletWithRole(
+                        walletId   = wallet.id,
+                        walletName = wallet.name,
+                        role       = membership.role
+                    )
+                }.getOrNull()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Fetch current balance for a wallet directly by walletId.
+     * Cheaper than going through conversation for the pre-check path.
+     */
+    suspend fun getWalletBalanceById(walletId: String): Double {
+        return try {
+            val wallet = supabaseClient.from("group_wallet")
+                .select { filter { eq("id", walletId) } }
+                .decodeSingle<Map<String, kotlinx.serialization.json.JsonElement>>()
+            wallet["balance"]?.toString()?.replace("\"", "")?.toDoubleOrNull() ?: 0.0
+        } catch (e: Exception) {
+            0.0
+        }
+    }
+
+    /**
+     * Called from DiaryViewModel after the item is saved locally.
+     * 1. Calls rpc_wallet_purchase (atomic balance deduct + transaction row).
+     * 2. Sends a system message with item image into the group chat.
+     *
+     * Returns Result.success on success, Result.failure with a descriptive
+     * exception when balance is insufficient or RPC fails.
+     */
+    suspend fun executePurchaseTransaction(
+        walletId:       String,
+        amount:         Double,
+        itemId:         String?,
+        note:           String,
+        imageUrl:       String? = null,
+        conversationId: String? = null
+    ): Result<Unit> = runCatching {
+        val currentUserId = getAuthenticatedUserId()
+
+        val rpcArgs = PurchaseRpcArgs(
+            walletId = walletId,
+            amount   = amount,
+            note     = note,
+            itemId   = null
+        )
+        // rpc_wallet_purchase raises a Postgres exception when balance is insufficient;
+        // the runCatching wrapper converts that into Result.failure automatically.
+        supabaseClient.postgrest.rpc(
+            function   = "rpc_wallet_purchase",
+            parameters = rpcArgs
+        )
+
+        // Phân giải conversationId từ wallet_id khi không được cung cấp
+        val convId = conversationId ?: runCatching {
+            supabaseClient.from("conversation")
+                .select { filter { eq("wallet_id", walletId) } }
+                .decodeSingle<SupabaseConversationDto>()
+                .id
+        }.getOrNull()
+
+        if (convId != null) {
+            val members = fetchGroupMembersFromServer(convId)
+            val actorName = members.find { it.first == currentUserId }?.second ?: "Thành viên"
+            val amountFormatted = String.format("%,.0f", amount)
+            val body = "$actorName đã mua \"$note\" từ quỹ nhóm — $amountFormatted VND"
+
+            sendMessage(
+                conversationId = convId,
+                senderId       = "system",
+                body           = body,
+                imageUrl       = imageUrl,  // item image shown in the chat bubble
+                isSystem       = true
+            )
+        }
     }
 }
