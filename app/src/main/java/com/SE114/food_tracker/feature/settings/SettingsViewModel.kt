@@ -3,12 +3,15 @@ package com.SE114.food_tracker.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.core.sync.LocalDataCleaner
+import com.SE114.food_tracker.data.repository.AuthOutcome
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.Profile
 import com.SE114.food_tracker.data.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,8 +26,18 @@ class SettingsViewModel @Inject constructor(
     val profile: StateFlow<Profile?> = profileRepository.observeMyProfile()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    // Gates the admin entry in Settings; the server re-checks is_admin on every admin RPC.
+    private val _isAdmin = MutableStateFlow(false)
+    val isAdmin: StateFlow<Boolean> = _isAdmin.asStateFlow()
+
     init {
         viewModelScope.launch { profileRepository.refreshMyProfile() }
+        viewModelScope.launch {
+            when (val outcome = profileRepository.amIAdmin()) {
+                is AuthOutcome.Success -> _isAdmin.value = outcome.data
+                is AuthOutcome.Failure -> Unit
+            }
+        }
     }
 
     /**

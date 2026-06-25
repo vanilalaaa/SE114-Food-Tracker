@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +13,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -56,13 +60,31 @@ private val AUTH_ROUTES = setOf(
 
 // complete_profile is post-auth but pre-onboarding: no bottom bar, but a dropped
 // session there should still bounce to login (so it stays out of the guard skip set).
-private val NO_BOTTOM_BAR_ROUTES = AUTH_ROUTES + AppDestinations.CompleteProfile.route
+// The admin graph is a separate area with its own back navigation — no bottom bar.
+private val NO_BOTTOM_BAR_ROUTES = AUTH_ROUTES + setOf(
+    AppDestinations.CompleteProfile.route,
+    AppDestinations.AdminDashboard.route,
+    AppDestinations.AdminUsers.route,
+    AppDestinations.AdminReports.route
+)
 
 @Composable
 fun MainScaffold() {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = hiltViewModel()
     val session by mainViewModel.sessionStatus.collectAsStateWithLifecycle()
+    val blockedReason by mainViewModel.blockedReason.collectAsStateWithLifecycle()
+
+    // Re-verify the account whenever the app returns to the foreground (e.g. an admin on
+    // another device just banned this user).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) mainViewModel.recheckActive()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // App-wide display-currency context: every price formats through this, so switching
     // the currency in Settings re-renders all amounts without mutating any stored value.
@@ -82,10 +104,11 @@ fun MainScaffold() {
     // FAB state lives here; DiaryScreen receives a callback to trigger the add flow
     var triggerDiaryAdd by remember { mutableStateOf(false) }
 
-    // Auth guard: if the session drops while inside the app, return to login and clear the back stack.
-    LaunchedEffect(session, currentRoute) {
+    // Auth guard: if the session drops while inside the app, return to login and clear the back
+    // stack. A non-null blockedReason (banned/soft-deleted sign-out) is carried to the Login screen.
+    LaunchedEffect(session, currentRoute, blockedReason) {
         if (session is SessionStatus.NotAuthenticated && currentRoute != null && currentRoute !in AUTH_ROUTES) {
-            navController.navigate(AppDestinations.Login.route) {
+            navController.navigate(AppDestinations.Login.createRoute(blockedReason)) {
                 popUpTo(navController.graph.id) { inclusive = true }
             }
         }
