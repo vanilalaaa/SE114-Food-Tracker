@@ -168,6 +168,11 @@
     <string name="profile_user_id_cooldown">Có thể đổi sau %1$d ngày</string>
     <string name="profile_save">Lưu</string>
     <string name="profile_edit_title">Chỉnh sửa hồ sơ</string>
+    <string name="profile_crop_title">Cắt ảnh đại diện</string>
+    <string name="profile_crop_instruction">Kéo để di chuyển, kéo góc để đổi kích thước</string>
+    <string name="profile_crop_cancel">Hủy</string>
+    <string name="profile_crop_confirm">Xong</string>
+    <string name="profile_crop_error">Không đọc được ảnh</string>
     <!-- Public profile -->
     <string name="profile_viewer_title">Profile</string>
     <string name="profile_menu_open">Mở menu</string>

@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.profile
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,13 +66,10 @@ fun MyProfileScreen(
     viewModel: MyProfileViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    var pickedAvatarUri by remember { mutableStateOf<Uri?>(null) }
 
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            if (bytes != null) viewModel.onAvatarPicked(bytes)
-        }
+        if (uri != null) pickedAvatarUri = uri
     }
 
     // A successful save returns to Settings, where the profile block reflects the change.
@@ -89,6 +90,17 @@ fun MyProfileScreen(
         onUserIdChange = viewModel::onUserIdChange,
         onSave = viewModel::save
     )
+
+    pickedAvatarUri?.let { uri ->
+        AvatarCropScreen(
+            imageUri = uri,
+            onCancel = { pickedAvatarUri = null },
+            onConfirm = { bytes ->
+                viewModel.onAvatarPicked(bytes)
+                pickedAvatarUri = null
+            }
+        )
+    }
 }
 
 @Composable
