@@ -85,6 +85,7 @@ class ChatRepository @Inject constructor(
         @SerialName("name") val name: String? = null,
         @SerialName("is_group") val isGroup: Boolean = false,
         @SerialName("wallet_id") val walletId: String? = null,
+        @SerialName("avatar_url") val avatarUrl: String? = null,
         @SerialName("last_message_at") val lastMessageAt: Long = 0L,
         @SerialName("last_message_snippet") val lastMessageSnippet: String? = null
     )
@@ -254,6 +255,7 @@ class ChatRepository @Inject constructor(
                     name               = dto.name ?: "Trò chuyện 1-1",
                     isGroup            = dto.isGroup,
                     walletId           = dto.walletId ?: prev?.walletId ?: "wallet_default",
+                    avatarUrl          = dto.avatarUrl ?: prev?.avatarUrl,
                     lastMessageAt      = if (keepLocalLast) prev?.lastMessageAt ?: 0L else dto.lastMessageAt,
                     lastMessageSnippet = if (keepLocalLast) prev?.lastMessageSnippet else dto.lastMessageSnippet,
                     createdAt          = prev?.createdAt ?: System.currentTimeMillis()
@@ -486,8 +488,9 @@ class ChatRepository @Inject constructor(
                             currentConv?.let {
                                 chatDAO.insertConversation(
                                     it.copy(
-                                        name     = updatedDto.name ?: it.name,
-                                        walletId = updatedDto.walletId ?: it.walletId
+                                        name      = updatedDto.name ?: it.name,
+                                        walletId  = updatedDto.walletId ?: it.walletId,
+                                        avatarUrl = updatedDto.avatarUrl ?: it.avatarUrl
                                     )
                                 )
                             }
@@ -917,6 +920,32 @@ class ChatRepository @Inject constructor(
 
             sendSystemMessage(conversationId, "Tên nhóm đã được đổi thành '$newName'")
         } catch (e: Exception) {
+        }
+    }
+
+    /** Upload a new group avatar and update server + local. Other members pick it up via the
+     *  conversation realtime UPDATE. Returns false on failure. */
+    suspend fun updateGroupAvatar(conversationId: String, imageUri: String): Boolean {
+        return try {
+            val bytes = context.contentResolver.openInputStream(android.net.Uri.parse(imageUri))
+                ?.use { it.readBytes() } ?: return false
+
+            val bucket = supabaseClient.storage.from("chat-images")
+            val fileName = "group_avatar_${conversationId}_${UUID.randomUUID()}.jpg"
+            bucket.upload(path = fileName, data = bytes) { upsert = true }
+            val publicUrl = bucket.publicUrl(fileName)
+
+            supabaseClient.from("conversation").update(mapOf("avatar_url" to publicUrl)) {
+                filter { eq("id", conversationId) }
+            }
+            chatDAO.getConversationById(conversationId).firstOrNull()?.let {
+                chatDAO.insertConversation(it.copy(avatarUrl = publicUrl))
+            }
+            sendSystemMessage(conversationId, "Ảnh đại diện nhóm đã được cập nhật.")
+            true
+        } catch (e: Exception) {
+            Timber.tag("Chat").e(e, "updateGroupAvatar failed")
+            false
         }
     }
 

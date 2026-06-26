@@ -17,6 +17,9 @@ data class Conversation(
     @ColumnInfo(name = "wallet_id")
     val walletId: String?,
 
+    @ColumnInfo(name = "avatar_url")
+    val avatarUrl: String? = null,
+
     @ColumnInfo(name = "last_message_at")
     val lastMessageAt: Long = 0L,
 

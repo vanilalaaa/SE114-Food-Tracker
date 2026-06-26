@@ -78,6 +78,7 @@ fun ChatScreen(
         // Groups use the live stored name (reflects renames); 1-1 chats use the resolved peer
         // name passed in (the stored name is the generic "Trò chuyện 1-1" placeholder).
         conversationName = if (isGroup) conversationState?.name ?: conversationName else conversationName,
+        groupAvatarUrl = conversationState?.avatarUrl,
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,
@@ -137,6 +138,7 @@ fun ChatScreen(
 fun ChatScreenContent(
     conversationId: String,
     conversationName: String,
+    groupAvatarUrl: String? = null,
     messageList: List<MessageUiModel>,
     myId: String,
     isGroup: Boolean,
@@ -208,11 +210,21 @@ fun ChatScreenContent(
     if (showSettingsDialog) {
         GroupSettingsDialog(
             conversationName = conversationName,
+            currentAvatarUrl = groupAvatarUrl,
             memberList = memberList,
             onDismissRequest = { showSettingsDialog = false },
             onRenameGroup = { newName ->
                 onRenameGroup(conversationId, newName)
                 showSettingsDialog = false
+            },
+            onChangeAvatar = { uri ->
+                viewModel.updateGroupAvatar(conversationId, uri) { success ->
+                    Toast.makeText(
+                        context,
+                        if (success) "Đã cập nhật ảnh đại diện nhóm! 🖼️" else "Lỗi cập nhật ảnh, thử lại nhé!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             },
             onKickMember = { userId, name ->
                 memberToKick = Pair(userId, name)

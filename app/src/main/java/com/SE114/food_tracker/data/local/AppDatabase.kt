@@ -38,7 +38,7 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         FeedComment::class,
         FeedHiddenPost::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -133,6 +133,14 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
                 db.createFeedHiddenPostTable()
+            }
+        }
+
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!db.hasColumn("conversations", "avatar_url")) {
+                    db.execSQL("ALTER TABLE conversations ADD COLUMN avatar_url TEXT")
+                }
             }
         }
     }

@@ -31,6 +31,8 @@ data class ConversationWithUnread(
     @ColumnInfo(name = "is_group") val isGroup: Boolean,
     @ColumnInfo(name = "name") val name: String?,
     @ColumnInfo(name = "wallet_id") val walletId: String?,
+    /** Group conversation avatar (null for 1-1 — use [peerAvatar] there). */
+    @ColumnInfo(name = "avatar_url") val avatarUrl: String? = null,
     @ColumnInfo(name = "last_message_at") val lastMessageAt: Long,
     @ColumnInfo(name = "last_message_snippet") val lastMessageSnippet: String?,
     @ColumnInfo(name = "created_at") val createdAt: Long,
@@ -108,6 +110,7 @@ interface ChatDAO {
             c.is_group,
             c.name,
             c.wallet_id,
+            c.avatar_url,
             c.last_message_at,
             c.last_message_snippet,
             c.created_at,

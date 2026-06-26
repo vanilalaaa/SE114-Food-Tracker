@@ -142,6 +142,12 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { chatRepository.updateGroupName(conversationId, newName) }
     }
 
+    fun updateGroupAvatar(conversationId: String, imageUri: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            onResult(chatRepository.updateGroupAvatar(conversationId, imageUri))
+        }
+    }
+
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
         viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
     }

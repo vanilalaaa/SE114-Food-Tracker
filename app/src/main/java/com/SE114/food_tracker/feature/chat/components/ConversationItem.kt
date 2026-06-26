@@ -48,11 +48,12 @@ fun ConversationItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar — the 1-1 peer's photo when available, otherwise a colored initial.
-        if (!conversation.isGroup && !conversation.peerAvatar.isNullOrBlank()) {
+        // Avatar — group photo or 1-1 peer photo when available, otherwise a colored initial.
+        val avatarUrl = if (conversation.isGroup) conversation.avatarUrl else conversation.peerAvatar
+        if (!avatarUrl.isNullOrBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(conversation.peerAvatar)
+                    .data(avatarUrl)
                     .crossfade(true)
                     .build(),
                 contentDescription = null,
