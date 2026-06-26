@@ -246,21 +246,24 @@ class ChatRepository @Inject constructor(
             // could overwrite a newer locally-tracked last_message_at with a stale snapshot —
             // both scramble the newest-first order. Read existing rows and preserve those fields.
             val existing = chatDAO.getConversationsByIds(convIds).associateBy { it.id }
-            chatDAO.insertConversations(
-                conversations.map { dto ->
-                    val prev = existing[dto.id]
-                    val keepLocalLast = (prev?.lastMessageAt ?: 0L) > dto.lastMessageAt
-                    LocalConversation(
-                        id                 = dto.id,
-                        name               = dto.name ?: "Trò chuyện 1-1",
-                        isGroup            = dto.isGroup,
-                        walletId           = dto.walletId ?: prev?.walletId ?: "wallet_default",
-                        lastMessageAt      = if (keepLocalLast) prev?.lastMessageAt ?: 0L else dto.lastMessageAt,
-                        lastMessageSnippet = if (keepLocalLast) prev?.lastMessageSnippet else dto.lastMessageSnippet,
-                        createdAt          = prev?.createdAt ?: System.currentTimeMillis()
-                    )
-                }
-            )
+            val mapped = conversations.map { dto ->
+                val prev = existing[dto.id]
+                val keepLocalLast = (prev?.lastMessageAt ?: 0L) > dto.lastMessageAt
+                LocalConversation(
+                    id                 = dto.id,
+                    name               = dto.name ?: "Trò chuyện 1-1",
+                    isGroup            = dto.isGroup,
+                    walletId           = dto.walletId ?: prev?.walletId ?: "wallet_default",
+                    lastMessageAt      = if (keepLocalLast) prev?.lastMessageAt ?: 0L else dto.lastMessageAt,
+                    lastMessageSnippet = if (keepLocalLast) prev?.lastMessageSnippet else dto.lastMessageSnippet,
+                    createdAt          = prev?.createdAt ?: System.currentTimeMillis()
+                )
+            }
+            // Only write rows that actually changed: REPLACE-ing every row on each refresh
+            // invalidates the Room Flow and recomposes the whole list, which is the pull-to-
+            // refresh jank. A no-op sync now writes nothing.
+            val changed = mapped.filter { it != existing[it.id] }
+            if (changed.isNotEmpty()) chatDAO.insertConversations(changed)
 
             // Persist the participant graph + peer profiles in two batched queries so the
             // list can render the 1-1 peer's name/avatar without a per-conversation round-trip.

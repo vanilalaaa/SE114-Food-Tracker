@@ -188,12 +188,9 @@ fun ConversationListScreen(
         onBackClick = onBackClick,
         onCreateGroupClick = { showCreateGroupDialog = true },
         onRefreshData = { onComplete ->
-            try {
-                viewModel.fetchConversationsFromServer()
-                onComplete()
-            } catch (e: Exception) {
-                onComplete()
-            }
+            // Keep the spinner until the sync actually finishes (instead of dismissing instantly
+            // and then recomposing the list mid-scroll).
+            viewModel.fetchConversationsFromServer { onComplete() }
         }
     )
 }
@@ -368,12 +365,12 @@ fun ConversationListScreenPreview() {
                 ConversationWithUnread(
                     id = "1", isGroup = false, name = "Azun (Data)", walletId = "w1",
                     lastMessageAt = System.currentTimeMillis(), lastMessageSnippet = "Ăn bún bò Huế đi!",
-                    createdAt = System.currentTimeMillis(), unreadCount = 5
+                    createdAt = System.currentTimeMillis(), isUnread = true, unreadCount = 5
                 ),
                 ConversationWithUnread(
                     id = "2", isGroup = true, name = "Quỹ Nhóm 4 Food Tracker", walletId = "w2",
                     lastMessageAt = 0L, lastMessageSnippet = null,
-                    createdAt = System.currentTimeMillis(), unreadCount = 0
+                    createdAt = System.currentTimeMillis(), isUnread = false, unreadCount = 0
                 )
             ),
             friendList = listOf(Pair("3", "Thúy Vy"), Pair("4", "Hải Đăng")),

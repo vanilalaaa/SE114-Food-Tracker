@@ -65,12 +65,14 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun fetchConversationsFromServer() {
+    fun fetchConversationsFromServer(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 chatRepository.fetchAndSaveConversationsToLocal()
             } catch (e: Exception) {
-                println("Lỗi kéo danh sách hội thoại từ server: ${e.localizedMessage}")
+                Timber.tag("Chat").e(e, "Failed to fetch conversations")
+            } finally {
+                onComplete()
             }
         }
     }
