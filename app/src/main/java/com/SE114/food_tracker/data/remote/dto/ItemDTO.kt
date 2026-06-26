@@ -17,7 +17,6 @@ data class ItemDTO(
     @SerialName("note")          val note: String? = null,
     @SerialName("image_url")     val imageUrl: String? = null,
     @SerialName("is_shared")     val isShared: Boolean = false,
-    @SerialName("wallet_id")     val walletId: String? = null,
     @SerialName("created_at")    val createdAt: String,   // ISO 8601 timestamp
     @SerialName("updated_at")    val updatedAt: String,   // ISO 8601 timestamp
     @SerialName("is_deleted")    val isDeleted: Boolean = false
