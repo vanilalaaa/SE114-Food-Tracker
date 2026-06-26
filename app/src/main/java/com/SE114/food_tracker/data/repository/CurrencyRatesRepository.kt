@@ -2,7 +2,7 @@ package com.SE114.food_tracker.data.repository
 
 import com.SE114.food_tracker.core.datastore.UserPreferences
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.android.Android
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +30,7 @@ data class RatesResult(val rates: Map<String, Double>, val stale: Boolean)
 class CurrencyRatesRepository @Inject constructor(
     private val userPreferences: UserPreferences
 ) {
-    private val http by lazy { HttpClient(Android) }
+    private val http by lazy { HttpClient(OkHttp) }
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun getRates(forceRefresh: Boolean = false): RatesResult = withContext(Dispatchers.IO) {

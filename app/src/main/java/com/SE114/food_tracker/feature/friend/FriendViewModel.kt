@@ -107,7 +107,7 @@ class FriendViewModel @Inject constructor(
             .onSuccess {
                 repository.refreshFriendships()
                     .onSuccess {
-                        refreshSearchRelationship()
+                        refreshSearchRelationshipSafely()
                         runCatching { feedRepository.refreshVisibleFromSupabase() }
                             .onFailure { reportActionError(it) }
                     }
@@ -167,11 +167,15 @@ class FriendViewModel @Inject constructor(
 
     fun sendFriendRequest(targetProfileId: String) {
         viewModelScope.launch {
+            updateSearchRelationship(targetProfileId, FriendRelationship.PENDING)
             repository.sendFriendRequest(targetProfileId)
                 .onSuccess {
-                    searchUser()
+                    refreshSearchRelationshipSafely()
                 }
-                .onFailure { reportActionError(it) }
+                .onFailure {
+                    refreshSearchRelationshipSafely()
+                    reportActionError(it)
+                }
         }
     }
 
@@ -187,14 +191,14 @@ class FriendViewModel @Inject constructor(
     fun cancelOutgoingRequest(friendshipId: String) =
         runFriendAction(friendshipId) { repository.cancelOutgoingRequest(friendshipId) }
 
-    fun submitReport(targetId: String, reason: ReportReason) {
+    fun submitReport(targetId: String, reason: ReportReason, details: String?) {
         if (_isReportSubmitting.value) return
 
         viewModelScope.launch {
             _isReportSubmitting.value = true
             reportRepository.submitProfileReport(
                 targetId = targetId,
-                reason = reason.remoteValue
+                reason = reason.toRemoteValue(details)
             ).onSuccess {
                 _actionMessage.value = "Đã gửi báo cáo, admin sẽ xem xét"
             }.onFailure { reportActionError(it) }
@@ -205,17 +209,20 @@ class FriendViewModel @Inject constructor(
     private fun loadFriendData(showRefreshing: Boolean = false) {
         loadFriendDataJob?.cancel()
         loadFriendDataJob = viewModelScope.launch {
-            if (showRefreshing) _isRefreshing.value = true
-            _profileLoadError.value = null
-            repository.refreshCurrentProfile()
-                .onSuccess {
-                    repository.refreshFriendships()
-                        .onSuccess { refreshSearchRelationship() }
-                }
-                .onFailure { e ->
-                    _profileLoadError.value = e.message ?: "Không lấy được ID"
-                }
-            if (showRefreshing) _isRefreshing.value = false
+            try {
+                if (showRefreshing) _isRefreshing.value = true
+                _profileLoadError.value = null
+                repository.refreshCurrentProfile()
+                    .onSuccess {
+                        repository.refreshFriendships()
+                            .onSuccess { refreshSearchRelationshipSafely() }
+                    }
+                    .onFailure { e ->
+                        _profileLoadError.value = e.message ?: "Không lấy được ID"
+                    }
+            } finally {
+                if (showRefreshing) _isRefreshing.value = false
+            }
         }
     }
 
@@ -225,10 +232,10 @@ class FriendViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                action()
+                runCatching { action() }.getOrElse { Result.failure(it) }
                     .onSuccess {
                         repository.refreshFriendships()
-                            .onSuccess { refreshSearchRelationship() }
+                            .onSuccess { refreshSearchRelationshipSafely() }
                             .onFailure { reportActionError(it) }
                         runCatching { feedRepository.refreshVisibleFromSupabase() }
                             .onFailure { reportActionError(it) }
@@ -248,15 +255,18 @@ class FriendViewModel @Inject constructor(
         if (query != _searchQuery.value.trim()) return
 
         _isLoadingSearch.value = true
-        _searchResult.value = repository.searchUser(query).map { profile ->
-            FriendSearchResult(
-                profile = profile,
-                relationship = FriendRelationship.fromStatus(
-                    repository.friendshipStatusWith(profile.id)
+        try {
+            _searchResult.value = repository.searchUser(query).mapCatching { profile ->
+                FriendSearchResult(
+                    profile = profile,
+                    relationship = FriendRelationship.fromStatus(
+                        repository.friendshipStatusWith(profile.id)
+                    )
                 )
-            )
+            }
+        } finally {
+            _isLoadingSearch.value = false
         }
-        _isLoadingSearch.value = false
     }
 
     private suspend fun refreshSearchRelationship() {
@@ -267,6 +277,20 @@ class FriendViewModel @Inject constructor(
                     repository.friendshipStatusWith(currentSearch.profile.id)
                 )
             )
+        )
+    }
+
+    private suspend fun refreshSearchRelationshipSafely() {
+        runCatching { refreshSearchRelationship() }
+            .onFailure { reportActionError(it) }
+    }
+
+    private fun updateSearchRelationship(profileId: String, relationship: FriendRelationship) {
+        val currentSearch = _searchResult.value?.getOrNull() ?: return
+        if (currentSearch.profile.id != profileId) return
+
+        _searchResult.value = Result.success(
+            currentSearch.copy(relationship = relationship)
         )
     }
 

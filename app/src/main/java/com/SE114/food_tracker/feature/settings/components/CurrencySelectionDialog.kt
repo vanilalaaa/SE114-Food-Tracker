@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -25,6 +29,9 @@ fun CurrencySelectionDialog(
     onSelect: (AppCurrency) -> Unit,
     onDismissRequest: () -> Unit
 ) {
+    // Selection is staged locally; the display currency only changes when the user confirms.
+    var pending by remember(selected) { mutableStateOf(selected) }
+
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
             shape = RoundedCornerShape(24.dp),
@@ -48,21 +55,20 @@ fun CurrencySelectionDialog(
                         CurrencyRadioItem(
                             currencyCode = "${currency.symbol} ${currency.code}",
                             currencyName = currency.displayName,
-                            isSelected = currency == selected,
-                            onClick = {
-                                onSelect(currency)
-                                onDismissRequest()
-                            }
+                            isSelected = currency == pending,
+                            onClick = { pending = currency }
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = stringResource(R.string.settings_currency_note),
-                    style = AppTypography.labelMedium,
-                    color = HintGray
+                SettingActionButton(
+                    text = stringResource(R.string.settings_currency_confirm),
+                    onClick = {
+                        onSelect(pending)
+                        onDismissRequest()
+                    }
                 )
             }
         }

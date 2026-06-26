@@ -156,10 +156,10 @@ class FriendRepository @Inject constructor(
         updateRemoteStatus(friendshipId, "declined")
 
     suspend fun unfriend(friendshipId: String): Result<Unit> =
-        deleteRemoteFriendship(friendshipId)
+        deleteRemoteFriendshipOptimistic(friendshipId)
 
     suspend fun cancelOutgoingRequest(friendshipId: String): Result<Unit> =
-        deleteRemoteFriendship(friendshipId)
+        deleteRemoteFriendshipOptimistic(friendshipId)
 
     suspend fun searchUser(searchUserId: String): Result<ProfileDTO> = runCatching {
         val me = requireCurrentProfile()
@@ -209,20 +209,27 @@ class FriendRepository @Inject constructor(
             ?: error("Không tìm thấy người dùng này!")
         friendDao.insertUserCache(targetProfile.toCacheEntity())
 
-        val friendshipId = UUID.randomUUID().toString()
+        val reusableFriendship = friendDao.getFriendshipByDirection(me.id, targetProfileId)
+        val friendshipId = reusableFriendship?.friendshipId ?: UUID.randomUUID().toString()
         val entity = FriendshipEntity(
             friendshipId = friendshipId,
             senderId = me.id,
             receiverId = targetProfileId,
             status = "pending",
-            syncStatus = "SYNCED",
+            syncStatus = "PENDING",
             isDeleted = false,
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()
         )
 
-        supabaseClient.postgrest.from("friendship").insert(entity.toWriteDto())
         friendDao.insertFriendship(entity)
+        runCatching {
+            supabaseClient.postgrest.from("friendship").upsert(entity.toWriteDto())
+            friendDao.updateFriendshipStatus(friendshipId, "pending", syncStatus = "SYNCED")
+        }.onFailure { throwable ->
+            friendDao.softDeleteFriendship(friendshipId, syncStatus = "FAILED")
+            throw throwable
+        }.getOrThrow()
     }
 
     private fun currentProfileScoped(
@@ -290,14 +297,56 @@ class FriendRepository @Inject constructor(
                 error("Không thể cập nhật lời mời này.")
             }
 
-            supabaseClient.postgrest.from("friendship").update(
-                {
-                    set("status", status)
+            friendDao.updateFriendshipStatus(friendshipId, status, syncStatus = "PENDING")
+            runCatching {
+                supabaseClient.postgrest.from("friendship").update(
+                    {
+                        set("status", status)
+                    }
+                ) {
+                    filter { eq("id", friendshipId) }
                 }
-            ) {
-                filter { eq("id", friendshipId) }
+                friendDao.updateFriendshipStatus(friendshipId, status, syncStatus = "SYNCED")
+            }.onFailure { throwable ->
+                friendDao.updateFriendshipStatus(friendshipId, friendship.status, syncStatus = "FAILED")
+                throw throwable
+            }.getOrThrow()
+        }
+
+    private suspend fun deleteRemoteFriendshipOptimistic(friendshipId: String): Result<Unit> =
+        runCatching {
+            val friendship = friendDao.getFriendshipById(friendshipId)
+                ?: error("Không tìm thấy kết bạn.")
+            val me = requireCurrentProfile()
+            if (friendship.senderId != me.id && friendship.receiverId != me.id) {
+                error("Không thể xóa kết bạn này.")
             }
-            friendDao.updateFriendshipStatus(friendshipId, status, syncStatus = "SYNCED")
+
+            friendDao.softDeleteFriendship(friendshipId, syncStatus = "PENDING")
+            val pairFriendships = fetchFriendshipsBetween(friendship.senderId, friendship.receiverId)
+            runCatching {
+                pairFriendships.forEach { remoteFriendship ->
+                    supabaseClient.postgrest.from("friendship").delete {
+                        filter { eq("id", remoteFriendship.id) }
+                    }
+                }
+                val stillExists = fetchFriendshipsBetween(friendship.senderId, friendship.receiverId).isNotEmpty()
+                if (stillExists) {
+                    error("Chưa xóa được kết bạn trên server.")
+                }
+                friendDao.softDeleteFriendshipsBetween(
+                    firstUserId = friendship.senderId,
+                    secondUserId = friendship.receiverId,
+                    syncStatus = "SYNCED"
+                )
+            }.onFailure { throwable ->
+                friendDao.restoreFriendshipStatus(
+                    friendshipId = friendship.friendshipId,
+                    newStatus = friendship.status,
+                    syncStatus = "FAILED"
+                )
+                throw throwable
+            }.getOrThrow()
         }
 
     private suspend fun deleteRemoteFriendship(friendshipId: String): Result<Unit> =

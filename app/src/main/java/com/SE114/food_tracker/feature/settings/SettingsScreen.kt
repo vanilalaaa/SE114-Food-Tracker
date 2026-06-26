@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
@@ -64,20 +65,24 @@ fun SettingsScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToCategories: () -> Unit,
     onChangePassword: () -> Unit,
+    onNavigateToAdmin: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
     currencyViewModel: CurrencyViewModel = hiltViewModel()
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
+    val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
     val currencyState by currencyViewModel.uiState.collectAsStateWithLifecycle()
 
     SettingsContent(
         profile = profile,
+        isAdmin = isAdmin,
         displayCurrency = currencyState.displayCurrency,
         currencies = currencyState.currencies,
         ratesStale = currencyState.ratesStale,
         onProfileClick = onNavigateToProfile,
         onCategoriesClick = onNavigateToCategories,
         onChangePasswordClick = onChangePassword,
+        onAdminClick = onNavigateToAdmin,
         onCurrencyDialogOpen = currencyViewModel::refreshRates,
         onSelectCurrency = currencyViewModel::selectCurrency,
         onLogout = viewModel::logout
@@ -87,12 +92,14 @@ fun SettingsScreen(
 @Composable
 private fun SettingsContent(
     profile: Profile?,
+    isAdmin: Boolean,
     displayCurrency: AppCurrency,
     currencies: List<AppCurrency>,
     ratesStale: Boolean,
     onProfileClick: () -> Unit,
     onCategoriesClick: () -> Unit,
     onChangePasswordClick: () -> Unit,
+    onAdminClick: () -> Unit,
     onCurrencyDialogOpen: () -> Unit,
     onSelectCurrency: (AppCurrency) -> Unit,
     onLogout: () -> Unit
@@ -138,6 +145,14 @@ private fun SettingsContent(
                 title = stringResource(R.string.settings_change_password),
                 onClick = onChangePasswordClick
             )
+
+            if (isAdmin) {
+                SettingsRow(
+                    icon = Icons.Outlined.AdminPanelSettings,
+                    title = stringResource(R.string.settings_admin),
+                    onClick = onAdminClick
+                )
+            }
 
             Spacer(Modifier.height(24.dp))
 
@@ -287,12 +302,14 @@ private fun SettingsContentPreview() {
     FoodTrackerTheme {
         SettingsContent(
             profile = Profile(id = "u1", displayName = "An Nguyễn", userId = "an.nguyen", avatarUrl = null),
+            isAdmin = true,
             displayCurrency = AppCurrency.VND,
             currencies = AppCurrency.entries,
             ratesStale = false,
             onProfileClick = {},
             onCategoriesClick = {},
             onChangePasswordClick = {},
+            onAdminClick = {},
             onCurrencyDialogOpen = {},
             onSelectCurrency = {},
             onLogout = {}
