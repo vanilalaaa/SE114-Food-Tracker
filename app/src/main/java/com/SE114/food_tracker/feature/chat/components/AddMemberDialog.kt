@@ -25,11 +25,13 @@ import com.SE114.food_tracker.core.designsystem.theme.StatPinkDark
 @Composable
 fun AddMemberDialog(
     friendList: List<Pair<String, String>>,
+    currentMembers: List<Pair<String, String>>,
     onDismiss: () -> Unit,
     onConfirm: (List<String>) -> Unit
 ) {
     val selectedMembers = remember { mutableStateListOf<String>() }
-
+    val currentMemberIds = currentMembers.map { it.first }
+    val availableFriends = friendList.filter { it.first !in currentMemberIds }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = LightPinkBG,
@@ -43,7 +45,7 @@ fun AddMemberDialog(
             )
         },
         text = {
-            if (friendList.isEmpty()) {
+            if (availableFriends.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -88,13 +90,15 @@ fun AddMemberDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = { onConfirm(selectedMembers.toList()) },
-                colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark)
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Thêm")
+            if (availableFriends.isNotEmpty()) {
+                Button(
+                    onClick = { onConfirm(selectedMembers.toList()) },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Thêm", color = Color.White, fontWeight = FontWeight.Bold) // Chữ màu trắng
+                }
             }
         }
     )
@@ -108,9 +112,13 @@ fun AddMemberDialogPreview() {
         Pair("2", "Tzan"),
         Pair("3", "Uyen")
     )
+    val currentMembers = listOf(
+        Pair("1", "Azun")
+    )
     androidx.compose.material3.MaterialTheme {
         AddMemberDialog(
             friendList = previewFriends,
+            currentMembers = currentMembers,
             onDismiss = {},
             onConfirm = {}
         )

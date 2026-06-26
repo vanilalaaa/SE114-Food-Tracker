@@ -16,7 +16,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.* import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +37,8 @@ import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.filled.Image
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.SE114.food_tracker.feature.friend.FriendViewModel
 import kotlinx.coroutines.flow.firstOrNull
 
 // Per-message character cap, in line with modern chat apps (Discord ~2,000, Telegram/Slack ~4,000).
@@ -47,6 +50,7 @@ fun ChatScreen(
     conversationName: String,
     targetFriendId: String? = null,
     viewModel: ChatViewModel,
+    friendViewModel: FriendViewModel = hiltViewModel(),
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit
 ) {
@@ -56,12 +60,19 @@ fun ChatScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val conversationState by viewModel.getConversationState(conversationId).collectAsState(initial = null)
+    val conversationState by viewModel.getConversationState(conversationId)
+        .collectAsState(initial = null)
     val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
     val currentUserId = viewModel.currentUserId
 
     val isGroup = conversationState?.isGroup ?: false
+    val acceptedFriends by friendViewModel.acceptedFriends.collectAsState()
 
+    val friendList = remember(acceptedFriends) {
+        acceptedFriends.map {
+            Pair(it.userId, it.displayName)
+        }
+    }
     LaunchedEffect(conversationId) {
         viewModel.connectToConversation(conversationId)
         viewModel.loadGroupMembers(conversationId)
@@ -80,7 +91,8 @@ fun ChatScreen(
         conversationId = conversationId,
         // Groups use the live stored name (reflects renames); 1-1 chats use the resolved peer
         // name passed in (the stored name is the generic "Trò chuyện 1-1" placeholder).
-        conversationName = if (isGroup) conversationState?.name ?: conversationName else conversationName,
+        conversationName = if (isGroup) conversationState?.name
+            ?: conversationName else conversationName,
         groupAvatarUrl = conversationState?.avatarUrl,
         messageList = messages,
         myId = currentUserId,
@@ -90,6 +102,10 @@ fun ChatScreen(
             viewModel.disbandGroup(conversationId)
         },
         memberList = memberList.map { Pair(it.first, it.second) },
+        friendList = friendList,
+        onAddMembers = { userIds ->
+            viewModel.addMembers(conversationId, userIds)
+        },
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {},
@@ -141,6 +157,8 @@ fun ChatScreenContent(
     onSendImage: (String) -> Unit,
     onRetryMessage: (com.SE114.food_tracker.data.local.entities.Message) -> Unit,
     onRenameGroup: (String, String) -> Unit,
+    friendList: List<Pair<String, String>>,
+    onAddMembers: (List<String>) -> Unit,
     onKickMember: (String, String, String) -> Unit,
     onKickMemberWithResult: ((String, String, String) -> Unit)? = null,
     viewModel: ChatViewModel,
@@ -235,7 +253,9 @@ fun ChatScreenContent(
                 memberToKick = Pair(userId, name)
             },
             isAdmin = isAdmin,
-            onDisbandGroup = onDisbandGroup
+            onDisbandGroup = onDisbandGroup,
+            friendList = friendList,
+            onAddMembers = { userIds -> viewModel.addMembers(conversationId, userIds) }
         )
     }
 
@@ -289,7 +309,7 @@ fun ChatScreenContent(
             )
         },
         containerColor = MainBackground,
-       // modifier = modifier
+        // modifier = modifier
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
@@ -488,6 +508,8 @@ fun ChatScreenPreview() {
             onRenameGroup = { _, _ -> },
             onKickMember = { _, _, _ -> },
             onDisbandGroup = {},
+            friendList = emptyList(),
+            onAddMembers = {},
             viewModel = viewModel()
         )
     }
