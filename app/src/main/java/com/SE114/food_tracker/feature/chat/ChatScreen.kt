@@ -75,7 +75,9 @@ fun ChatScreen(
     val friendId = memberList.firstOrNull { it.first != currentUserId }?.first
     ChatScreenContent(
         conversationId = conversationId,
-        conversationName = conversationState?.name ?: conversationName,
+        // Groups use the live stored name (reflects renames); 1-1 chats use the resolved peer
+        // name passed in (the stored name is the generic "Trò chuyện 1-1" placeholder).
+        conversationName = if (isGroup) conversationState?.name ?: conversationName else conversationName,
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,
