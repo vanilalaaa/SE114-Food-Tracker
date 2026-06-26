@@ -189,23 +189,38 @@ private fun FoodPreviewStack(
     }
 
     val avatarSize = (30f * scale.coerceIn(0.9f, 1.15f)).dp
-    val horizontalStep = (avatarSize.value * 0.56f).dp
-    val verticalStep = (avatarSize.value * 0.44f).dp
-    val stackWidth = (avatarSize.value + horizontalStep.value * 1.5f).dp
-    val stackHeight = (avatarSize.value + verticalStep.value).dp
+    val step = (avatarSize.value * 0.44f).dp
+    val visibleCount = previews.take(4).size
+
+    val stackHeight = if (visibleCount > 2) (avatarSize + step) else avatarSize
 
     Box(
-        modifier = Modifier.size(width = stackWidth, height = stackHeight),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(stackHeight),
         contentAlignment = Alignment.TopCenter
     ) {
+        val positions = when (visibleCount) {
+            0, 1 -> listOf(0.dp to 0.dp)
+            2 -> listOf(
+                -(step / 2) to 0.dp,
+                (step / 2) to 0.dp
+            )
+            3 -> listOf(
+                -(step / 2) to 0.dp,
+                (step / 2) to 0.dp,
+                0.dp to step
+            )
+            else -> listOf(
+                -(step / 2) to 0.dp,
+                (step / 2) to 0.dp,
+                -(step / 2) to step,
+                (step / 2) to step
+            )
+        }
+
         previews.take(4).forEachIndexed { index, preview ->
-            val xOffset = when (index) {
-                0 -> 0.dp
-                1 -> horizontalStep
-                2 -> (horizontalStep.value * 0.5f).dp
-                else -> (horizontalStep.value * 1.5f).dp
-            }
-            val yOffset = if (index < 2) 0.dp else verticalStep
+            val (xOffset, yOffset) = positions[index]
 
             CalendarFoodAvatar(
                 preview = preview,
