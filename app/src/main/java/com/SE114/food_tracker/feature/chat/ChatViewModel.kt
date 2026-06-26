@@ -150,8 +150,17 @@ class ChatViewModel @Inject constructor(
     }
     fun addMembers(conversationId: String, userIds: List<String>) {
         viewModelScope.launch {
-            chatRepository.addMembersToGroup(conversationId, userIds)
-            loadGroupMembers(conversationId)
+            // Lấy danh sách mới nhất từ server trước khi lọc
+            val currentRemoteMembers = chatRepository.fetchGroupMembersFromServer(conversationId)
+            val currentMemberIds = currentRemoteMembers.map { it.first.lowercase().trim() }
+
+            val newMembers = userIds.filter { it.lowercase().trim() !in currentMemberIds }
+
+            if (newMembers.isNotEmpty()) {
+                chatRepository.addMembersToGroup(conversationId, newMembers)
+                // Cập nhật lại State sau khi thêm
+                loadGroupMembers(conversationId)
+            }
         }
     }
     fun kickGroupMember(conversationId: String, userId: String, name: String) {

@@ -30,8 +30,10 @@ fun AddMemberDialog(
     onConfirm: (List<String>) -> Unit
 ) {
     val selectedMembers = remember { mutableStateListOf<String>() }
-    val currentMemberIds = currentMembers.map { it.first }
-    val availableFriends = friendList.filter { it.first !in currentMemberIds }
+    val currentMemberIds = currentMembers.map { it.first.lowercase().trim() }
+    val availableFriends = friendList.filter {
+        it.first.lowercase().trim() !in currentMemberIds
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = LightPinkBG,
@@ -64,7 +66,7 @@ fun AddMemberDialog(
                         .fillMaxWidth()
                         .heightIn(max = 300.dp)
                 ) {
-                    items(friendList) { friend ->
+                    items(availableFriends) { friend ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

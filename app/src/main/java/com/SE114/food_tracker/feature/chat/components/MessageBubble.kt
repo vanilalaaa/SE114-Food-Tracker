@@ -131,7 +131,6 @@ fun MessageBubble(
                 }
             }
 
-            // 🔥 ĐÃ FIX LUỒNG AVATAR MẶC ĐỊNH: Nếu có link ảnh thì load, nếu link rỗng hoặc load lỗi (mạng yếu/link sai) tự động hiện Avatar chữ cái pastel ngay lập tức!
             if (message.senderAvatarUrl.isNotBlank()) {
                 SubcomposeAsyncImage(
                     model = message.senderAvatarUrl,

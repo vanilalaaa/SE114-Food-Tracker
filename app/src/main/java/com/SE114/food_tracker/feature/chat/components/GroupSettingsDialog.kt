@@ -231,6 +231,7 @@ fun GroupSettingsDialog(
                     if (showAddMemberDialog) {
                         AddMemberDialog(
                             friendList = friendList,
+                            currentMembers = memberList,
                             onDismiss = { showAddMemberDialog = false },
                             onConfirm = { userIds ->
                                 onAddMembers(userIds)

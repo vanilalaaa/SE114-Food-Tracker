@@ -184,7 +184,7 @@ fun ChatScreenContent(
             },
             text = {
                 Text(
-                    "Bạn có chắc chắn muốn mời ${memberToKick?.second} rời khỏi nhóm Quỹ này không?",
+                    "Bạn có chắc chắn muốn mời ${memberToKick?.second} rời khỏi nhóm này không?",
                     fontSize = 14.sp
                 )
             },
