@@ -33,6 +33,7 @@ object DatabaseModule {
             .addMigrations(AppDatabase.MIGRATION_13_14)
             .addMigrations(AppDatabase.MIGRATION_14_15)
             .addMigrations(AppDatabase.MIGRATION_15_16)
+            .addMigrations(AppDatabase.MIGRATION_16_17)
             .fallbackToDestructiveMigration()
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {

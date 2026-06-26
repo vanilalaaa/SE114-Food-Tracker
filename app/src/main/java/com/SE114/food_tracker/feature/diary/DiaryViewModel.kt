@@ -5,12 +5,15 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
+import com.SE114.food_tracker.data.repository.ChatRepository
+import com.SE114.food_tracker.core.network.NetworkMonitor
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.core.sync.SyncStatus
+import com.SE114.food_tracker.data.remote.SupabaseItemService
 import com.SE114.food_tracker.data.repository.ImageRepository
 import com.SE114.food_tracker.data.repository.ItemRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -49,6 +52,9 @@ import kotlinx.coroutines.withContext
 class DiaryViewModel @Inject constructor(
     private val itemRepository: ItemRepository,
     private val imageRepository: ImageRepository,
+    private val chatRepository: ChatRepository,
+    private val supabaseItemService: SupabaseItemService,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -61,6 +67,9 @@ class DiaryViewModel @Inject constructor(
     // ── Trạng thái ảnh tạm thời ──────────────────────────────────────────────
     private val _pendingImageUri = MutableStateFlow<Uri?>(null)
     val pendingImageUri: StateFlow<Uri?> = _pendingImageUri.asStateFlow()
+
+    private val _availableWallets = MutableStateFlow<List<ChatRepository.WalletWithRole>>(emptyList())
+    val availableWallets: StateFlow<List<ChatRepository.WalletWithRole>> = _availableWallets.asStateFlow()
 
     private var _pendingImageBytes: ByteArray? = null
     private var _imageCompressionJob: Job? = null
@@ -155,6 +164,11 @@ class DiaryViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { computeStreak() }
+        viewModelScope.launch {
+            runCatching { chatRepository.getUserWalletsWithRoles() }
+                .onSuccess { _availableWallets.value = it }
+                .onFailure { Timber.e(it, "[DiaryVM] failed to load wallets") }
+        }
     }
 
     fun loadDate(date: LocalDate) {
@@ -199,13 +213,27 @@ class DiaryViewModel @Inject constructor(
         rating: Int,
         note: String,
         timeType: Int,
-        isShared: Boolean = false
+        isShared: Boolean = false,
+        walletId: String? = null
     ) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value     = null
 
             try {
+                if (walletId != null) {
+                    val online = networkMonitor.isOnline.first()
+                    if (!online) {
+                        _error.value = "Cần có mạng để chi từ quỹ nhóm"
+                        return@launch
+                    }
+                    val balance = chatRepository.getWalletBalanceById(walletId)
+                    if (balance < price) {
+                        _error.value = "Số dư quỹ không đủ (còn ${String.format("%,.0f", balance)} VND, cần ${String.format("%,.0f", price)} VND)"
+                        return@launch
+                    }
+                }
+
                 _imageCompressionJob?.join()
                 val imageBytes = _pendingImageBytes
 
@@ -237,17 +265,34 @@ class DiaryViewModel @Inject constructor(
                     note       = note.ifBlank { null },
                     imageUrl   = finalImageUrl,
                     isShared   = isShared,
+                    walletId   = walletId,
                     syncStatus = SyncStatus.PENDING.name,
                     entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
                     createdAt  = now,
                     updatedAt  = now
                 )
 
-                // Thực hiện ghi vào DB và dọn dẹp
+                // Lưu vào Room trước để giao diện (UI) cập nhật lập tức
                 itemRepository.insert(item)
                 clearPendingImage()
                 computeStreak()
                 SyncScheduler.triggerImmediateSync(context)
+
+                if (walletId != null) {
+                    chatRepository.executePurchaseTransaction(
+                        walletId = walletId,
+                        amount   = price,
+                        itemId   = itemId,   // Vẫn truyền vào — ChatRepository hiện tại sẽ bỏ qua nó một cách an toàn
+                        note     = name,
+                        imageUrl = finalImageUrl
+                    ).onFailure { err ->
+                        Timber.e(err, "[DiaryVM] Gọi RPC thanh toán thất bại")
+                        _error.value = "Trừ quỹ thất bại: ${err.message}"
+                    }
+                } else {
+                    // Món ăn thông thường: Để WorkManager xử lý việc đồng bộ như bình thường
+                    SyncScheduler.triggerImmediateSync(context)
+                }
 
             } catch (t: Throwable) {
                 _error.value = t.message
@@ -266,7 +311,8 @@ class DiaryViewModel @Inject constructor(
         rating: Int,
         note: String,
         timeType: Int,
-        isShared: Boolean
+        isShared: Boolean,
+        walletId: String? = null
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -304,7 +350,8 @@ class DiaryViewModel @Inject constructor(
                         note       = note.ifBlank { null },
                         imageUrl   = finalImageUrl,
                         isShared   = isShared,
-                        syncStatus = SyncStatus.PENDING.name, // Đưa về trạng thái cần sync lại lên server
+                        walletId   = walletId,
+                        syncStatus = SyncStatus.PENDING.name,
                         updatedAt  = Clock.System.now().toEpochMilliseconds()
                     )
                 )
