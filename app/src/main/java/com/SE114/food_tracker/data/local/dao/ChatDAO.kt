@@ -72,6 +72,10 @@ interface ChatDAO {
     @Query("SELECT * FROM messages WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getUnsentMessages(): List<Message>
 
+    /** Oldest-first PENDING queue the MessageSyncWorker drains when connectivity returns. */
+    @Query("SELECT * FROM messages WHERE sync_status = 'PENDING' ORDER BY created_at ASC")
+    suspend fun getPendingMessagesOrdered(): List<Message>
+
     @Query("SELECT * FROM messages WHERE id = :serverId LIMIT 1")
     suspend fun getMessageByServerId(serverId: String): Message?
 

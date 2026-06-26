@@ -2,6 +2,8 @@ package com.SE114.food_tracker.data.repository
 
 import android.content.Context
 import android.net.Uri
+import com.SE114.food_tracker.core.network.NetworkMonitor
+import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.local.dao.ChatDAO
 import com.SE114.food_tracker.data.local.dao.MessageWithProfile
 import com.SE114.food_tracker.data.local.entities.ConversationParticipant
@@ -63,6 +65,7 @@ import timber.log.Timber
 class ChatRepository @Inject constructor(
     private val chatDAO: ChatDAO,
     private val supabaseClient: SupabaseClient,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val context: Context
 ) {
     @Serializable
@@ -747,7 +750,9 @@ class ChatRepository @Inject constructor(
             messageAt      = pendingMessage.createdAt,
             snippet        = if (isSystem) "📢 Tin nhắn hệ thống" else body
         )
-        performNetworkSend(pendingMessage)
+        if (performNetworkSend(pendingMessage) == SendResult.PENDING_RETRY) {
+            SyncScheduler.enqueueMessageSync(context)
+        }
     }
 
     suspend fun getOrCreateOneToOneChat(friendUserId: String): String? {
@@ -1131,34 +1136,39 @@ class ChatRepository @Inject constructor(
         }
     }
 
-    private suspend fun performNetworkSend(message: Message) {
-        try {
+    private enum class SendResult { SENT, PENDING_RETRY, FAILED }
+
+    private suspend fun performNetworkSend(message: Message): SendResult {
+        return try {
             var finalImageUrl = message.imageUrl
             val currentUserId = getAuthenticatedUserId()
 
-            // Xử lý upload ảnh (giữ nguyên, nhưng không block broadcast)
             if (message.imageUrl != null && (message.imageUrl.startsWith("content://") || message.imageUrl.startsWith("file://"))) {
-                try {
+                val fileBytes = try {
                     val uri = android.net.Uri.parse(message.imageUrl)
-                    val inputStream = context.contentResolver.openInputStream(uri)
-                    val fileBytes = inputStream?.use { it.readBytes() }
-
-                    if (fileBytes != null) {
-                        val storageBucket = supabaseClient.storage.from("chat-images")
-                        val fileName = "${UUID.randomUUID()}.jpg"
-                        storageBucket.upload(path = fileName, data = fileBytes) { upsert = true }
-                        finalImageUrl = storageBucket.publicUrl(fileName)
-                    }
-                } catch (storageErr: Exception) {
-                    storageErr.printStackTrace()
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } catch (readErr: Exception) {
+                    Timber.tag("Chat").e(readErr, "queued image no longer readable")
+                    null
                 }
+                if (fileBytes == null) {
+                    // Local image is gone/unreadable (e.g. a GetContent content:// grant lost after
+                    // process death). That's permanent, not a connectivity issue — fail it so the
+                    // worker doesn't retry forever and block the rest of the PENDING queue.
+                    chatDAO.updateMessage(message.copy(syncStatus = MessageSyncStatus.FAILED))
+                    return SendResult.FAILED
+                }
+                val storageBucket = supabaseClient.storage.from("chat-images")
+                val fileName = "${UUID.randomUUID()}.jpg"
+                storageBucket.upload(path = fileName, data = fileBytes) { upsert = true }
+                finalImageUrl = storageBucket.publicUrl(fileName)
             }
 
             val finalSenderId = currentUserId
 
-            // 🔥 ĐỒNG BỘ KHÓA CHÍNH: Dùng luôn message.localId làm 'id' gửi đi
-            val broadcastPayload = SupabaseMessageDto(
-                id             = message.localId, // <--- Bắt buộc truyền id cục bộ lên
+            // message.localId doubles as the server row id, so a resend is the same row.
+            val payload = SupabaseMessageDto(
+                id             = message.localId,
                 conversationId = message.conversationId,
                 senderId       = finalSenderId,
                 body           = message.body,
@@ -1167,49 +1177,79 @@ class ChatRepository @Inject constructor(
                 createdAt      = Clock.System.now().toString()
             )
 
-            val channelReady = awaitChannelReady(message.conversationId, 2000)
-            if (channelReady) {
-                val channel = activeChannels[message.conversationId]?.channel
-                if (channel != null) {
-                    runCatching {
-                        channel.broadcast(event = BROADCAST_EVENT_NEW_MESSAGE, message = broadcastPayload)
-                        println("Broadcast đã gửi (siêu tốc) cho tin nhắn ${message.localId}")
-                    }.onFailure { broadcastErr ->
-                        println("Broadcast thất bại: ${broadcastErr.localizedMessage}")
-                    }
-                } else {
-                    println("Channel null dù ready, fallback CDC")
+            // Broadcast is best-effort instant delivery when a channel is live; it's silently
+            // skipped in the background worker, where no channel is subscribed.
+            if (awaitChannelReady(message.conversationId, 2000)) {
+                activeChannels[message.conversationId]?.channel?.let { channel ->
+                    runCatching { channel.broadcast(event = BROADCAST_EVENT_NEW_MESSAGE, message = payload) }
                 }
-            } else {
-                println("Channel chưa sẵn sàng, fallback CDC")
             }
 
-            // 🔥 BƯỚC 2: TIẾN HÀNH LƯU DỮ LIỆU XUỐNG DATABASE QUA API REST (Chạy sau/song song để bền vững dữ liệu)
-            val response    = supabaseClient.from("message").insert(listOf(broadcastPayload)) { select() }
+            // upsert (not insert) keyed on the deterministic local id: retrying a message the
+            // server already stored is a no-op update, not a duplicate-key failure.
+            val response    = supabaseClient.from("message").upsert(listOf(payload)) { select() }
             val insertedDto = response.decodeSingle<SupabaseMessageDto>()
 
-            val successMessage = message.copy(
-                syncStatus = MessageSyncStatus.SENT,
-                serverId   = insertedDto.id, // Sẽ trùng khớp hoàn toàn với message.localId
-                imageUrl   = finalImageUrl,
-                senderId   = finalSenderId,
-                createdAt  = parseServerTimeToLong(insertedDto.createdAt)
+            chatDAO.updateMessage(
+                message.copy(
+                    syncStatus = MessageSyncStatus.SENT,
+                    serverId   = insertedDto.id,
+                    imageUrl   = finalImageUrl,
+                    senderId   = finalSenderId,
+                    createdAt  = parseServerTimeToLong(insertedDto.createdAt)
+                )
             )
-
-            chatDAO.updateMessage(successMessage)
-            println("DEBUG: Tin nhắn đã được lưu kiên cố vào Server Database")
-
+            SendResult.SENT
         } catch (e: Exception) {
-            println("LỖI GỬI TIN CHI TIẾT: ${e.localizedMessage}")
-            e.printStackTrace()
-            chatDAO.updateMessage(message.copy(syncStatus = MessageSyncStatus.FAILED))
+            val offline = runCatching { !networkMonitor.isOnline.first() }.getOrDefault(false)
+            if (offline || e.isNetworkError()) {
+                // Connectivity problem: keep the message queued for the worker, never FAILED.
+                chatDAO.updateMessage(message.copy(syncStatus = MessageSyncStatus.PENDING))
+                SendResult.PENDING_RETRY
+            } else {
+                Timber.tag("Chat").e(e, "message send failed (server error)")
+                chatDAO.updateMessage(message.copy(syncStatus = MessageSyncStatus.FAILED))
+                SendResult.FAILED
+            }
         }
+    }
+
+    private fun Throwable.isNetworkError(): Boolean {
+        var cause: Throwable? = this
+        while (cause != null) {
+            if (cause is java.io.IOException) return true
+            cause = cause.cause
+        }
+        return false
+    }
+
+    /**
+     * Drains the PENDING message queue oldest-first (called by [MessageSyncWorker]). Returns
+     * false — so the worker retries when connectivity returns — if a send hits a connectivity
+     * failure; true when the queue holds no PENDING messages (server-FAILED ones are left for
+     * manual retry). Idempotent: [performNetworkSend] upserts by local id.
+     */
+    suspend fun flushPendingMessages(): Boolean {
+        if (getAuthenticatedUserId().isBlank()) return true
+        val pending = chatDAO.getPendingMessagesOrdered()
+        for (msg in pending) {
+            if (performNetworkSend(msg) == SendResult.PENDING_RETRY) return false
+        }
+        return true
+    }
+
+    /** Schedule the offline queue to drain. Call once auth is ready (the worker no-ops when
+     *  signed out); WorkManager's CONNECTED constraint also re-runs it when the network returns. */
+    fun enqueuePendingMessageSync() {
+        SyncScheduler.enqueueMessageSync(context)
     }
 
     suspend fun retryMessage(message: Message) {
         val reloadingMessage = message.copy(syncStatus = MessageSyncStatus.PENDING)
         chatDAO.updateMessage(reloadingMessage)
-        performNetworkSend(reloadingMessage)
+        if (performNetworkSend(reloadingMessage) == SendResult.PENDING_RETRY) {
+            SyncScheduler.enqueueMessageSync(context)
+        }
     }
 
     suspend fun markAsRead(conversationId: String) {

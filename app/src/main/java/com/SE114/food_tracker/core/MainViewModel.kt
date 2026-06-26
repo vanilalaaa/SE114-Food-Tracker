@@ -41,7 +41,12 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.currentSessionFlow()
                 .filterIsInstance<SessionStatus.Authenticated>()
-                .collect { enforceActive() }
+                .collect {
+                    enforceActive()
+                    // Auth is ready (login or restored session) — drain any chat messages queued
+                    // offline or left PENDING by a previous session/crash.
+                    chatRepository.enqueuePendingMessageSync()
+                }
         }
     }
 
