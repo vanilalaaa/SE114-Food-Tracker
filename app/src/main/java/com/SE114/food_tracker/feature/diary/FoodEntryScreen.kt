@@ -325,7 +325,8 @@ fun FoodEntryScreen(
                 foodName  = it
                 nameError = null
             },
-            placeholder = "VD: Phở Bò"
+            placeholder = "VD: Phở Bò",
+            maxChars    = 20 // Giới hạn tên món tối đa 20 ký tự
         )
         FieldError(nameError)
 
@@ -401,7 +402,8 @@ fun FoodEntryScreen(
             value         = note,
             onValueChange = { note = it },
             placeholder   = "VD: Món này ngon quá!",
-            isSingleLine  = false
+            isSingleLine  = false,
+            maxChars      = 100 // Giới hạn ghi chú tối đa 100 ký tự
         )
 
         Spacer(Modifier.height(24.dp))
@@ -425,7 +427,6 @@ fun FoodEntryScreen(
         Spacer(Modifier.height(40.dp))
     }
 }
-
 @Composable
 private fun FieldError(error: String?) {
     if (error != null) {
@@ -435,26 +436,5 @@ private fun FieldError(error: String?) {
             fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
         )
-    }
-}
-
-@Preview(showSystemUi = true, device = "spec:width=411dp,height=891dp")
-@Composable
-fun FoodEntryScreenPreview() {
-    val previewCategories = listOf(
-        DiaryCategory("preview-1", "Cơm",        "🍚", isSystem = true),
-        DiaryCategory("preview-2", "Mì & Phở",   "🍜", isSystem = true),
-        DiaryCategory("preview-3", "Bánh mì",    "🥖", isSystem = true),
-        DiaryCategory("preview-4", "Đồ uống",    "🥤", isSystem = true),
-        DiaryCategory("preview-5", "Tráng miệng","🍰", isSystem = true),
-    )
-    FoodTrackerTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MainBackground) {
-            FoodEntryScreen(
-                categories = previewCategories,
-                onDismiss  = {},
-                onSave     = { _, _, _, _, _, _, _, _, _ -> }
-            )
-        }
     }
 }
