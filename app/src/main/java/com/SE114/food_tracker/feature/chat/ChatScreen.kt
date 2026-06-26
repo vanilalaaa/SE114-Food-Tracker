@@ -35,6 +35,9 @@ import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
+// Per-message character cap, in line with modern chat apps (Discord ~2,000, Telegram/Slack ~4,000).
+private const val MAX_MESSAGE_LENGTH = 2000
+
 @Composable
 fun ChatScreen(
     conversationId: String,
@@ -391,7 +394,8 @@ fun ChatScreenContent(
 
                     OutlinedTextField(
                         value = textInput,
-                        onValueChange = { textInput = it },
+                        // Cap input length (truncates pastes too); the counter below appears near the limit.
+                        onValueChange = { textInput = it.take(MAX_MESSAGE_LENGTH) },
                         placeholder = { Text("Nhập tin nhắn...", fontSize = 14.sp) },
                         modifier = Modifier
                             .weight(1f)
@@ -403,7 +407,18 @@ fun ChatScreenContent(
                             focusedBorderColor = StatPinkDark,
                             unfocusedBorderColor = Color(0xFFE0E0E0)
                         ),
-                        maxLines = 4
+                        maxLines = 4,
+                        supportingText = if (textInput.length > MAX_MESSAGE_LENGTH - 200) {
+                            {
+                                Text(
+                                    text = "${textInput.length}/$MAX_MESSAGE_LENGTH",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.End,
+                                    fontSize = 11.sp,
+                                    color = if (textInput.length >= MAX_MESSAGE_LENGTH) StatRed else TextLabelGray
+                                )
+                            }
+                        } else null
                     )
 
                     IconButton(
