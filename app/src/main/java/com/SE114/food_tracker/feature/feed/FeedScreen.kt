@@ -10,9 +10,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -33,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.SE114.food_tracker.core.designsystem.components.AppTopBar
 import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
@@ -183,11 +190,35 @@ fun FeedScreenContent(
         onLoadNextPage = onLoadNextPage
     )
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MainBackground)
-    ) {
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            AppTopBar(
+                title = "Newsfeed",
+                subtitle = "${uiState.posts.size} bài viết",
+                actions = {
+                    IconButton(
+                        onClick = onNavigateToFriend,
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Groups,
+                            contentDescription = "Bạn bè",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                }
+            )
+        },
+        containerColor = MainBackground
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MainBackground)
+                .padding(innerPadding)
+        ) {
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = onRefresh,
@@ -206,7 +237,6 @@ fun FeedScreenContent(
             FeedGridContent(
                 uiState = uiState,
                 gridState = gridState,
-                onNavigateToFriend = onNavigateToFriend,
                 onPostClick = onPostClick
             )
         }
@@ -265,6 +295,7 @@ fun FeedScreenContent(
             onSetCommentHidden = onSetCommentHidden,
             onClearError = onClearError
         )
+        }
     }
 }
 

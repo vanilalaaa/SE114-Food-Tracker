@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -155,31 +156,38 @@ fun DiaryScreenContent(
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MainBackground)
-    ) {
+    Scaffold(
+        topBar = {
+            DiaryTopBar(
+                streakCount  = uiState.streak.toString(),
+                currentMonth = "Tháng ${uiState.selectedDate.monthNumber} ${uiState.selectedDate.year}",
+                onMonthClick = { showDatePicker = true },
+                onPreviousClick = {
+                    val previousMonthDate = uiState.selectedDate.minus(DatePeriod(months = 1))
+                    runCatching { LocalDate(previousMonthDate.year, previousMonthDate.monthNumber, 1) }
+                        .getOrNull()?.let { onLoadDate(it) }
+                },
+                onNextClick = {
+                    val nextMonthDate = uiState.selectedDate.plus(DatePeriod(months = 1))
+                    runCatching { LocalDate(nextMonthDate.year, nextMonthDate.monthNumber, 1) }
+                        .getOrNull()?.let { onLoadDate(it) }
+                }
+            )
+        },
+        containerColor = MainBackground
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MainBackground)
+                .padding(innerPadding)
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-        DiaryTopBar(
-            streakCount  = uiState.streak.toString(),
-            currentMonth = "Tháng ${uiState.selectedDate.monthNumber} ${uiState.selectedDate.year}",
-            onMonthClick = { showDatePicker = true },
-            onPreviousClick = {
-                val previousMonthDate = uiState.selectedDate.minus(DatePeriod(months = 1))
-                runCatching { LocalDate(previousMonthDate.year, previousMonthDate.monthNumber, 1) }
-                    .getOrNull()?.let { onLoadDate(it) }
-            },
-            onNextClick = {
-                val nextMonthDate = uiState.selectedDate.plus(DatePeriod(months = 1))
-                runCatching { LocalDate(nextMonthDate.year, nextMonthDate.monthNumber, 1) }
-                    .getOrNull()?.let { onLoadDate(it) }
-            }
-        )
+        Spacer(modifier = Modifier.height(8.dp))
 
         NutritionCard(
             unfilteredItems    = uiState.monthlyItems,
@@ -222,6 +230,7 @@ fun DiaryScreenContent(
                 .align(Alignment.BottomEnd)
                 .padding(end = 24.dp, bottom = DiaryAddButtonBottomPadding)
         )
+        }
     }
 
     // ── POPUPS / OVERLAYS ──────────────────────────────────────────────────

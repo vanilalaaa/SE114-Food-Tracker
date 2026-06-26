@@ -32,7 +32,7 @@ import kotlinx.datetime.todayIn
 import kotlinx.datetime.toLocalDateTime
 
 private val CalendarTodayNumberSize = 32.dp
-private val CalendarDataCellWidth = 44.dp
+private val CalendarDataCellWidth = 40.dp
 private val CalendarDataCellHeight = 65.dp
 private val CalendarCardPadding = 16.dp
 private val CalendarHeaderHeight = 18.dp
