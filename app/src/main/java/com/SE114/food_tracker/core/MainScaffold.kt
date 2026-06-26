@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -99,7 +100,7 @@ fun MainScaffold() {
 
     val selectedRoute = bottomBarRouteFor(currentRoute)
     val selectedIndex = BAR_ROUTES.indexOf(selectedRoute).coerceAtLeast(0)
-    val showBottomBar = currentRoute != null && currentRoute !in NO_BOTTOM_BAR_ROUTES
+    val showBottomBar = currentRoute in BAR_ROUTES
     val onBottomItemSelected: (Int) -> Unit = { index ->
         val targetRoute = BAR_ROUTES[index]
         if (selectedRoute == targetRoute && currentRoute != targetRoute) {
@@ -133,26 +134,28 @@ fun MainScaffold() {
     }
 
     CompositionLocalProvider(LocalCurrencyDisplay provides currencyDisplay) {
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            AppNavGraph(
-                navController = navController,
-                modifier = Modifier.fillMaxSize()
-            )
-            if (showBottomBar) {
-                BottomBar(
-                    selectedIndex = selectedIndex,
-                    onItemSelected = onBottomItemSelected,
-                    modifier = Modifier.align(Alignment.BottomCenter)
+        Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                AppNavGraph(
+                    navController = navController,
+                    modifier = Modifier.fillMaxSize()
                 )
+
+                if (showBottomBar) {
+                    BottomBar(
+                        selectedIndex = selectedIndex,
+                        onItemSelected = onBottomItemSelected,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp)
+                    )
+                }
             }
         }
-    }
     }
 }

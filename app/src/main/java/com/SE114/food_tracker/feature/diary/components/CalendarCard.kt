@@ -35,6 +35,12 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
 import kotlinx.datetime.toLocalDateTime
 
+private val CalendarDayNumberSize = 32.dp
+private val CalendarDataCellWidth = 44.dp
+private val CalendarDataCellHeight = 76.dp
+private val CalendarPreviewAreaHeight = 40.dp
+private val CalendarFoodIconMaxSize = 36.dp
+
 @Composable
 fun CalendarCard(
     selectedYear: Int,
@@ -89,7 +95,7 @@ fun CalendarCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 16.dp)
-            .height(410.dp),
+            .height(350.dp),
         shape = RoundedCornerShape(28.dp),
         color = Color.White,
         shadowElevation = 8.dp
@@ -110,12 +116,12 @@ fun CalendarCard(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(5.dp))
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(7),
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(calendarGridItems) { date ->
@@ -127,19 +133,23 @@ fun CalendarCard(
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
+                                .size(
+                                    width = CalendarDataCellWidth,
+                                    height = CalendarDataCellHeight
+                                )
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(if (hasData) CalendarHighlight else Color.Transparent)
                                 .clickable { onDateClick(date) }
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = 2.dp)
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(CalendarDayNumberSize)
                             ) {
                                 if (isToday) {
                                     Box(
                                         modifier = Modifier
-                                            .size(36.dp)
+                                            .size(CalendarDayNumberSize)
                                             .background(MintGreen, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -160,7 +170,7 @@ fun CalendarCard(
                                 }
                             }
 
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(0.dp))
 
                             FoodPreviewStack(
                                 previews = dayPreviews,
@@ -169,7 +179,12 @@ fun CalendarCard(
                             )
                         }
                     } else {
-                        Spacer(modifier = Modifier.size(36.dp))
+                        Spacer(
+                            modifier = Modifier.size(
+                                width = CalendarDataCellWidth,
+                                height = CalendarDataCellHeight
+                            )
+                        )
                     }
                 }
             }
@@ -184,20 +199,19 @@ private fun FoodPreviewStack(
     scale: Float
 ) {
     if (!hasData) {
-        Spacer(modifier = Modifier.height(42.dp))
+        Spacer(modifier = Modifier.height(22.dp))
         return
     }
 
-    val avatarSize = (30f * scale.coerceIn(0.9f, 1.15f)).dp
+    val avatarSize = (28f * scale.coerceIn(0.9f, 1.5f)).dp.coerceAtMost(CalendarFoodIconMaxSize)
     val step = (avatarSize.value * 0.44f).dp
     val visibleCount = previews.take(4).size
-
-    val stackHeight = if (visibleCount > 2) (avatarSize + step) else avatarSize
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(stackHeight),
+            .height(CalendarPreviewAreaHeight)
+            .clip(RoundedCornerShape(10.dp)),
         contentAlignment = Alignment.TopCenter
     ) {
         val positions = when (visibleCount) {
@@ -227,7 +241,7 @@ private fun FoodPreviewStack(
                 size = avatarSize,
                 modifier = Modifier
                     .offset(x = xOffset, y = yOffset)
-                    .zIndex(index.toFloat())
+                    .zIndex((visibleCount - index).toFloat())
             )
         }
     }

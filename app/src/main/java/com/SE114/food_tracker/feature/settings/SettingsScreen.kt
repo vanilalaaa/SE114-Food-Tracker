@@ -52,6 +52,7 @@ import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
 import com.SE114.food_tracker.core.designsystem.components.AppScaffold
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
@@ -154,7 +155,7 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
 
             AppButton(
                 text = stringResource(R.string.settings_logout),
@@ -162,6 +163,9 @@ private fun SettingsContent(
                 modifier = Modifier.fillMaxWidth(),
                 variant = AppButtonVariant.Destructive
             )
+
+            Spacer(modifier = Modifier.height(BottomBarContentPadding))
+
         }
     }
 

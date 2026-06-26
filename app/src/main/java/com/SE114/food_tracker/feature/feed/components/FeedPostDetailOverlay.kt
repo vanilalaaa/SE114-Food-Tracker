@@ -368,7 +368,7 @@ private fun FeedPostDetailPage(
                     start = 22.dp,
                     top = 22.dp,
                     end = 22.dp,
-                    bottom = navigationBarBottom + 16.dp
+                    bottom = navigationBarBottom + 42.dp
                 ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -742,7 +742,7 @@ private fun FeedCommentsBottomSheet(
                 .fillMaxHeight(0.88f)
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, bottom = 12.dp)
+                .padding(start = 18.dp, end = 18.dp, bottom = 24.dp)
         ) {
             FeedCommentsList(
                 comments = comments,

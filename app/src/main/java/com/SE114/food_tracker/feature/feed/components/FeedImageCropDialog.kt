@@ -61,12 +61,19 @@ import com.SE114.food_tracker.core.designsystem.theme.OrangeMain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.max
 import kotlin.math.roundToInt
 
 private const val FeedPostAspectRatio = 0.82f
 private const val MaxCropZoom = 4f
+private const val FeedPostImageWidth = 960
+private const val FeedPostImageQuality = 80
+private const val MinFeedPostImageWidth = 640
+private const val MinFeedPostImageQuality = 60
+private const val MaxFeedPostImageBytes = 1 * 1024 * 1024
+private const val MaxFeedCropDecodeSize = 2048
 
 @Composable
 fun FeedImageCropDialog(
@@ -271,7 +278,13 @@ fun FeedImageCropDialog(
 private fun Context.decodeFeedCropBitmap(uri: Uri): Bitmap {
     val rawBytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
         ?: error("Không đọc được ảnh")
-    var decoded = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size)
+    val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, boundsOptions)
+
+    val decodeOptions = BitmapFactory.Options().apply {
+        inSampleSize = calculateInSampleSize(boundsOptions, MaxFeedCropDecodeSize)
+    }
+    var decoded = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, decodeOptions)
         ?: error("Ảnh không hợp lệ")
 
     val rotationDegrees = contentResolver.openInputStream(uri)?.use { input ->
@@ -306,6 +319,21 @@ private fun Context.decodeFeedCropBitmap(uri: Uri): Bitmap {
     return decoded
 }
 
+private fun calculateInSampleSize(
+    options: BitmapFactory.Options,
+    maxSize: Int
+): Int {
+    var inSampleSize = 1
+    val halfWidth = options.outWidth / 2
+    val halfHeight = options.outHeight / 2
+
+    while (halfWidth / inSampleSize >= maxSize || halfHeight / inSampleSize >= maxSize) {
+        inSampleSize *= 2
+    }
+
+    return inSampleSize
+}
+
 private fun Context.saveFeedCrop(
     bitmap: Bitmap,
     cropSize: IntSize,
@@ -329,7 +357,7 @@ private fun Context.saveFeedCrop(
     val height = sourceHeight.roundToInt().coerceIn(1, bitmap.height - top)
 
     val cropped = Bitmap.createBitmap(bitmap, left, top, width, height)
-    val targetWidth = 1080
+    val targetWidth = FeedPostImageWidth
     val targetHeight = (targetWidth / FeedPostAspectRatio).roundToInt()
     val output = Bitmap.createScaledBitmap(cropped, targetWidth, targetHeight, true)
     if (output != cropped) cropped.recycle()
@@ -337,8 +365,44 @@ private fun Context.saveFeedCrop(
     val directory = File(cacheDir, "feed_post_crops").apply { mkdirs() }
     val file = File(directory, "feed_crop_${System.currentTimeMillis()}.jpg")
     file.outputStream().use { out ->
-        output.compress(Bitmap.CompressFormat.JPEG, 92, out)
+        out.write(output.compressFeedPostJpeg())
     }
     output.recycle()
     return Uri.fromFile(file)
+}
+
+private fun Bitmap.compressFeedPostJpeg(): ByteArray {
+    var current = this
+    var currentWidth = width
+    var lastBytes = ByteArray(0)
+
+    while (true) {
+        var quality = FeedPostImageQuality
+        while (quality >= MinFeedPostImageQuality) {
+            val stream = ByteArrayOutputStream()
+            current.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+            lastBytes = stream.toByteArray()
+
+            if (lastBytes.size <= MaxFeedPostImageBytes) {
+                if (current !== this) current.recycle()
+                return lastBytes
+            }
+
+            quality -= 5
+        }
+
+        if (currentWidth <= MinFeedPostImageWidth) {
+            if (current !== this) current.recycle()
+            return lastBytes
+        }
+
+        val nextWidth = (currentWidth * 0.85f)
+            .roundToInt()
+            .coerceAtLeast(MinFeedPostImageWidth)
+        val nextHeight = (nextWidth / FeedPostAspectRatio).roundToInt()
+        val resized = Bitmap.createScaledBitmap(current, nextWidth, nextHeight, true)
+        if (current !== this) current.recycle()
+        current = resized
+        currentWidth = nextWidth
+    }
 }

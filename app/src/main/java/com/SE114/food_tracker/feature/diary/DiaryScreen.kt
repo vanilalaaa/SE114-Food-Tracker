@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +40,9 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import com.SE114.food_tracker.data.repository.ChatRepository
+
+private val CalendarAddButtonOverlap = 28.dp
+private val CalendarAddButtonScrollSpace = 88.dp
 
 @Composable
 fun DiaryScreen(
@@ -188,29 +193,35 @@ fun DiaryScreenContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Box {
-            CalendarCard(
-                selectedYear  = uiState.selectedDate.year,
-                selectedMonth = uiState.selectedDate.monthNumber,
-                onDateClick   = { day ->
-                    runCatching {
-                        LocalDate(uiState.selectedDate.year, uiState.selectedDate.monthNumber, day)
-                    }.getOrNull()?.let { selectedDate ->
-                        onLoadDate(selectedDate)
-                        showDetailSheet = true
-                    }
-                },
-                monthlyItems = filteredMonthlyItems,
-                scale        = calendarScale
-            )
+        CalendarCard(
+            selectedYear  = uiState.selectedDate.year,
+            selectedMonth = uiState.selectedDate.monthNumber,
+            onDateClick   = { day ->
+                runCatching {
+                    LocalDate(uiState.selectedDate.year, uiState.selectedDate.monthNumber, day)
+                }.getOrNull()?.let { selectedDate ->
+                    onLoadDate(selectedDate)
+                    showDetailSheet = true
+                }
+            },
+            monthlyItems = filteredMonthlyItems,
+            scale        = calendarScale
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(CalendarAddButtonScrollSpace)
+        ) {
             AddActionButton(
                 onClick = {
                     selectedItemForEdit = null
                     showSourceScreen = true
                 },
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
+                    .align(Alignment.TopEnd)
                     .padding(end = 24.dp)
+                    .offset(y = -CalendarAddButtonOverlap)
             )
         }
 

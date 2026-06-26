@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,6 +47,7 @@ fun BottomBar(
 ) {
     Card(
         modifier = modifier
+            .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 8.dp)
             .fillMaxWidth()
             .height(68.dp),

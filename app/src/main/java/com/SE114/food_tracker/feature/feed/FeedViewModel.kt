@@ -200,11 +200,11 @@ class FeedViewModel @Inject constructor(
     }
 
     fun updateDraftFreeImageTitle(title: String) {
-        _draftFreeImageTitle.value = title
+        _draftFreeImageTitle.value = title.take(MaxPostTitleLength)
     }
 
     fun updateDraftCaption(caption: String) {
-        _draftCaption.value = caption
+        _draftCaption.value = caption.take(MaxPostCaptionLength)
     }
 
     fun updateDraftVisibility(visibility: FeedVisibility) {

@@ -56,6 +56,8 @@ import com.SE114.food_tracker.feature.feed.feedFallbackIcon
 import com.SE114.food_tracker.feature.feed.feedImageModelOrNull
 import kotlinx.coroutines.flow.distinctUntilChanged
 
+private val FeedBottomContentPadding = BottomBarContentPadding + 80.dp
+
 @Composable
 fun FeedGridContent(
     uiState: FeedUiState,
@@ -162,7 +164,7 @@ private fun FeedGrid(
             start = 12.dp,
             top = 10.dp,
             end = 12.dp,
-            bottom = BottomBarContentPadding
+            bottom = FeedBottomContentPadding
         ),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp)
