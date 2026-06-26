@@ -523,6 +523,35 @@ class ChatRepository @Inject constructor(
         }
     }
 
+    /**
+     * Tears down all chat realtime state so an in-process logout / account switch starts clean.
+     * Cancels every per-conversation and the global channel's collectors, clears the channel
+     * maps, and resets the global-channel user guard so the next login (any account) rebuilds
+     * its channels from scratch. The user guard is reset synchronously; the socket unsubscribes
+     * run off the caller's path. Call before [AuthRepository.signOut] while the session is valid.
+     */
+    fun resetChatState() {
+        val perConversation = activeChannels.values.toList()
+        activeChannels.clear()
+        reconnectingChannels.clear()
+        reconnectBackoff.clear()
+        subscribeDeferreds.clear()
+
+        val global = synchronized(globalChannelLock) {
+            val handle = globalChannelHandle
+            globalChannelHandle = null
+            globalChannelUserId = null
+            handle
+        }
+
+        perConversation.forEach { it.scope.cancel() }
+        global?.scope?.cancel()
+        repositoryScope.launch {
+            perConversation.forEach { runCatching { it.channel.unsubscribe() } }
+            global?.let { runCatching { it.channel.unsubscribe() } }
+        }
+    }
+
     fun subscribeToGlobalConversationsRealtime() {
         val currentUserId = getAuthenticatedUserId()
         if (currentUserId.isBlank()) return

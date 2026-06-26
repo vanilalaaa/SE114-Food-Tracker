@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.core.sync.LocalDataCleaner
 import com.SE114.food_tracker.data.repository.AuthOutcome
 import com.SE114.food_tracker.data.repository.AuthRepository
+import com.SE114.food_tracker.data.repository.ChatRepository
 import com.SE114.food_tracker.data.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -22,6 +23,7 @@ import javax.inject.Inject
 class MainViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
+    private val chatRepository: ChatRepository,
     private val localDataCleaner: LocalDataCleaner
 ) : ViewModel() {
 
@@ -64,6 +66,7 @@ class MainViewModel @Inject constructor(
         // Set the reason before sign-out so the session guard navigates to Login with it.
         _blockedReason.value = REASON_BLOCKED
         localDataCleaner.clearUserOwnedData()
+        chatRepository.resetChatState()
         authRepository.signOut()
     }
 
