@@ -267,7 +267,6 @@ class DiaryViewModel @Inject constructor(
                     note       = note.ifBlank { null },
                     imageUrl   = finalImageUrl,
                     isShared   = isShared,
-                    walletId   = walletId,
                     syncStatus = SyncStatus.PENDING.name,
                     entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
                     createdAt  = pickedTimeMillis, // ← SỬA: Thay thế 'now' thành mốc thời gian người dùng chọn
@@ -354,7 +353,6 @@ class DiaryViewModel @Inject constructor(
                         imageUrl   = finalImageUrl,
                         isShared   = isShared,
                         syncStatus = SyncStatus.PENDING.name,
-                        walletId   = walletId,
                         createdAt  = pickedTimeMillis,
                         updatedAt  = Clock.System.now().toEpochMilliseconds()
                     )

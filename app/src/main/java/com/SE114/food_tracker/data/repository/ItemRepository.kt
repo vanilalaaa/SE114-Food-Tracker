@@ -53,7 +53,6 @@ class ItemRepository @Inject constructor(
                     note = item.note,
                     imageUrl = item.imageUrl,
                     isShared = item.isShared,
-                    walletId = item.walletId,
                     entryDate = item.entryDate,
                     createdAt = item.createdAt,
                     updatedAt = item.updatedAt

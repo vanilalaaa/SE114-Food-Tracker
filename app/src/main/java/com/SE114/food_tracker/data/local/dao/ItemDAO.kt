@@ -31,22 +31,22 @@ interface ItemDAO {
     fun getItemsByCategory(ownerId: String, catId: String): Flow<List<Item>>
 
     // CHẶN QUỸ NHÓM: Thêm điều kiện wallet_id IS NULL cho danh sách món ăn theo ngày trong thống kê cá nhân
-    @Query("SELECT * FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0 ORDER BY time_type ASC, created_at DESC")
+    @Query("SELECT * FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND is_deleted = 0 ORDER BY time_type ASC, created_at DESC")
     fun getItemsByDay(ownerId: String, startDate: Long, endDate: Long): Flow<List<Item>>
 
     // CHẶN QUỸ NHÓM: QUAN TRỌNG NHẤT - Thêm wallet_id IS NULL để getDetailItems của tầng Thống Kê loại bỏ hoàn toàn đồ ăn nhóm từ gốc Database
-    @Query("SELECT * FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0 ORDER BY entry_date DESC")
+    @Query("SELECT * FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND is_deleted = 0 ORDER BY entry_date DESC")
     fun getItemsByDateRange(ownerId: String, startDate: Long, endDate: Long): Flow<List<Item>>
 
     // CHẶN QUỸ NHÓM: Thêm wallet_id IS NULL
-    @Query("SELECT * FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND category_id = :categoryId AND wallet_id IS NULL AND is_deleted = 0 ORDER BY entry_date DESC")
+    @Query("SELECT * FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND category_id = :categoryId AND is_deleted = 0 ORDER BY entry_date DESC")
     fun getItemsByCategoryAndDay(ownerId: String, categoryId: String, startDate: Long, endDate: Long): Flow<List<Item>>
 
     @Query("SELECT * FROM item WHERE owner_id = :ownerId AND (sync_status = 'PENDING' OR sync_status = 'FAILED')")
     suspend fun getPendingItems(ownerId: String): List<Item>
 
     // CHẶN QUỸ NHÓM: Lấy các ngày có dữ liệu, cũng chỉ tính ngày có chi tiêu cá nhân
-    @Query(" SELECT DISTINCT entry_date FROM item WHERE owner_id = :ownerId AND wallet_id IS NULL AND is_deleted = 0 ORDER BY entry_date DESC")
+    @Query(" SELECT DISTINCT entry_date FROM item WHERE owner_id = :ownerId AND is_deleted = 0 ORDER BY entry_date DESC")
     suspend fun getDistinctEntryDates(ownerId: String): List<Long>
 
     @Upsert
@@ -62,13 +62,13 @@ interface ItemDAO {
     @Query("DELETE FROM item")
     suspend fun clearAll()
 
-    @Query("SELECT COUNT(*) FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0")
+    @Query("SELECT COUNT(*) FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND is_deleted = 0")
     fun getItemCountForDay(ownerId: String, startDate: Long, endDate: Long): Flow<Int>
 
-    @Query("SELECT SUM(price) FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0")
+    @Query("SELECT SUM(price) FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND is_deleted = 0")
     fun getTotalExpenseForDay(ownerId: String, startDate: Long, endDate: Long): Flow<Double?>
 
-    @Query("SELECT category_id, SUM(price) as total FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND wallet_id IS NULL AND is_deleted = 0 GROUP BY category_id ORDER BY total DESC")
+    @Query("SELECT category_id, SUM(price) as total FROM item WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate AND is_deleted = 0 GROUP BY category_id ORDER BY total DESC")
     fun getPersonalExpenseByCategory(ownerId: String, startDate: Long, endDate: Long): Flow<List<CategoryExpense>>
 
     /**
@@ -79,7 +79,7 @@ interface ItemDAO {
         SELECT time_type, SUM(price) as total, COUNT(*) as count
         FROM item
         WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate
-          AND wallet_id IS NULL AND is_deleted = 0
+           AND is_deleted = 0
         GROUP BY time_type
         ORDER BY time_type ASC
     """)
@@ -93,7 +93,7 @@ interface ItemDAO {
         SELECT entry_date, SUM(price) as total
         FROM item
         WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate
-          AND wallet_id IS NULL AND is_deleted = 0
+          AND is_deleted = 0
         GROUP BY entry_date
         ORDER BY entry_date ASC
     """)
@@ -108,7 +108,7 @@ interface ItemDAO {
             SUM(price) as total
         FROM item
         WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate
-          AND wallet_id IS NULL AND is_deleted = 0
+          AND is_deleted = 0
         GROUP BY month_epoch
         ORDER BY month_epoch ASC
     """)
@@ -121,7 +121,7 @@ interface ItemDAO {
     @Query("""
         SELECT * FROM item
         WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate
-          AND wallet_id IS NULL AND is_deleted = 0
+          AND is_deleted = 0
         ORDER BY price DESC
         LIMIT :limit
     """)
@@ -134,7 +134,7 @@ interface ItemDAO {
         SELECT name, COUNT(*) as recordCount, SUM(price) as totalSpent
         FROM item
         WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate
-          AND wallet_id IS NULL AND is_deleted = 0
+          AND is_deleted = 0
         GROUP BY name
         ORDER BY recordCount DESC, totalSpent DESC
         LIMIT :limit
@@ -147,7 +147,7 @@ interface ItemDAO {
     @Query("""
         SELECT SUM(price) FROM item
         WHERE owner_id = :ownerId AND entry_date >= :startDate AND entry_date < :endDate
-          AND wallet_id IS NULL AND is_deleted = 0
+          AND is_deleted = 0
     """)
     fun getTotalExpenseForRange(ownerId: String, startDate: Long, endDate: Long): Flow<Double?>
 }

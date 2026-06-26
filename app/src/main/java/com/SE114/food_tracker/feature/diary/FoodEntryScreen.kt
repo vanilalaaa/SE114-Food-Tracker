@@ -69,11 +69,10 @@ fun FoodEntryScreen(
     preSelectedCategory: DiaryCategory? = null,
     categories: List<DiaryCategory> = emptyList(),
     manageCategories: List<DiaryCategory> = categories,
-    availableWallets: List<ChatRepository.WalletWithRole> = emptyList(),
     pendingImageUri: Uri? = null,
     categoryDeleteError: String? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, pickedTimeMillis: Long, walletId: String?) -> Unit,
+    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, pickedTimeMillis: Long) -> Unit,
     onDelete: ((String) -> Unit)? = null,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
@@ -105,7 +104,6 @@ fun FoodEntryScreen(
 
     var rating           by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
     var isShared         by remember(existingItem?.itemId) { mutableStateOf(existingItem?.isShared ?: false) }
-    var selectedWalletId by remember(existingItem?.itemId) { mutableStateOf(existingItem?.walletId) }
     var nameError     by remember { mutableStateOf<String?>(null) }
     var priceError    by remember { mutableStateOf<String?>(null) }
     var categoryError by remember { mutableStateOf<String?>(null) }
@@ -188,8 +186,7 @@ fun FoodEntryScreen(
                 note.trim(),
                 autoTimeType,
                 isShared,
-                pickedTimeMillis,
-                selectedWalletId
+                pickedTimeMillis
             )
         }
     }
@@ -369,12 +366,6 @@ fun FoodEntryScreen(
         ShareToggle(
             isShared      = isShared,
             onShareChange = { isShared = it }
-        )
-
-        PaymentSourceSelector(
-            availableWallets  = availableWallets,
-            selectedWalletId  = selectedWalletId,
-            onSelectionChange = { selectedWalletId = it }
         )
 
         Spacer(Modifier.height(16.dp))

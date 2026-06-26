@@ -14,9 +14,6 @@ data class Conversation(
 
     val name: String?,
 
-    @ColumnInfo(name = "wallet_id")
-    val walletId: String?,
-
     @ColumnInfo(name = "avatar_url")
     val avatarUrl: String? = null,
 
