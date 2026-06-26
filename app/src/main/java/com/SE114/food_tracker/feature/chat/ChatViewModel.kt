@@ -148,8 +148,8 @@ class ChatViewModel @Inject constructor(
     }
 
     fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
-        connectToConversation(conversationId)
-
+        // The realtime connection is owned by ChatScreen's LaunchedEffect(conversationId);
+        // connecting here too would fire a second concurrent subscribe for the same conversation.
         return chatRepository.getMessagesWithProfileStream(conversationId).map { joinEntities ->
             joinEntities.map { entity ->
                 val finalName = when {

@@ -52,7 +52,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import timber.log.Timber
@@ -164,7 +165,14 @@ class ChatRepository @Inject constructor(
     private val activeChannels = ConcurrentHashMap<String, ChannelHandle>()
     private val reconnectingChannels = ConcurrentHashMap.newKeySet<String>()
     private val reconnectBackoff = ConcurrentHashMap<String, Long>()
-    private val globalChannelStarted = AtomicBoolean(false)
+    // One lock per conversation, serializing its subscribe/unsubscribe/reconnect so they never
+    // race on the single channel instance supabase-kt caches per topic (a concurrent op could
+    // otherwise unsubscribe the very instance another op just registered).
+    private val channelMutexes = ConcurrentHashMap<String, Mutex>()
+    // One global channel per authenticated user; rebuilt on an in-process account switch.
+    private val globalChannelLock = Any()
+    private var globalChannelUserId: String? = null
+    private var globalChannelHandle: ChannelHandle? = null
     private val _memberUpdateSignal = MutableSharedFlow<String>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -220,15 +228,22 @@ class ChatRepository @Inject constructor(
                 .select { filter { isIn("id", convIds) } }
                 .decodeList<SupabaseConversationDto>()
 
+            // REPLACE would otherwise reset created_at to "now" (the server DTO has none) and
+            // could overwrite a newer locally-tracked last_message_at with a stale snapshot —
+            // both scramble the newest-first order. Read existing rows and preserve those fields.
+            val existing = chatDAO.getConversationsByIds(convIds).associateBy { it.id }
             chatDAO.insertConversations(
                 conversations.map { dto ->
+                    val prev = existing[dto.id]
+                    val keepLocalLast = (prev?.lastMessageAt ?: 0L) > dto.lastMessageAt
                     LocalConversation(
                         id                 = dto.id,
                         name               = dto.name ?: "Trò chuyện 1-1",
                         isGroup            = dto.isGroup,
-                        walletId           = dto.walletId ?: "wallet_default",
-                        lastMessageAt      = dto.lastMessageAt,
-                        lastMessageSnippet = dto.lastMessageSnippet
+                        walletId           = dto.walletId ?: prev?.walletId ?: "wallet_default",
+                        lastMessageAt      = if (keepLocalLast) prev?.lastMessageAt ?: 0L else dto.lastMessageAt,
+                        lastMessageSnippet = if (keepLocalLast) prev?.lastMessageSnippet else dto.lastMessageSnippet,
+                        createdAt          = prev?.createdAt ?: System.currentTimeMillis()
                     )
                 }
             )
@@ -292,16 +307,23 @@ class ChatRepository @Inject constructor(
             activeChannels.containsKey(conversationId)
         }
     }
+    private fun channelMutex(conversationId: String): Mutex =
+        channelMutexes.getOrPut(conversationId) { Mutex() }
+
     fun subscribeToChatRealtime(conversationId: String) {
         repositoryScope.launch {
-            if (activeChannels.containsKey(conversationId)) {
-                subscribeDeferreds[conversationId]?.complete(Unit)
-                return@launch
-            }
-
+            // Serialize subscribe/unsubscribe/reconnect per conversation: supabase-kt caches one
+            // channel instance per topic, so overlapping ops would corrupt its state (e.g. an
+            // abandoned subscribe unsubscribing the instance another op just registered).
+            val mutex = channelMutex(conversationId)
+            mutex.lock()
             val deferred = CompletableDeferred<Unit>()
-            subscribeDeferreds[conversationId] = deferred
             try {
+                if (activeChannels.containsKey(conversationId)) {
+                    subscribeDeferreds[conversationId]?.complete(Unit)
+                    return@launch
+                }
+                subscribeDeferreds[conversationId] = deferred
                 // Collectors run on a child scope tied to this channel so leaving the chat
                 // (unsubscribeFromChatRealtime) cancels exactly these collectors, nothing else.
                 val channelScope = CoroutineScope(
@@ -469,6 +491,8 @@ class ChatRepository @Inject constructor(
                 }
 
                 channel.subscribe()
+                // Holding the per-conversation lock, no other op can be mid-flight, so register
+                // unconditionally; unsubscribe/reconnect only run after we release the lock.
                 activeChannels[conversationId] = ChannelHandle(channel, channelScope)
                 reconnectBackoff.remove(conversationId)
                 deferred.complete(Unit)
@@ -476,6 +500,8 @@ class ChatRepository @Inject constructor(
                 deferred.completeExceptionally(e)
                 Timber.tag("Chat").e(e, "subscribe failed for $conversationId")
                 handleRealtimeReconnect(conversationId)
+            } finally {
+                mutex.unlock()
             }
         }
     }
@@ -485,20 +511,38 @@ class ChatRepository @Inject constructor(
     fun unsubscribeFromChatRealtime(conversationId: String) {
         reconnectingChannels.remove(conversationId)
         reconnectBackoff.remove(conversationId)
-        subscribeDeferreds.remove(conversationId)
-        val handle = activeChannels.remove(conversationId) ?: return
-        handle.scope.cancel()
-        repositoryScope.launch { runCatching { handle.channel.unsubscribe() } }
+        repositoryScope.launch {
+            // Wait for any in-flight subscribe to finish before tearing down, so we never miss a
+            // channel that is mid-registration (which would otherwise leak).
+            channelMutex(conversationId).withLock {
+                subscribeDeferreds.remove(conversationId)
+                val handle = activeChannels.remove(conversationId) ?: return@withLock
+                handle.scope.cancel()
+                runCatching { handle.channel.unsubscribe() }
+            }
+        }
     }
 
     fun subscribeToGlobalConversationsRealtime() {
         val currentUserId = getAuthenticatedUserId()
         if (currentUserId.isBlank()) return
-        // The repo is a singleton but every ChatViewModel calls this; keep exactly one
-        // global channel so message inserts aren't processed by several collectors.
-        if (!globalChannelStarted.compareAndSet(false, true)) return
+        // The repo is a singleton and every ChatViewModel calls this. Keep exactly one global
+        // channel for the current user; on an in-process account switch, tear the previous
+        // user's channel down and rebuild so the new user actually receives list realtime.
+        synchronized(globalChannelLock) {
+            if (globalChannelUserId == currentUserId && globalChannelHandle != null) return
+            globalChannelHandle?.let { stale ->
+                stale.scope.cancel()
+                repositoryScope.launch { runCatching { stale.channel.unsubscribe() } }
+            }
+            globalChannelHandle = null
+            globalChannelUserId = currentUserId
+        }
 
-        repositoryScope.launch {
+        val globalScope = CoroutineScope(
+            SupervisorJob(repositoryScope.coroutineContext[Job]) + Dispatchers.IO
+        )
+        globalScope.launch {
             try {
                 val globalChannel = supabaseClient.channel("global_conv_channel_$currentUserId")
 
@@ -523,7 +567,7 @@ class ChatRepository @Inject constructor(
                         table = "message"
                     }
 
-                repositoryScope.launch {
+                globalScope.launch {
                     participantInsertFlow.collect { action ->
                         val userIdStr =
                             action.record["user_id"]?.toString()?.replace("\"", "")?.lowercase()
@@ -531,7 +575,7 @@ class ChatRepository @Inject constructor(
                     }
                 }
 
-                repositoryScope.launch {
+                globalScope.launch {
                     participantDeleteFlow.collect { action ->
                         val userIdStr = action.oldRecord["user_id"]?.toString()?.replace("\"", "")?.lowercase()
                         val convIdStr = action.oldRecord["conversation_id"]?.toString()?.replace("\"", "")
@@ -544,7 +588,7 @@ class ChatRepository @Inject constructor(
 
                 // Read elsewhere: another device advanced last_read_at — mirror it locally so
                 // the list de-emphasises a conversation the user already read.
-                repositoryScope.launch {
+                globalScope.launch {
                     participantUpdateFlow.collect { action ->
                         val rec = action.record
                         val userIdStr = rec["user_id"]?.toString()?.replace("\"", "")?.lowercase()
@@ -558,7 +602,7 @@ class ChatRepository @Inject constructor(
                     }
                 }
 
-                repositoryScope.launch {
+                globalScope.launch {
                     messageInsertFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
                         val exist = chatDAO.getMessageByServerId(dto.id ?: "")
@@ -586,8 +630,26 @@ class ChatRepository @Inject constructor(
 
                 // subscribe() after collectors — same rule as the chat channel above.
                 globalChannel.subscribe()
+                val superseded = synchronized(globalChannelLock) {
+                    if (globalChannelUserId == currentUserId) {
+                        globalChannelHandle = ChannelHandle(globalChannel, globalScope)
+                        false
+                    } else {
+                        true
+                    }
+                }
+                if (superseded) {
+                    // A newer account switch took over mid-subscribe — discard this channel.
+                    // unsubscribe() runs on repositoryScope since cancelling globalScope would
+                    // abort this suspend call (and can't be invoked inside the lock anyway).
+                    globalScope.cancel()
+                    repositoryScope.launch { runCatching { globalChannel.unsubscribe() } }
+                }
             } catch (e: Exception) {
-                globalChannelStarted.set(false)
+                synchronized(globalChannelLock) {
+                    if (globalChannelUserId == currentUserId) globalChannelUserId = null
+                }
+                globalScope.cancel()
                 Timber.tag("Chat").e(e, "global channel subscribe failed")
             }
         }
@@ -600,13 +662,15 @@ class ChatRepository @Inject constructor(
             val backoff = reconnectBackoff.getOrDefault(conversationId, 2000L)
             try {
                 delay(backoff)
-                // Drop any stale channel + collectors before re-subscribing so activeChannels
-                // never holds two channels for the same conversation.
-                activeChannels.remove(conversationId)?.let { stale ->
-                    stale.scope.cancel()
-                    runCatching { stale.channel.unsubscribe() }
+                // Drop any stale channel + collectors before re-subscribing, under the lock so it
+                // can't race the subscribe that follows.
+                channelMutex(conversationId).withLock {
+                    activeChannels.remove(conversationId)?.let { stale ->
+                        stale.scope.cancel()
+                        runCatching { stale.channel.unsubscribe() }
+                    }
+                    subscribeDeferreds.remove(conversationId)
                 }
-                subscribeDeferreds.remove(conversationId)
                 reconnectBackoff[conversationId] = (backoff * 2).coerceAtMost(60000L)
             } finally {
                 reconnectingChannels.remove(conversationId)
@@ -1112,7 +1176,10 @@ class ChatRepository @Inject constructor(
         val currentUserId = getAuthenticatedUserId()
         if (currentUserId.isBlank()) return
 
-        val now = System.currentTimeMillis()
+        // Advance the local marker to at least the newest known message: message timestamps
+        // come from the server/sender clock, the device clock may lag, and comparing the two
+        // would otherwise leave a just-read message counted as unread.
+        val now = maxOf(System.currentTimeMillis(), chatDAO.getLatestMessageTime(conversationId) ?: 0L)
 
         chatDAO.insertParticipantIfAbsent(
             ConversationParticipant(
