@@ -23,6 +23,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 import kotlinx.coroutines.flow.firstOrNull
+import timber.log.Timber
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -212,6 +213,29 @@ class ChatViewModel @Inject constructor(
 
     fun getConversationsFlow(): Flow<List<Conversation>> {
         return chatDAO.getAllConversations()
+    }
+
+    /**
+     * Open a 1-1 chat with a friend from the search suggestions. Resolves (or creates) the real
+     * conversation on the server first, then hands back its id — sending to a conversation_id that
+     * doesn't exist yet violates the message→conversation foreign key, which is why first messages
+     * to a brand-new 1-1 used to fail.
+     */
+    fun openConversationWithFriend(
+        friendUserId: String,
+        friendName: String,
+        onResolved: (conversationId: String, name: String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val conversationId = chatRepository.getOrCreateOneToOneChat(friendUserId)
+            if (conversationId.isNullOrBlank()) {
+                Timber.tag("Chat").e("Could not open 1-1 chat with %s", friendUserId)
+                return@launch
+            }
+            onResolved(conversationId, friendName)
+            // Pull the just-created conversation into Room so it shows in the list.
+            fetchConversationsFromServer()
+        }
     }
 
     // ── MARK AS READ ──────────────────────────────────────────────────────────

@@ -179,6 +179,12 @@ fun ConversationListScreen(
             viewModel.markAsRead(id)
             onConversationClick(id, name)
         },
+        onFriendClick = { friendId, friendName ->
+            // Create/resolve the real 1-1 conversation, then open it with the valid id.
+            viewModel.openConversationWithFriend(friendId, friendName) { conversationId, name ->
+                onConversationClick(conversationId, name)
+            }
+        },
         onBackClick = onBackClick,
         onCreateGroupClick = { showCreateGroupDialog = true },
         onRefreshData = { onComplete ->
@@ -198,6 +204,9 @@ fun ConversationListScreenContent(
     conversationList: List<ConversationWithUnread>,           // ← CHANGED type
     friendList: List<Pair<String, String>> = emptyList(),
     onConversationClick: (id: String, name: String) -> Unit,
+    // Friend suggestions need the 1-1 conversation created/resolved before opening, unlike
+    // existing conversations whose id is already valid.
+    onFriendClick: (friendId: String, friendName: String) -> Unit = { _, _ -> },
     onBackClick: (() -> Unit)?,
     onCreateGroupClick: () -> Unit,
     onRefreshData: (onComplete: () -> Unit) -> Unit = {},
@@ -339,7 +348,7 @@ fun ConversationListScreenContent(
                                 }
                                 ConversationItem(
                                     conversation = mockConversation,
-                                    onClick = { onConversationClick(friend.first, friend.second) }
+                                    onClick = { onFriendClick(friend.first, friend.second) }
                                 )
                             }
                         }
