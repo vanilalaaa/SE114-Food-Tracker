@@ -188,7 +188,8 @@ fun DayDetailBottomSheetContent(
                         categoryIcon = catIcon,
                         imageUrl     = item.imageUrl,
                         price        = item.price,
-                        time         = item.timeLabel.ifBlank { item.timeType.toTimeLabel() },
+                        createdAt    = item.createdAt,
+                        timeLabel    = item.timeLabel,
                         onClick      = { onEditItemClick(item) }
                     )
                 }

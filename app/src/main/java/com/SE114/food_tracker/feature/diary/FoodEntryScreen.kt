@@ -56,6 +56,7 @@ import com.SE114.food_tracker.feature.diary.components.ManageCategoryBottomSheet
 import com.SE114.food_tracker.feature.diary.components.ShareToggle
 import com.SE114.food_tracker.feature.diary.components.StarRatingBar
 import com.SE114.food_tracker.feature.diary.components.TimeSelector
+import com.SE114.food_tracker.feature.diary.components.WheelTimePickerDialog
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,7 +69,7 @@ fun FoodEntryScreen(
     pendingImageUri: Uri? = null,
     categoryDeleteError: String? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean) -> Unit,
+    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, pickedTimeMillis: Long) -> Unit,
     onDelete: ((String) -> Unit)? = null,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
@@ -106,17 +107,24 @@ fun FoodEntryScreen(
     var showDeleteDialog    by remember { mutableStateOf(false) }
     var showManageCategoriesSheet by remember { mutableStateOf(false) }
 
-    var selectedHour by remember(existingItem?.itemId) {
-        val initialHour = when (existingItem?.timeType) {
-            0 -> 8
-            1 -> 12
-            2 -> 19
-            else -> Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    var selectedHour by remember(existingItem) {
+        val calendar = Calendar.getInstance()
+        if (existingItem != null) {
+            calendar.timeInMillis = existingItem.createdAt
+            mutableIntStateOf(calendar.get(Calendar.HOUR_OF_DAY))
+        } else {
+            mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
         }
-        mutableIntStateOf(initialHour)
     }
-    var selectedMinute by remember(existingItem?.itemId) {
-        mutableIntStateOf(if (existingItem != null) 0 else Calendar.getInstance().get(Calendar.MINUTE))
+
+    var selectedMinute by remember(existingItem) {
+        val calendar = Calendar.getInstance()
+        if (existingItem != null) {
+            calendar.timeInMillis = existingItem.createdAt
+            mutableIntStateOf(calendar.get(Calendar.MINUTE))
+        } else {
+            mutableIntStateOf(Calendar.getInstance().get(Calendar.MINUTE))
+        }
     }
     var showTimePicker by remember { mutableStateOf(false) }
 
@@ -160,7 +168,25 @@ fun FoodEntryScreen(
         categoryError = if (selectedCategoryId.isBlank()) "Vui lòng chọn loại món" else null
 
         if (nameError == null && priceError == null && categoryError == null && parsedPrice != null) {
-            onSave(trimmedName, parsedPrice, selectedCategoryId, rating, note.trim(), autoTimeType, isShared)
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = existingItem?.entryDate ?: System.currentTimeMillis()
+                set(Calendar.HOUR_OF_DAY, selectedHour)
+                set(Calendar.MINUTE, selectedMinute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val pickedTimeMillis = cal.timeInMillis
+
+            onSave(
+                trimmedName,
+                parsedPrice,
+                selectedCategoryId,
+                rating,
+                note.trim(),
+                autoTimeType,
+                isShared,
+                pickedTimeMillis
+            )
         }
     }
 
@@ -186,27 +212,14 @@ fun FoodEntryScreen(
 
     // ── Time picker dialog (TV3) ───────────────────────────────────────────
     if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(
-            initialHour   = selectedHour,
+        WheelTimePickerDialog(
+            initialHour = selectedHour,
             initialMinute = selectedMinute,
-            is24Hour      = true
-        )
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    selectedHour   = timePickerState.hour
-                    selectedMinute = timePickerState.minute
-                    showTimePicker = false
-                }) { Text("Xong") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("Hủy") }
-            },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    TimePicker(state = timePickerState)
-                }
+            onDismiss = { showTimePicker = false },
+            onDone = { hour, minute ->
+                selectedHour = hour
+                selectedMinute = minute
+                showTimePicker = false
             }
         )
     }
@@ -431,7 +444,7 @@ fun FoodEntryScreenPreview() {
             FoodEntryScreen(
                 categories = previewCategories,
                 onDismiss  = {},
-                onSave     = { _, _, _, _, _, _, _ -> }
+                onSave     = { _, _, _, _, _, _, _, _ -> }
             )
         }
     }

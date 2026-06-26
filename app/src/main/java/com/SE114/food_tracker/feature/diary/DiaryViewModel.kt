@@ -65,14 +65,12 @@ class DiaryViewModel @Inject constructor(
     private var _pendingImageBytes: ByteArray? = null
     private var _imageCompressionJob: Job? = null
 
-    // TỐI ƯU: Loại bỏ mutationTrigger, để Room Flow tự động cập nhật bất cứ khi nào DB thay đổi
     private val selectedDayItems: Flow<List<DiaryItem>> =
         _selectedDate.flatMapLatest { date ->
             val range = date.utcDayRange()
             itemRepository.getDiaryItemsByDay(range.start, range.end)
         }
 
-    // Dữ liệu tháng hiện tại để hiển thị lên NutritionCard (sticker vật lý)
     private val selectedMonthItems: Flow<List<DiaryItem>> =
         _selectedDate.flatMapLatest { date ->
             val monthStart     = LocalDate(date.year, date.monthNumber, 1)
@@ -83,7 +81,6 @@ class DiaryViewModel @Inject constructor(
             )
         }
 
-    // TỐI ƯU: Loại bỏ mutationTrigger tại đây luôn
     private val datesWithData: Flow<Set<Int>> =
         _selectedDate.flatMapLatest { date ->
             val monthStart     = LocalDate(date.year, date.monthNumber, 1)
@@ -199,7 +196,8 @@ class DiaryViewModel @Inject constructor(
         rating: Int,
         note: String,
         timeType: Int,
-        isShared: Boolean = false
+        isShared: Boolean = false,
+        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds() // ← Thêm tham số nhận dạng thời gian thực ăn
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -239,11 +237,10 @@ class DiaryViewModel @Inject constructor(
                     isShared   = isShared,
                     syncStatus = SyncStatus.PENDING.name,
                     entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
-                    createdAt  = now,
+                    createdAt  = pickedTimeMillis, // ← SỬA: Thay thế 'now' thành mốc thời gian người dùng chọn
                     updatedAt  = now
                 )
 
-                // Thực hiện ghi vào DB và dọn dẹp
                 itemRepository.insert(item)
                 clearPendingImage()
                 computeStreak()
@@ -266,7 +263,8 @@ class DiaryViewModel @Inject constructor(
         rating: Int,
         note: String,
         timeType: Int,
-        isShared: Boolean
+        isShared: Boolean,
+        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds()
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -304,7 +302,8 @@ class DiaryViewModel @Inject constructor(
                         note       = note.ifBlank { null },
                         imageUrl   = finalImageUrl,
                         isShared   = isShared,
-                        syncStatus = SyncStatus.PENDING.name, // Đưa về trạng thái cần sync lại lên server
+                        syncStatus = SyncStatus.PENDING.name,
+                        createdAt  = pickedTimeMillis,
                         updatedAt  = Clock.System.now().toEpochMilliseconds()
                     )
                 )
@@ -343,29 +342,22 @@ class DiaryViewModel @Inject constructor(
             val systemTimeZone = TimeZone.currentSystemDefault()
             val today = Clock.System.todayIn(systemTimeZone)
 
-            // 1. Lấy chuỗi ID người dùng hiện tại
             val ownerId = itemRepository.getCurrentUserId().orEmpty()
-
-            // 2. TỐI ƯU HIỆU NĂNG: Chỉ lấy danh sách các Epoch thuần túy (Kiểu Long) thay vì cả bảng Item
             val distinctEpochs = itemRepository.getDistinctEntryDates(ownerId)
 
-            // 3.
             val activeDates = distinctEpochs.map { epoch ->
                 Instant.fromEpochMilliseconds(epoch)
                     .toLocalDateTime(systemTimeZone)
                     .date
             }.toSet()
 
-            // 4. Thuật toán đếm lùi chuỗi ngày liên tục (Streak) trên RAM
             var streak = 0
             var cursor = today
 
-            // UX bảo vệ chuỗi: Nếu hôm nay chưa ăn/nhập gì, lùi lại bắt đầu xét từ hôm qua
             if (!activeDates.contains(cursor)) {
                 cursor = cursor.plus(DatePeriod(days = -1))
             }
 
-            // Vòng lặp đếm lùi siêu tốc cho đến khi đứt chuỗi
             while (activeDates.contains(cursor)) {
                 streak++
                 cursor = cursor.plus(DatePeriod(days = -1))

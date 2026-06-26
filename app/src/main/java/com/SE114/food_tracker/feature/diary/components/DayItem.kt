@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,17 +20,24 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.core.util.*
+import java.util.Calendar
 
 @Composable
 fun DayItem(
     name: String,
     category: String,
     price: Double,
-    time: String,
+    createdAt: Long,
+    timeLabel: String,
     categoryIcon: String = "",
     imageUrl: String? = null,
     onClick: () -> Unit
 ) {
+    val displayTime = remember(createdAt) {
+        val calendar = Calendar.getInstance().apply { timeInMillis = createdAt }
+        String.format("%02d:%02d", calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE))
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -76,12 +84,13 @@ fun DayItem(
                     Text(text = category, style = AppTypography.labelMedium)
                     Spacer(Modifier.width(12.dp))
 
+                    // Badge hiển thị: "15:45 • Chiều"
                     Surface(
                         color = Color(0xFFE2E2E2),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = time,
+                            text = "$displayTime • $timeLabel",
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             fontSize = 10.sp,
                             color = TextSecondary
@@ -108,7 +117,10 @@ fun DayItemPreview() {
                 name = "Phở Hà Nội",
                 category = "Mì & Phở",
                 price = 30000.0,
-                time = "Chiều",
+                createdAt = System.currentTimeMillis(),
+                timeLabel = "Chiều",
+                categoryIcon = "🍜",
+                imageUrl = null,
                 onClick = {}
             )
         }
