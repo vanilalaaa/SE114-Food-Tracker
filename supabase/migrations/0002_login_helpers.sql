@@ -1,9 +1,6 @@
 -- 0002_login_helpers.sql
 --
 -- Login-by-user_id support + a pre-auth user_id availability probe.
--- Run MANUALLY via Supabase Dashboard → SQL Editor (the Supabase CLI is not
--- configured for this project). The script is idempotent and safe to re-run.
---
 -- Both functions are security definer and granted to `anon` because they run
 -- during the login / register flows, before the caller has an authenticated
 -- session. RLS hides public.profile from anon, and auth.users.email is never

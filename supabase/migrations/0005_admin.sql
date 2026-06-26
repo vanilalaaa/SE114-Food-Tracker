@@ -2,9 +2,7 @@
 --
 -- In-app admin capability: lifecycle flags, admin RPCs, self-flag helpers, and
 -- admin read policies for public.profile / public.report.
--- Run MANUALLY via Supabase Dashboard → SQL Editor (the Supabase CLI is not
--- configured for this project). The script is idempotent and safe to re-run.
---
+
 -- Numbered 0005 (not 0003) because 0003/0004 are already taken by the feed
 -- migrations; the original task referenced 0003_admin.sql before those landed.
 --

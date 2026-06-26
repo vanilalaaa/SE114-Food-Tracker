@@ -1,17 +1,24 @@
 package com.SE114.food_tracker.feature.chat.components
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 
 @Composable
@@ -21,9 +28,15 @@ fun GroupSettingsDialog(
     onDismissRequest: () -> Unit,
     onRenameGroup: (String) -> Unit,
     onKickMember: (userId: String, name: String) -> Unit,
+    currentAvatarUrl: String? = null,
+    onChangeAvatar: (imageUri: String) -> Unit = {},
+    onRemoveAvatar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var groupNameInput by remember { mutableStateOf(conversationName) }
+    val avatarPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { onChangeAvatar(it.toString()) } }
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -42,6 +55,54 @@ fun GroupSettingsDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.padding(top = 8.dp)
             ) {
+
+                // Group avatar with an edit badge → opens the image picker.
+                Box(
+                    contentAlignment = Alignment.BottomEnd,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    if (!currentAvatarUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = currentAvatarUrl,
+                            contentDescription = "Ảnh đại diện nhóm",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(76.dp).clip(CircleShape).background(LightPeach)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.size(76.dp).clip(CircleShape).background(LightPeach),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = conversationName.trim().take(1).uppercase(),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 30.sp
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = CircleShape,
+                        color = StatPinkDark,
+                        modifier = Modifier.clickable { avatarPicker.launch("image/*") }
+                    ) {
+                        Text("✏️", fontSize = 14.sp, modifier = Modifier.padding(5.dp))
+                    }
+                }
+
+                if (!currentAvatarUrl.isNullOrBlank()) {
+                    TextButton(
+                        onClick = onRemoveAvatar,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(
+                            text = "Gỡ ảnh đại diện",
+                            color = StatRed,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
 
                 OutlinedTextField(
                     value = groupNameInput,
