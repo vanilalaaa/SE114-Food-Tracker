@@ -18,6 +18,9 @@ as $$
   join public.conversation_participant friend
     on friend.conversation_id = c.id and friend.user_id = p_friend
   where c.is_group = false
+  -- Deterministic tie-break so every caller converges on the same conversation if a
+  -- duplicate-creation race ever produced more than one direct chat for the pair.
+  order by c.id
   limit 1;
 $$;
 

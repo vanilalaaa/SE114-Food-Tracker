@@ -306,7 +306,7 @@ fun ConversationListScreenContent(
                                 ConversationItem(
                                     conversation = conversation,
                                     onClick = {
-                                        onConversationClick(conversation.id, conversation.name ?: "Người dùng")
+                                        onConversationClick(conversation.id, conversation.displayName ?: "Người dùng")
                                     }
                                 )
                             }
