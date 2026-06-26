@@ -80,7 +80,9 @@ fun DiaryScreen(
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
         onEditCategory             = { category, newName, newIconUrl -> categoryViewModel.editCategory(category, newName, newIconUrl) },
         onCreateCategory           = { name, emoji -> categoryViewModel.addCategory(name, emoji) },
-        onSelectCategoryFilter     = { catId -> diaryViewModel.selectCategoryFilter(catId) }
+        onSelectCategoryFilter     = { catId -> diaryViewModel.selectCategoryFilter(catId) },
+        onBoxScaleChange           = { diaryViewModel.updateBoxScale(it) },
+        onCalendarScaleChange      = { diaryViewModel.updateCalendarScale(it) }
     )
 }
 
@@ -106,15 +108,15 @@ fun DiaryScreenContent(
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
     onEditCategory: (DiaryCategory, String, String) -> Unit,
     onCreateCategory: (String, String) -> Unit,
-    onSelectCategoryFilter: (String?) -> Unit
+    onSelectCategoryFilter: (String?) -> Unit,
+    onBoxScaleChange: (Float) -> Unit,
+    onCalendarScaleChange: (Float) -> Unit
 ) {
     var showDetailSheet     by remember { mutableStateOf(false) }
     var showEntryScreen     by remember { mutableStateOf(false) }
     var showSourceScreen    by remember { mutableStateOf(false) }
     var selectedItemForEdit by remember { mutableStateOf<DiaryItem?>(null) }
     var showDatePicker      by remember { mutableStateOf(false) }
-    var boxScale            by remember { mutableStateOf(1f) }
-    var calendarScale       by remember { mutableStateOf(1f) }
     val scrollState         = rememberScrollState()
     var preSelectedCategory by remember { mutableStateOf<DiaryCategory?>(null) }
 
@@ -195,10 +197,10 @@ fun DiaryScreenContent(
             categories         = categories,
             selectedCategoryId = uiState.selectedCategoryId,
             onCategorySelect   = onSelectCategoryFilter,
-            boxScale           = boxScale,
-            calendarScale      = calendarScale,
-            onBoxScaleChange   = { boxScale = it },
-            onCalendarScaleChange = { calendarScale = it }
+            boxScale           = uiState.boxScale,
+            calendarScale      = uiState.calendarScale,
+            onBoxScaleChange   = onBoxScaleChange,
+            onCalendarScaleChange = onCalendarScaleChange
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -215,7 +217,7 @@ fun DiaryScreenContent(
                 }
             },
             monthlyItems = filteredMonthlyItems,
-            scale        = calendarScale
+            scale        = uiState.calendarScale
         )
 
         Spacer(modifier = Modifier.height(DiaryBottomContentPadding))
@@ -373,7 +375,9 @@ fun DiaryScreenPreview() {
             onToggleCategoryVisibility = {},
             onEditCategory             = { _, _, _ -> },
             onCreateCategory           = { _, _ -> },
-            onSelectCategoryFilter     = {}
+            onSelectCategoryFilter     = {},
+            onBoxScaleChange           = {},
+            onCalendarScaleChange      = {}
         )
     }
 }

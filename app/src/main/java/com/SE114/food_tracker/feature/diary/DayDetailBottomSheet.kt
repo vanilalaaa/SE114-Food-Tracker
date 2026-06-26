@@ -145,7 +145,7 @@ fun DayDetailBottomSheetContent(
         Spacer(Modifier.height(28.dp))
         Text("Danh sách", style = AppTypography.titleSmall)
         Text(
-            "Swipe left to reveal delete. Tap to edit.",
+            "Vuốt sang trái để xóa. Nhấn để sửa.",
             style = AppTypography.labelMedium,
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)

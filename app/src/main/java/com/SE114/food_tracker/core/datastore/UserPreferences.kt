@@ -3,6 +3,7 @@ package com.SE114.food_tracker.core.datastore
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.SE114.food_tracker.core.util.AppCurrency
@@ -27,6 +28,12 @@ class UserPreferences @Inject constructor(
         CachedRates(json, ts)
     }
 
+    val diaryBoxScale: Flow<Float> =
+        dataStore.data.map { it[DIARY_BOX_SCALE] ?: 1f }
+
+    val diaryCalendarScale: Flow<Float> =
+        dataStore.data.map { it[DIARY_CALENDAR_SCALE] ?: 1f }
+
     suspend fun setDisplayCurrency(code: String) {
         dataStore.edit { it[DISPLAY_CURRENCY] = code }
     }
@@ -38,10 +45,20 @@ class UserPreferences @Inject constructor(
         }
     }
 
+    suspend fun setDiaryBoxScale(scale: Float) {
+        dataStore.edit { it[DIARY_BOX_SCALE] = scale.coerceIn(0.5f, 1.5f) }
+    }
+
+    suspend fun setDiaryCalendarScale(scale: Float) {
+        dataStore.edit { it[DIARY_CALENDAR_SCALE] = scale.coerceIn(0.5f, 1.5f) }
+    }
+
     companion object {
         private val DISPLAY_CURRENCY = stringPreferencesKey("display_currency")
         private val RATES_JSON = stringPreferencesKey("rates_json")
         private val RATES_TIMESTAMP = longPreferencesKey("rates_timestamp")
+        private val DIARY_BOX_SCALE = floatPreferencesKey("diary_box_scale")
+        private val DIARY_CALENDAR_SCALE = floatPreferencesKey("diary_calendar_scale")
     }
 }
 
