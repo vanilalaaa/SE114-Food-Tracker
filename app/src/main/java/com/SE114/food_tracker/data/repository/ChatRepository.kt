@@ -21,6 +21,7 @@ import io.github.jan.supabase.realtime.decodeRecord
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.storage.storage
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -156,7 +157,17 @@ class ChatRepository @Inject constructor(
         @SerialName("avatar_url") val avatarUrl: String? = null
     )
 
-    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // supabase-kt's CallbackManagerImpl removes a channel's flow callbacks from a non-thread-safe
+    // AtomicMutableList during cancellation. Tearing down a channel that has several flows (this
+    // app registers 7 per chat channel) races on a stale index and throws IndexOutOfBoundsException
+    // on the IO dispatcher — an uncaught crash when leaving a chat / reconnecting / logging out.
+    // We can't patch the library, so we contain that teardown exception here instead of crashing.
+    private val realtimeErrorHandler = CoroutineExceptionHandler { _, t ->
+        Timber.tag("Chat").w(t, "realtime coroutine error contained (channel teardown race)")
+    }
+
+    private val repositoryScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.IO + realtimeErrorHandler)
 
     /** A subscribed realtime channel plus the scope its collectors run on, so one
      *  conversation can be torn down without affecting any other. */
@@ -327,7 +338,7 @@ class ChatRepository @Inject constructor(
                 // Collectors run on a child scope tied to this channel so leaving the chat
                 // (unsubscribeFromChatRealtime) cancels exactly these collectors, nothing else.
                 val channelScope = CoroutineScope(
-                    SupervisorJob(repositoryScope.coroutineContext[Job]) + Dispatchers.IO
+                    SupervisorJob(repositoryScope.coroutineContext[Job]) + Dispatchers.IO + realtimeErrorHandler
                 )
                 val channel = supabaseClient.channel("chat_channel_$conversationId")
 
@@ -569,7 +580,7 @@ class ChatRepository @Inject constructor(
         }
 
         val globalScope = CoroutineScope(
-            SupervisorJob(repositoryScope.coroutineContext[Job]) + Dispatchers.IO
+            SupervisorJob(repositoryScope.coroutineContext[Job]) + Dispatchers.IO + realtimeErrorHandler
         )
         globalScope.launch {
             try {
@@ -938,7 +949,7 @@ class ChatRepository @Inject constructor(
 
             if (currentUserId.isBlank()) return false
 
-            val currentConv = chatDAO.getConversationById(conversationId).first()
+            val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
             val walletName  = currentConv?.name ?: "Quỹ nhóm"
 
             val walletDto = SupabaseGroupWalletDto(
@@ -1005,7 +1016,7 @@ class ChatRepository @Inject constructor(
     ): Boolean {
         return try {
             val currentUserId    = getAuthenticatedUserId()
-            val conversation     = chatDAO.getConversationById(conversationId).first()
+            val conversation     = chatDAO.getConversationById(conversationId).firstOrNull()
             val walletId         = conversation?.walletId ?: ""
 
             if (walletId.isBlank() || walletId == "wallet_default") return false

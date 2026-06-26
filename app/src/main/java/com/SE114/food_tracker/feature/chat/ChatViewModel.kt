@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -245,7 +245,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val transactionType = if (isDeposit) "deposit" else "withdrawal"
-                val conversation = chatDAO.getConversationById(conversationId).first()
+                val conversation = chatDAO.getConversationById(conversationId).firstOrNull()
                 val actualWalletId = conversation?.walletId
                 if (actualWalletId.isNullOrBlank() || actualWalletId == "wallet_default") return@launch
 
