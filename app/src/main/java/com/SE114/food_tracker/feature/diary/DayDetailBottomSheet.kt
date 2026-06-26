@@ -158,18 +158,31 @@ fun DayDetailBottomSheetContent(
         var itemToDelete by remember { mutableStateOf<DiaryItem?>(null) }
 
         itemToDelete?.let { target ->
-            ConfirmDialog(
-                title        = "Xóa món ăn?",
-                body         = "Bạn có chắc chắn muốn xóa món ăn này không? Hành động này không thể hoàn tác.",
-                confirmLabel = "Xóa",
-                cancelLabel  = "Huỷ",
-                destructive  = true,
-                onConfirm    = {
-                    onDeleteItem(target.itemId)
-                    itemToDelete = null
-                },
-                onDismiss    = { itemToDelete = null }
-            )
+            if (target.walletId != null) {
+                ConfirmDialog(
+                    title        = "Không thể xóa",
+                    body         = "Món ăn này được thanh toán từ Quỹ nhóm. Bạn không thể xóa món ăn này.",
+                    confirmLabel = "Đóng",
+                    cancelLabel  = "",
+                    destructive  = false,
+                    onConfirm    = { itemToDelete = null },
+                    onDismiss    = { itemToDelete = null }
+                )
+            } else {
+                // Món ăn cá nhân bình thường
+                ConfirmDialog(
+                    title        = "Xóa món ăn?",
+                    body         = "Bạn có chắc chắn muốn xóa món ăn này không? Hành động này không thể hoàn tác.",
+                    confirmLabel = "Xóa",
+                    cancelLabel  = "Huỷ",
+                    destructive  = true,
+                    onConfirm    = {
+                        onDeleteItem(target.itemId)
+                        itemToDelete = null
+                    },
+                    onDismiss    = { itemToDelete = null }
+                )
+            }
         }
 
         items.forEach { item ->
@@ -188,7 +201,8 @@ fun DayDetailBottomSheetContent(
                         categoryIcon = catIcon,
                         imageUrl     = item.imageUrl,
                         price        = item.price,
-                        time         = item.timeLabel.ifBlank { item.timeType.toTimeLabel() },
+                        createdAt    = item.createdAt,
+                        timeLabel    = item.timeLabel,
                         onClick      = { onEditItemClick(item) }
                     )
                 }
@@ -292,8 +306,9 @@ private fun SwipeToRevealDeleteRow(
 
 private fun Int.toTimeLabel(): String = when (this) {
     0    -> "Sáng"
-    1    -> "Trưa/Chiều"
-    2    -> "Tối"
+    1    -> "Trưa"
+    2    -> "Chiều"
+    3    -> "Tối"
     else -> "Khác"
 }
 

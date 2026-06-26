@@ -14,6 +14,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 @Singleton
 class ProfileViewerRepository @Inject constructor(
@@ -99,14 +101,27 @@ class ProfileViewerRepository @Inject constructor(
             price = price,
             timeLabel = timeType.toProfileTimeLabel(),
             imageUrl = imageUrl,
-            entryDate = entryDate
+            entryDate = entryDate,
+            createdAt = try {
+                val formattedInput = if (!createdAt.contains("Z") && !createdAt.contains("+") && createdAt.contains("T")) {
+                    "${createdAt}Z"
+                } else {
+                    createdAt
+                }
+                val instant = Instant.parse(formattedInput)
+                instant.toEpochMilliseconds()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Clock.System.now().toEpochMilliseconds()
+            }
         )
 
     private fun Int.toProfileTimeLabel(): String =
         when (this) {
             0 -> "Sáng"
-            1 -> "Trưa/Chiều"
-            2 -> "Tối"
+            1 -> "Trưa"
+            2 -> "Chiều"
+            3 -> "Tối"
             else -> "Khác"
         }
 }

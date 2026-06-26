@@ -172,7 +172,8 @@ private fun ProfileScreenDiaryPreview() {
                         price = 45_000.0,
                         timeLabel = "Sáng",
                         imageUrl = null,
-                        entryDate = "2026-06-07"
+                        entryDate = "2026-06-07",
+                        createdAt = System.currentTimeMillis()
                     )
                 )
             ),

@@ -6,6 +6,7 @@ data class ProfileSharedItem(
     val categoryName: String,
     val categoryIcon: String,
     val price: Double,
+    val createdAt: Long,
     val timeLabel: String,
     val imageUrl: String?,
     val entryDate: String
