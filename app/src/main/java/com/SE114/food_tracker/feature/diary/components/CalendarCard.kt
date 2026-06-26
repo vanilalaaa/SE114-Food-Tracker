@@ -105,7 +105,7 @@ fun CalendarCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 16.dp)
             .height(calendarHeight),
         shape = RoundedCornerShape(28.dp),
         color = Color.White,

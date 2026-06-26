@@ -48,7 +48,7 @@ fun BottomBar(
     Card(
         modifier = modifier
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .fillMaxWidth()
             .height(68.dp),
         shape = RoundedCornerShape(30.dp),

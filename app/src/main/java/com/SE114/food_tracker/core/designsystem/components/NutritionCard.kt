@@ -70,7 +70,7 @@ fun NutritionCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(160.dp)
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 16.dp),
         color = LightPinkBG,
         shape = RoundedCornerShape(30.dp),
         shadowElevation = 2.dp

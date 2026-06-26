@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -57,6 +58,7 @@ import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.HintGrayStat
+import com.SE114.food_tracker.core.designsystem.theme.SettingActionOrange
 import com.SE114.food_tracker.core.util.AppCurrency
 import com.SE114.food_tracker.data.repository.Profile
 import com.SE114.food_tracker.feature.settings.components.CurrencySelectionDialog
@@ -161,7 +163,11 @@ private fun SettingsContent(
                 text = stringResource(R.string.settings_logout),
                 onClick = { showLogoutDialog = true },
                 modifier = Modifier.fillMaxWidth(),
-                variant = AppButtonVariant.Destructive
+                variant = AppButtonVariant.Destructive,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SettingActionOrange,
+                    contentColor = CardWhite
+                )
             )
 
             Spacer(modifier = Modifier.height(BottomBarContentPadding))
@@ -190,7 +196,8 @@ private fun SettingsContent(
                 onLogout()
             },
             onDismiss = { showLogoutDialog = false },
-            destructive = true
+            destructive = true,
+            confirmColorOverride = SettingActionOrange
         )
     }
 }

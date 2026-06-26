@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
+import com.SE114.food_tracker.core.designsystem.theme.AppTypography
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.HintGray
 import com.SE114.food_tracker.core.designsystem.theme.LightPeach
@@ -118,15 +119,13 @@ private fun FeedHeader(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 14.dp),
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Newsfeed",
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp
+                style = AppTypography.titleLarge
             )
             Text(
                 text = "$postCount bài viết",
