@@ -1,7 +1,9 @@
 package com.SE114.food_tracker.feature.auth
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.navigation.AppDestinations
 import com.SE114.food_tracker.core.sync.SyncManager
 import com.SE114.food_tracker.data.repository.AuthError
 import com.SE114.food_tracker.data.repository.AuthOutcome
@@ -20,9 +22,12 @@ data class LoginUiState(
     val password: String = "",
     val isLoading: Boolean = false,
     val error: AuthError? = null,
-    val navTarget: PostAuthDestination? = null
+    val navTarget: PostAuthDestination? = null,
+    // Arrived here because the account was banned/soft-deleted and signed out.
+    val accountBlocked: Boolean = false
 ) {
-    val canSubmit: Boolean get() = identifier.isNotBlank() && password.isNotBlank() && !isLoading
+    val canSubmit: Boolean
+        get() = identifier.isNotBlank() && password.isNotBlank() && !isLoading
 }
 
 @HiltViewModel
@@ -30,13 +35,19 @@ class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
     private val postAuthNavigator: PostAuthNavigator,
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(LoginUiState())
+    private val _state = MutableStateFlow(
+        LoginUiState(
+            accountBlocked = savedStateHandle.get<String>(AppDestinations.Login.ARG_REASON) != null
+        )
+    )
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
-    fun onIdentifierChange(value: String) = _state.update { it.copy(identifier = value, error = null) }
+    fun onIdentifierChange(value: String) =
+        _state.update { it.copy(identifier = value, error = null, accountBlocked = false) }
     fun onPasswordChange(value: String) = _state.update { it.copy(password = value, error = null) }
 
     fun submit() {

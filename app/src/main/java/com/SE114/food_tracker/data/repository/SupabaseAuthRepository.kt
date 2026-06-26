@@ -24,6 +24,8 @@ class SupabaseAuthRepository @Inject constructor(
 
     override fun currentSessionFlow(): Flow<SessionStatus> = auth.sessionStatus
 
+    override fun hasSession(): Boolean = auth.currentUserOrNull() != null
+
     override suspend fun signIn(email: String, password: String): AuthOutcome<Unit> = runAuth {
         auth.signInWith(Email) {
             this.email = email

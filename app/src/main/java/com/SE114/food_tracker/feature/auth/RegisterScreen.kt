@@ -48,7 +48,10 @@ fun RegisterScreen(
     }
 
     LaunchedEffect(state.pendingVerification) {
-        state.pendingVerification?.let { onNavigateToVerifyEmail(it.email, it.displayName, it.userId) }
+        state.pendingVerification?.let {
+            onNavigateToVerifyEmail(it.email, it.displayName, it.userId)
+            viewModel.consumePendingVerification()
+        }
     }
 
     RegisterContent(

@@ -50,4 +50,18 @@ interface ProfileRepository {
 
     /** Remaining whole days before user_id can change again; 0 = changeable now. */
     suspend fun userIdCooldownRemaining(): AuthOutcome<Int>
+
+    /**
+     * Reads the current user's `is_admin` via the `am_i_admin` security-definer RPC
+     * (the flag is off the column SELECT grant). Only toggles UI — every admin RPC
+     * re-checks server-side.
+     */
+    suspend fun amIAdmin(): AuthOutcome<Boolean>
+
+    /**
+     * True when the current user is neither banned nor soft-deleted, via the
+     * `am_i_active` security-definer RPC (those flags are off the column SELECT grant).
+     * The session guard signs out a user for whom this is false.
+     */
+    suspend fun amIActive(): AuthOutcome<Boolean>
 }

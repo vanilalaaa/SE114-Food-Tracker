@@ -5,9 +5,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import androidx.navigation.navArgument
 import com.SE114.food_tracker.feature.auth.ChangePasswordScreen
 import com.SE114.food_tracker.feature.auth.CompleteProfileScreen
 import com.SE114.food_tracker.feature.auth.ForgotPasswordScreen
@@ -27,10 +29,14 @@ import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
 import com.SE114.food_tracker.feature.chat.GroupWalletScreen
 import com.SE114.food_tracker.feature.profile.ProfileScreen
+import com.SE114.food_tracker.feature.admin.AdminDashboardScreen
+import com.SE114.food_tracker.feature.admin.AdminReportsScreen
+import com.SE114.food_tracker.feature.admin.AdminUsersScreen
 
 object NavGraphs {
     const val AUTH = "auth_graph"
     const val MAIN = "main_graph"
+    const val ADMIN = "admin_graph"
 }
 
 @Composable
@@ -68,13 +74,22 @@ fun AppNavGraph(
                 SplashScreen(
                     onResolved = ::navigatePostAuth,
                     onUnauthenticated = {
-                        navController.navigate(AppDestinations.Login.route) {
+                        navController.navigate(AppDestinations.Login.createRoute()) {
                             popUpTo(AppDestinations.Splash.route) { inclusive = true }
                         }
                     }
                 )
             }
-            composable(AppDestinations.Login.route) {
+            composable(
+                route = AppDestinations.Login.route,
+                arguments = listOf(
+                    navArgument(AppDestinations.Login.ARG_REASON) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) {
                 LoginScreen(
                     onAuthenticated = ::navigatePostAuth,
                     onNavigateRegister = { navController.navigate(AppDestinations.Register.route) },
@@ -178,7 +193,8 @@ fun AppNavGraph(
                 SettingsScreen(
                     onNavigateToProfile = { navController.navigate(AppDestinations.MyProfile.route) },
                     onNavigateToCategories = { navController.navigate(AppDestinations.CategoryManagement.route) },
-                    onChangePassword = { navController.navigate(AppDestinations.ChangePassword.route) }
+                    onChangePassword = { navController.navigate(AppDestinations.ChangePassword.route) },
+                    onNavigateToAdmin = { navController.navigate(AppDestinations.AdminDashboard.route) }
                 )
             }
 
@@ -192,6 +208,22 @@ fun AppNavGraph(
 
             composable(AppDestinations.CategoryManagement.route) {
                 CategoryManagementScreen(onBack = { navController.popBackStack() })
+            }
+        }
+
+        navigation(startDestination = AppDestinations.AdminDashboard.route, route = NavGraphs.ADMIN) {
+            composable(AppDestinations.AdminDashboard.route) {
+                AdminDashboardScreen(
+                    onNavigateToUsers = { navController.navigate(AppDestinations.AdminUsers.route) },
+                    onNavigateToReports = { navController.navigate(AppDestinations.AdminReports.route) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(AppDestinations.AdminUsers.route) {
+                AdminUsersScreen(onBack = { navController.popBackStack() })
+            }
+            composable(AppDestinations.AdminReports.route) {
+                AdminReportsScreen(onBack = { navController.popBackStack() })
             }
         }
     }

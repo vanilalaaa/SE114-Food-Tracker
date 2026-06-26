@@ -119,20 +119,31 @@ class RegisterViewModel @Inject constructor(
             )
             when (signUp) {
                 is AuthOutcome.Failure -> _state.update { it.copy(isLoading = false, error = signUp.error) }
-                // Email confirmation is ON: signUp returns no session — go verify the OTP first.
-                is AuthOutcome.Success -> _state.update {
-                    it.copy(
-                        isLoading = false,
-                        pendingVerification = PendingVerification(
-                            email = current.email.trim(),
-                            displayName = current.displayName.trim(),
-                            userId = current.userId.trim()
-                        )
-                    )
-                }
+                is AuthOutcome.Success ->
+                    // With "Confirm email" ON, signUp returns no session: go verify the 6-digit code.
+                    // With it OFF, Supabase auto-confirms and establishes a session immediately — no code
+                    // is ever sent, so proceed into the app instead of stranding the user on the OTP screen.
+                    if (authRepository.hasSession()) {
+                        resolveDestination()
+                    } else {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                pendingVerification = PendingVerification(
+                                    email = current.email.trim(),
+                                    displayName = current.displayName.trim(),
+                                    userId = current.userId.trim()
+                                )
+                            )
+                        }
+                    }
             }
         }
     }
+
+    // One-shot: cleared once the screen has navigated, so backing out of Verify-Email returns to
+    // Register instead of being re-routed to the OTP screen on the next recomposition.
+    fun consumePendingVerification() = _state.update { it.copy(pendingVerification = null) }
 
     fun signInWithGoogle(idToken: String, rawNonce: String) {
         viewModelScope.launch {
