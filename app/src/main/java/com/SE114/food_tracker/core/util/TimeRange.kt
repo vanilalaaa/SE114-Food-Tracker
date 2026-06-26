@@ -161,11 +161,11 @@ object TimeRangeProvider {
 
 // ─── Extension helpers used by ViewModel ─────────────────────────────────────
 
-/** Converts a time_type int (0/1/2) to a Vietnamese session label. */
 fun Int.toSessionLabel(): String = when (this) {
-    0    -> "Sáng"
-    1    -> "Trưa"
-    2    -> "Tối"
+    0 -> "Sáng"
+    1 -> "Trưa"
+    2 -> "Chiều"
+    3 -> "Tối"
     else -> "Khác"
 }
 

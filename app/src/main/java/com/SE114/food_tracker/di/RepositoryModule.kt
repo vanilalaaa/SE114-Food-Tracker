@@ -1,7 +1,9 @@
 package com.SE114.food_tracker.di
 
+import com.SE114.food_tracker.data.repository.AdminRepository
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.ProfileRepository
+import com.SE114.food_tracker.data.repository.SupabaseAdminRepository
 import com.SE114.food_tracker.data.repository.SupabaseAuthRepository
 import com.SE114.food_tracker.data.repository.SupabaseProfileRepository
 import dagger.Binds
@@ -21,4 +23,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindProfileRepository(impl: SupabaseProfileRepository): ProfileRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminRepository(impl: SupabaseAdminRepository): AdminRepository
 }

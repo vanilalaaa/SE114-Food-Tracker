@@ -87,13 +87,14 @@ fun ProfileDiaryTab(
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                             DayItem(
-                                name = item.name,
-                                category = item.categoryName,
-                                price = item.price,
-                                time = item.timeLabel,
+                                name         = item.name,
+                                category     = item.categoryName,
+                                price        = item.price,
+                                createdAt    = item.createdAt,
+                                timeLabel    = item.timeLabel,
                                 categoryIcon = item.categoryIcon,
-                                imageUrl = item.imageUrl,
-                                onClick = {}
+                                imageUrl     = item.imageUrl,
+                                onClick      = { }
                             )
                         }
                     }
@@ -136,6 +137,7 @@ private fun ProfileDiaryTabPreview() {
                     categoryName = "Mì & Phở",
                     categoryIcon = "🍜",
                     price = 45_000.0,
+                    createdAt = System.currentTimeMillis(),
                     timeLabel = "Sáng",
                     imageUrl = null,
                     entryDate = "2026-06-07"
@@ -146,6 +148,7 @@ private fun ProfileDiaryTabPreview() {
                     categoryName = "Đồ uống",
                     categoryIcon = "🥤",
                     price = 35_000.0,
+                    createdAt = System.currentTimeMillis(),
                     timeLabel = "Chiều",
                     imageUrl = null,
                     entryDate = "2026-06-06"

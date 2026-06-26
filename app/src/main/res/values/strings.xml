@@ -57,6 +57,7 @@
     <string name="auth_err_no_network">Không có kết nối mạng. Vui lòng kiểm tra Internet và thử lại.</string>
     <string name="auth_err_unknown">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
     <string name="auth_err_password_mismatch">Mật khẩu nhập lại không khớp</string>
+    <string name="auth_account_blocked">Tài khoản đã bị khóa</string>
 
     <!-- Register confirm password -->
     <string name="auth_register_confirm_password">Nhập lại mật khẩu</string>
@@ -114,7 +115,9 @@
     <string name="settings_currency">Đơn vị tiền tệ</string>
     <string name="settings_currency_title">Đơn vị tiền</string>
     <string name="settings_currency_note">Giá đã nhập được giữ nguyên; chỉ thay đổi cách hiển thị.</string>
+    <string name="settings_currency_confirm">Xác nhận</string>
     <string name="settings_change_password">Đổi mật khẩu</string>
+    <string name="settings_admin">Quản trị</string>
     <string name="settings_logout">Đăng xuất</string>
 
     <!-- Category management -->
@@ -166,6 +169,11 @@
     <string name="profile_user_id_cooldown">Có thể đổi sau %1$d ngày</string>
     <string name="profile_save">Lưu</string>
     <string name="profile_edit_title">Chỉnh sửa hồ sơ</string>
+    <string name="profile_crop_title">Cắt ảnh đại diện</string>
+    <string name="profile_crop_instruction">Kéo để di chuyển, kéo góc để đổi kích thước</string>
+    <string name="profile_crop_cancel">Hủy</string>
+    <string name="profile_crop_confirm">Xong</string>
+    <string name="profile_crop_error">Không đọc được ảnh</string>
     <!-- Public profile -->
     <string name="profile_viewer_title">Profile</string>
     <string name="profile_menu_open">Mở menu</string>
@@ -187,4 +195,94 @@
     <string name="report_reason_inappropriate">Nội dung không phù hợp</string>
     <string name="report_reason_harassment">Quấy rối</string>
     <string name="report_reason_other">Khác</string>
+    <string name="report_group_post_diary">Báo cáo bài đăng / nhật ký</string>
+    <string name="report_group_user">Báo cáo người dùng</string>
+    <string name="report_group_message_wallet">Báo cáo tin nhắn / quỹ nhóm</string>
+    <string name="report_group_other">Khác</string>
+    <string name="report_reason_post_spam_ads">Đây là spam hoặc quảng cáo</string>
+    <string name="report_reason_post_sensitive_content">Hình ảnh/Nội dung phản cảm, nhạy cảm</string>
+    <string name="report_reason_post_disordered_eating">Cổ xúy ăn uống thất thường / Rối loạn ăn uống</string>
+    <string name="report_reason_post_bullying_defamation">Bắt nạt hoặc bôi nhọ</string>
+    <string name="report_reason_user_impersonation">Họ đang mạo danh người khác</string>
+    <string name="report_reason_user_bad_avatar_name">Avatar hoặc tên hiển thị không phù hợp</string>
+    <string name="report_reason_user_repeated_friend_requests">Gửi lời mời kết bạn liên tục</string>
+    <string name="report_reason_message_money_scam">Lừa đảo hoặc gian lận tiền bạc</string>
+    <string name="report_reason_message_harassment">Bắt nạt hoặc quấy rối trong tin nhắn</string>
+    <string name="report_reason_message_malicious_links">Tin nhắn chứa link/nội dung độc hại</string>
+    <string name="report_group_label">Loại báo cáo</string>
+    <string name="report_reason_label">Lý do</string>
+    <string name="report_other_details_label">Nhập lý do báo cáo</string>
+
+    <!-- Admin -->
+    <string name="admin_back">Quay lại</string>
+    <string name="admin_dashboard_title">Quản trị</string>
+    <string name="admin_dashboard_users">Người dùng</string>
+    <string name="admin_dashboard_reports">Báo cáo</string>
+    <string name="admin_users_title">Quản lý người dùng</string>
+    <string name="admin_reports_title">Báo cáo</string>
+
+    <!-- Admin: common -->
+    <string name="admin_retry">Thử lại</string>
+    <string name="admin_cancel">Hủy</string>
+    <string name="admin_err_not_authorized">Bạn không có quyền thực hiện thao tác này</string>
+    <string name="admin_err_generic">Đã có lỗi xảy ra. Vui lòng thử lại.</string>
+
+    <!-- Admin: dashboard stats -->
+    <string name="admin_stat_total_users">Tổng người dùng</string>
+    <string name="admin_stat_banned">Đã khóa</string>
+    <string name="admin_stat_deleted">Đã xóa</string>
+    <string name="admin_stat_pending_reports">Báo cáo chờ xử lý</string>
+
+    <!-- Admin: users -->
+    <string name="admin_users_search_hint">Tìm theo User ID hoặc tên</string>
+    <string name="admin_users_empty">Không có người dùng</string>
+    <string name="admin_user_no_name">(Chưa đặt tên)</string>
+    <string name="admin_status_active">Hoạt động</string>
+    <string name="admin_status_banned">Đã khóa</string>
+    <string name="admin_status_deleted">Đã xóa</string>
+    <string name="admin_status_admin">Quản trị</string>
+    <string name="admin_action_ban">Khóa tài khoản</string>
+    <string name="admin_action_unban">Mở khóa tài khoản</string>
+    <string name="admin_action_delete">Xóa tài khoản</string>
+    <string name="admin_action_restore">Khôi phục tài khoản</string>
+    <string name="admin_ban_confirm_title">Khóa tài khoản?</string>
+    <string name="admin_ban_confirm_body">Người dùng %1$s sẽ bị đăng xuất và không thể đăng nhập lại.</string>
+    <string name="admin_confirm_ban">Khóa</string>
+    <string name="admin_delete_confirm_title">Xóa tài khoản?</string>
+    <string name="admin_delete_confirm_body">Tài khoản %1$s sẽ bị xóa mềm và ẩn khỏi người khác.</string>
+    <string name="admin_confirm_delete">Xóa</string>
+    <string name="admin_action_make_admin">Cấp quyền quản trị</string>
+    <string name="admin_action_revoke_admin">Thu hồi quyền quản trị</string>
+    <string name="admin_make_admin_confirm_title">Cấp quyền quản trị?</string>
+    <string name="admin_make_admin_confirm_body">Cấp quyền quản trị cho %1$s? Họ sẽ có toàn quyền quản lý.</string>
+    <string name="admin_confirm_make_admin">Cấp quyền</string>
+    <string name="admin_revoke_admin_confirm_title">Thu hồi quyền quản trị?</string>
+    <string name="admin_revoke_admin_confirm_body">Thu hồi quyền quản trị của %1$s?</string>
+    <string name="admin_confirm_revoke_admin">Thu hồi</string>
+    <string name="admin_ban_duration_title">Khóa trong bao lâu?</string>
+    <string name="admin_ban_duration_1d">24 giờ</string>
+    <string name="admin_ban_duration_1w">1 tuần</string>
+    <string name="admin_ban_duration_1mo">1 tháng</string>
+    <string name="admin_ban_duration_6mo">6 tháng</string>
+    <string name="admin_ban_duration_permanent">Vĩnh viễn</string>
+    <string name="admin_ban_count">Đã bị khóa %1$d lần</string>
+    <string name="admin_ban_until">Đến %1$s</string>
+
+    <!-- Admin: reports -->
+    <string name="admin_reports_filter_pending">Chờ xử lý</string>
+    <string name="admin_reports_filter_resolved">Đã xử lý</string>
+    <string name="admin_reports_filter_dismissed">Đã bỏ qua</string>
+    <string name="admin_reports_empty">Không có báo cáo</string>
+    <string name="admin_report_target">Bị báo cáo: %1$s</string>
+    <string name="admin_report_reporter">Người báo cáo: %1$s</string>
+    <string name="admin_report_reason">Lý do: %1$s</string>
+    <string name="admin_report_status_pending">Chờ xử lý</string>
+    <string name="admin_report_status_resolved">Đã xử lý</string>
+    <string name="admin_report_status_dismissed">Đã bỏ qua</string>
+    <string name="admin_report_actions_title">Xử lý báo cáo</string>
+    <string name="admin_report_resolve">Giải quyết</string>
+    <string name="admin_report_dismiss">Bỏ qua</string>
+    <string name="admin_report_also_ban">Đồng thời khóa người bị báo cáo</string>
+    <string name="admin_report_ban_label">Khóa người bị báo cáo</string>
+    <string name="admin_report_ban_none">Không khóa</string>
 </resources>

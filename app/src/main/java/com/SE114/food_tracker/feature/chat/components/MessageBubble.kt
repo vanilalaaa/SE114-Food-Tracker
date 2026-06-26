@@ -193,7 +193,7 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.width(4.dp))
                     when (message.syncStatus) {
                         MessageSyncStatus.PENDING -> {
-                            Text(text = "🕒", fontSize = 10.sp)
+                            Text(text = "🕒 đang chờ", fontSize = 10.sp, color = TextLabelGray)
                         }
                         MessageSyncStatus.SENT -> {
                             Text(

@@ -77,7 +77,6 @@ dependencies {
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.androidx.compose.runtime)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.work.runtime.ktx)
@@ -101,7 +100,8 @@ dependencies {
     implementation(libs.supabase.auth)
     implementation(libs.supabase.realtime)
     implementation(libs.supabase.storage)
-    implementation(libs.ktor.client.android)
+    implementation(libs.supabase.functions)
+    implementation(libs.ktor.client.okhttp)
 
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
@@ -117,6 +117,7 @@ dependencies {
 
     implementation(libs.androidx.emoji2.emojipicker)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation("com.github.commandiron:WheelPickerCompose:1.1.11")
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.4.X") // Hoặc phiên bản bạn đang dùng
     implementation("io.github.jan-tennert.supabase:auth-kt:2.4.X")
     implementation("io.github.jan-tennert.supabase:realtime-kt:2.4.X")

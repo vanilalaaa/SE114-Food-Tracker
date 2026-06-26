@@ -224,15 +224,18 @@ fun ConversationListScreen(
             viewModel.markAsRead(id)
             onConversationClick(id, name)
         },
+        onFriendClick = { friendId, friendName ->
+            // Create/resolve the real 1-1 conversation, then open it with the valid id.
+            viewModel.openConversationWithFriend(friendId, friendName) { conversationId, name ->
+                onConversationClick(conversationId, name)
+            }
+        },
         onBackClick = onBackClick,
         onCreateGroupClick = { showCreateGroupDialog = true },
         onRefreshData = { onComplete ->
-            try {
-                viewModel.fetchConversationsFromServer()
-                onComplete()
-            } catch (e: Exception) {
-                onComplete()
-            }
+            // Keep the spinner until the sync actually finishes (instead of dismissing instantly
+            // and then recomposing the list mid-scroll).
+            viewModel.fetchConversationsFromServer { onComplete() }
         }
     )
 }
@@ -243,6 +246,9 @@ fun ConversationListScreenContent(
     conversationList: List<ConversationWithUnread>,           // ← CHANGED type
     friendList: List<Pair<String, String>> = emptyList(),
     onConversationClick: (id: String, name: String) -> Unit,
+    // Friend suggestions need the 1-1 conversation created/resolved before opening, unlike
+    // existing conversations whose id is already valid.
+    onFriendClick: (friendId: String, friendName: String) -> Unit = { _, _ -> },
     onBackClick: (() -> Unit)?,
     onCreateGroupClick: () -> Unit,
     onRefreshData: (onComplete: () -> Unit) -> Unit = {},
@@ -382,10 +388,7 @@ fun ConversationListScreenContent(
                                 ConversationItem(
                                     conversation = conversation,
                                     onClick = {
-                                        onConversationClick(
-                                            conversation.id,
-                                            conversation.displayName ?: "Người dùng"
-                                        )
+                                        onConversationClick(conversation.id, conversation.displayName ?: "Người dùng")
                                     }
                                 )
                             }
@@ -418,7 +421,7 @@ fun ConversationListScreenContent(
                                 }
                                 ConversationItem(
                                     conversation = mockConversation,
-                                    onClick = { onConversationClick(friend.first, friend.second) }
+                                    onClick = { onFriendClick(friend.first, friend.second) }
                                 )
                             }
                         }
@@ -436,19 +439,14 @@ fun ConversationListScreenPreview() {
         ConversationListScreenContent(
             conversationList = listOf(
                 ConversationWithUnread(
-                    id = "1",
-                    isGroup = false,
-                    name = "Azun (Data)",
-                    walletId = "w1",
-                    lastMessageAt = System.currentTimeMillis(),
-                    lastMessageSnippet = "Ăn bún bò Huế đi!",
-                    createdAt = System.currentTimeMillis(),
-                    unreadCount = 5
+                    id = "1", isGroup = false, name = "Azun (Data)", walletId = "w1",
+                    lastMessageAt = System.currentTimeMillis(), lastMessageSnippet = "Ăn bún bò Huế đi!",
+                    createdAt = System.currentTimeMillis(), isUnread = true, unreadCount = 5
                 ),
                 ConversationWithUnread(
                     id = "2", isGroup = true, name = "Quỹ Nhóm 4 Food Tracker", walletId = "w2",
                     lastMessageAt = 0L, lastMessageSnippet = null,
-                    createdAt = System.currentTimeMillis(), unreadCount = 0
+                    createdAt = System.currentTimeMillis(), isUnread = false, unreadCount = 0
                 )
             ),
             friendList = listOf(Pair("3", "Thúy Vy"), Pair("4", "Hải Đăng")),

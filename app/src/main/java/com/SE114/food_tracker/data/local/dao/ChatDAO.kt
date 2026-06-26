@@ -31,17 +31,24 @@ data class ConversationWithUnread(
     @ColumnInfo(name = "is_group") val isGroup: Boolean,
     @ColumnInfo(name = "name") val name: String?,
     @ColumnInfo(name = "wallet_id") val walletId: String?,
+    /** Group conversation avatar (null for 1-1 — use [peerAvatar] there). */
+    @ColumnInfo(name = "avatar_url") val avatarUrl: String? = null,
     @ColumnInfo(name = "last_message_at") val lastMessageAt: Long,
     @ColumnInfo(name = "last_message_snippet") val lastMessageSnippet: String?,
     @ColumnInfo(name = "created_at") val createdAt: Long,
-    /** Count of messages newer than the user's last read time and not sent by the user. */
+    /**
+     * Unread = the conversation's last message is newer than the user's read marker. Uses the
+     * denormalized last_message_at (fetched for every conversation) so it works even for chats
+     * whose messages aren't synced into Room yet (messages only sync on open).
+     */
+    @ColumnInfo(name = "is_unread") val isUnread: Boolean = false,
+    /** Best-effort unread count from locally-synced messages (0 when none are cached yet). */
     @ColumnInfo(name = "unread_count") val unreadCount: Int = 0,
     /** The 1-1 peer's display name; null for groups (use [name] there). */
     @ColumnInfo(name = "peer_name") val peerName: String? = null,
     /** The 1-1 peer's avatar url; null for groups or when not cached yet. */
     @ColumnInfo(name = "peer_avatar") val peerAvatar: String? = null
 ) {
-    val isUnread: Boolean get() = unreadCount > 0
     /** Name to show in the list: the resolved 1-1 peer name, else the stored conversation name. */
     val displayName: String? get() = peerName ?: name
 }
@@ -72,6 +79,10 @@ interface ChatDAO {
     @Query("SELECT * FROM messages WHERE sync_status = 'PENDING' OR sync_status = 'FAILED'")
     suspend fun getUnsentMessages(): List<Message>
 
+    /** Oldest-first PENDING queue the MessageSyncWorker drains when connectivity returns. */
+    @Query("SELECT * FROM messages WHERE sync_status = 'PENDING' ORDER BY created_at ASC")
+    suspend fun getPendingMessagesOrdered(): List<Message>
+
     @Query("SELECT * FROM messages WHERE id = :serverId LIMIT 1")
     suspend fun getMessageByServerId(serverId: String): Message?
 
@@ -99,9 +110,11 @@ interface ChatDAO {
             c.is_group,
             c.name,
             c.wallet_id,
+            c.avatar_url,
             c.last_message_at,
             c.last_message_snippet,
             c.created_at,
+            CASE WHEN c.last_message_at > COALESCE(cp.last_read_at, 0) THEN 1 ELSE 0 END AS is_unread,
             (SELECT COUNT(*) FROM messages m
                 WHERE m.conversation_id = c.id
                   AND m.created_at > COALESCE(cp.last_read_at, 0)

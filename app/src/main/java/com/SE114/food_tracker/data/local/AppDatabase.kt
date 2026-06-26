@@ -16,6 +16,7 @@ import com.SE114.food_tracker.data.local.entities.Message
 import com.SE114.food_tracker.data.local.entities.FriendshipEntity
 import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
 import com.SE114.food_tracker.data.local.entities.FeedComment
+import com.SE114.food_tracker.data.local.entities.FeedHiddenPost
 import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
 import com.SE114.food_tracker.data.local.dao.ChatDAO
@@ -34,9 +35,10 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         UserProfileCacheEntity::class,
         FeedPost::class,
         FeedLike::class,
-        FeedComment::class
+        FeedComment::class,
+        FeedHiddenPost::class
     ],
-    version = 14,
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -89,10 +91,56 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_13_14 = object : Migration(13, 14) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // Chat (perf/chat-realtime): conversation ordering + per-participant read tracking.
                 db.execSQL("ALTER TABLE conversations ADD COLUMN last_message_at INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE conversations ADD COLUMN last_message_snippet TEXT")
-
                 db.execSQL("ALTER TABLE conversation_participants ADD COLUMN last_read_at INTEGER NOT NULL DEFAULT 0")
+                // Feed: comment moderation flags.
+                db.execSQL("ALTER TABLE feed_comment ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE feed_comment ADD COLUMN hidden_at INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.createFeedHiddenPostTable()
+            }
+        }
+
+        // Both branches once shipped a different v14, so a device may sit at v13/14/15 with only
+        // part of the v16 schema. Re-apply every column/index idempotently to converge safely.
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!db.hasColumn("feed_comment", "parent_comment_id")) {
+                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN parent_comment_id TEXT")
+                }
+                if (!db.hasColumn("feed_comment", "is_hidden")) {
+                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!db.hasColumn("feed_comment", "hidden_at")) {
+                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN hidden_at INTEGER")
+                }
+                if (!db.hasColumn("conversations", "last_message_at")) {
+                    db.execSQL("ALTER TABLE conversations ADD COLUMN last_message_at INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!db.hasColumn("conversations", "last_message_snippet")) {
+                    db.execSQL("ALTER TABLE conversations ADD COLUMN last_message_snippet TEXT")
+                }
+                if (!db.hasColumn("conversation_participants", "last_read_at")) {
+                    db.execSQL("ALTER TABLE conversation_participants ADD COLUMN last_read_at INTEGER NOT NULL DEFAULT 0")
+                }
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
+                db.createFeedHiddenPostTable()
+            }
+        }
+
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!db.hasColumn("conversations", "avatar_url")) {
+                    db.execSQL("ALTER TABLE conversations ADD COLUMN avatar_url TEXT")
+                }
             }
         }
     }
@@ -145,7 +193,6 @@ private fun SupportSQLiteDatabase.createFeedTables() {
             user_id TEXT NOT NULL,
             display_name TEXT NOT NULL,
             body TEXT NOT NULL,
-            parent_comment_id TEXT,
             sync_status TEXT NOT NULL DEFAULT 'PENDING',
             is_deleted INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL,
@@ -154,7 +201,30 @@ private fun SupportSQLiteDatabase.createFeedTables() {
         """.trimIndent()
     )
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_post_id ON feed_comment(post_id)")
-    execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_user_id ON feed_comment(user_id)")
     execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_sync_status ON feed_comment(sync_status)")
+}
+
+private fun SupportSQLiteDatabase.createFeedHiddenPostTable() {
+    execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS feed_hidden_post (
+            post_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            hidden_at INTEGER NOT NULL,
+            PRIMARY KEY(post_id, user_id)
+        )
+        """.trimIndent()
+    )
+    execSQL("CREATE INDEX IF NOT EXISTS index_feed_hidden_post_user_id ON feed_hidden_post(user_id)")
+}
+
+private fun SupportSQLiteDatabase.hasColumn(tableName: String, columnName: String): Boolean {
+    query("PRAGMA table_info(`$tableName`)").use { cursor ->
+        val nameIndex = cursor.getColumnIndex("name")
+        while (cursor.moveToNext()) {
+            if (cursor.getString(nameIndex) == columnName) return true
+        }
+    }
+    return false
 }

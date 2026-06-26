@@ -63,7 +63,7 @@ fun ProfileScreenContent(
     onRetryDiary: () -> Unit,
     onTabSelected: (ProfileTab) -> Unit,
     onPostClick: (String) -> Unit,
-    onReportClick: (ReportReason) -> Unit,
+    onReportClick: (ReportReason, String?) -> Unit,
     onFriendshipActionClick: () -> Unit,
     onReportMessageShown: () -> Unit
 ) {
@@ -126,8 +126,8 @@ fun ProfileScreenContent(
             ReportDialog(
                 isSubmitting = uiState.isReportSubmitting,
                 onDismissRequest = { isReportDialogOpen = false },
-                onConfirmReport = { reason ->
-                    onReportClick(reason)
+                onConfirmReport = { reason, details ->
+                    onReportClick(reason, details)
                     isReportDialogOpen = false
                 }
             )
@@ -172,7 +172,8 @@ private fun ProfileScreenDiaryPreview() {
                         price = 45_000.0,
                         timeLabel = "Sáng",
                         imageUrl = null,
-                        entryDate = "2026-06-07"
+                        entryDate = "2026-06-07",
+                        createdAt = System.currentTimeMillis()
                     )
                 )
             ),
@@ -181,7 +182,7 @@ private fun ProfileScreenDiaryPreview() {
             onRetryDiary = {},
             onTabSelected = {},
             onPostClick = {},
-            onReportClick = {},
+            onReportClick = { _, _ -> },
             onFriendshipActionClick = {},
             onReportMessageShown = {}
         )
@@ -225,7 +226,7 @@ private fun ProfileScreenPostsPreview() {
             onRetryDiary = {},
             onTabSelected = {},
             onPostClick = {},
-            onReportClick = {},
+            onReportClick = { _, _ -> },
             onFriendshipActionClick = {},
             onReportMessageShown = {}
         )
@@ -243,7 +244,7 @@ private fun ProfileScreenLoadingPreview() {
             onRetryDiary = {},
             onTabSelected = {},
             onPostClick = {},
-            onReportClick = {},
+            onReportClick = { _, _ -> },
             onFriendshipActionClick = {},
             onReportMessageShown = {}
         )
@@ -263,7 +264,7 @@ private fun ProfileScreenErrorPreview() {
             onRetryDiary = {},
             onTabSelected = {},
             onPostClick = {},
-            onReportClick = {},
+            onReportClick = { _, _ -> },
             onFriendshipActionClick = {},
             onReportMessageShown = {}
         )

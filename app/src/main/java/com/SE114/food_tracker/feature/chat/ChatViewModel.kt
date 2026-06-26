@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import timber.log.Timber
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -64,12 +65,14 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun fetchConversationsFromServer() {
+    fun fetchConversationsFromServer(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 chatRepository.fetchAndSaveConversationsToLocal()
             } catch (e: Exception) {
-                println("Lỗi kéo danh sách hội thoại từ server: ${e.localizedMessage}")
+                Timber.tag("Chat").e(e, "Failed to fetch conversations")
+            } finally {
+                onComplete()
             }
         }
     }
@@ -137,6 +140,18 @@ class ChatViewModel @Inject constructor(
 
     fun renameGroup(conversationId: String, newName: String) {
         viewModelScope.launch { chatRepository.updateGroupName(conversationId, newName) }
+    }
+
+    fun updateGroupAvatar(conversationId: String, imageUri: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            onResult(chatRepository.updateGroupAvatar(conversationId, imageUri))
+        }
+    }
+
+    fun removeGroupAvatar(conversationId: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            onResult(chatRepository.removeGroupAvatar(conversationId))
+        }
     }
 
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
@@ -214,6 +229,29 @@ class ChatViewModel @Inject constructor(
         return chatDAO.getAllConversations()
     }
 
+    /**
+     * Open a 1-1 chat with a friend from the search suggestions. Resolves (or creates) the real
+     * conversation on the server first, then hands back its id — sending to a conversation_id that
+     * doesn't exist yet violates the message→conversation foreign key, which is why first messages
+     * to a brand-new 1-1 used to fail.
+     */
+    fun openConversationWithFriend(
+        friendUserId: String,
+        friendName: String,
+        onResolved: (conversationId: String, name: String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val conversationId = chatRepository.getOrCreateOneToOneChat(friendUserId)
+            if (conversationId.isNullOrBlank()) {
+                Timber.tag("Chat").e("Could not open 1-1 chat with %s", friendUserId)
+                return@launch
+            }
+            onResolved(conversationId, friendName)
+            // Pull the just-created conversation into Room so it shows in the list.
+            fetchConversationsFromServer()
+        }
+    }
+
     // ── MARK AS READ ──────────────────────────────────────────────────────────
 
     fun markAsRead(conversationId: String) {
@@ -245,7 +283,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val transactionType = if (isDeposit) "deposit" else "withdrawal"
-                val conversation = chatDAO.getConversationById(conversationId).first()
+                val conversation = chatDAO.getConversationById(conversationId).firstOrNull()
                 val actualWalletId = conversation?.walletId
                 if (actualWalletId.isNullOrBlank() || actualWalletId == "wallet_default") return@launch
 

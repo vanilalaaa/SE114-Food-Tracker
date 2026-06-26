@@ -48,11 +48,12 @@ fun ConversationItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar — the 1-1 peer's photo when available, otherwise a colored initial.
-        if (!conversation.isGroup && !conversation.peerAvatar.isNullOrBlank()) {
+        // Avatar — group photo or 1-1 peer photo when available, otherwise a colored initial.
+        val avatarUrl = if (conversation.isGroup) conversation.avatarUrl else conversation.peerAvatar
+        if (!avatarUrl.isNullOrBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(conversation.peerAvatar)
+                    .data(avatarUrl)
                     .crossfade(true)
                     .build(),
                 contentDescription = null,
@@ -101,21 +102,31 @@ fun ConversationItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Unread badge — stands out when there are unread messages, absent once read.
-        if (conversation.unreadCount > 0) {
-            Box(
-                modifier = Modifier
-                    .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
-                    .clip(CircleShape)
-                    .background(StatPinkDark)
-                    .padding(horizontal = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (conversation.unreadCount > 99) "99+" else conversation.unreadCount.toString(),
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+        // Unread indicator — a count badge when we have the number, else a plain dot; gone once read.
+        when {
+            conversation.unreadCount > 0 -> {
+                Box(
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+                        .clip(CircleShape)
+                        .background(StatPinkDark)
+                        .padding(horizontal = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (conversation.unreadCount > 99) "99+" else conversation.unreadCount.toString(),
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            conversation.isUnread -> {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(StatPinkDark)
                 )
             }
         }
@@ -144,6 +155,7 @@ private fun fakeConversation(
     lastMessageAt = if (unreadCount > 0) System.currentTimeMillis() else 0L,
     lastMessageSnippet = snippet,
     createdAt = System.currentTimeMillis(),
+    isUnread = unreadCount > 0,
     unreadCount = unreadCount
 )
 

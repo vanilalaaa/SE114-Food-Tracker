@@ -104,8 +104,13 @@ fun FeedScreen(
         onClosePostDetail = viewModel::closePostDetail,
         onSelectPostAt = viewModel::selectPostAt,
         onToggleLike = viewModel::toggleLike,
+        onHidePost = viewModel::hidePost,
+        onDownloadPost = viewModel::downloadPostImage,
         onDeletePost = viewModel::deletePost,
-        onAddComment = viewModel::addComment
+        onAddComment = viewModel::addComment,
+        onEditComment = viewModel::editComment,
+        onDeleteComment = viewModel::deleteComment,
+        onSetCommentHidden = viewModel::setCommentHidden
     )
 
     pendingCropUri?.let { uri ->
@@ -147,8 +152,13 @@ fun FeedScreenContent(
     onClosePostDetail: () -> Unit,
     onSelectPostAt: (Int) -> Unit,
     onToggleLike: (String) -> Unit,
+    onHidePost: (String) -> Unit,
+    onDownloadPost: (FeedPostDto) -> Unit,
     onDeletePost: (String) -> Unit,
     onAddComment: (String, String, String?) -> Unit,
+    onEditComment: (String, String) -> Unit,
+    onDeleteComment: (String) -> Unit,
+    onSetCommentHidden: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val gridState = rememberLazyGridState()
@@ -242,8 +252,13 @@ fun FeedScreenContent(
             onNavigateToProfile = onNavigateToProfile,
             onSelectPostAt = onSelectPostAt,
             onToggleLike = onToggleLike,
+            onHidePost = onHidePost,
+            onDownloadPost = onDownloadPost,
             onDeletePost = onDeletePost,
             onAddComment = onAddComment,
+            onEditComment = onEditComment,
+            onDeleteComment = onDeleteComment,
+            onSetCommentHidden = onSetCommentHidden,
             onClearError = onClearError
         )
     }
@@ -273,8 +288,13 @@ private fun FeedScreenPreview() {
             onClosePostDetail = {},
             onSelectPostAt = {},
             onToggleLike = {},
+            onHidePost = {},
+            onDownloadPost = {},
             onDeletePost = {},
-            onAddComment = { _, _, _ -> }
+            onAddComment = { _, _, _ -> },
+            onEditComment = { _, _ -> },
+            onDeleteComment = {},
+            onSetCommentHidden = { _, _ -> }
         )
     }
 }
@@ -303,8 +323,13 @@ private fun FeedScreenEmptyPreview() {
             onClosePostDetail = {},
             onSelectPostAt = {},
             onToggleLike = {},
+            onHidePost = {},
+            onDownloadPost = {},
             onDeletePost = {},
-            onAddComment = { _, _, _ -> }
+            onAddComment = { _, _, _ -> },
+            onEditComment = { _, _ -> },
+            onDeleteComment = {},
+            onSetCommentHidden = { _, _ -> }
         )
     }
 }

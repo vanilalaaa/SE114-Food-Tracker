@@ -109,7 +109,8 @@ class ItemRepository @Inject constructor(
 private fun Int.toDiaryTimeLabel(): String =
     when (this) {
         0 -> "Sáng"
-        1 -> "Trưa/Chiều"
-        2 -> "Tối"
+        1 -> "Trưa"
+        2 -> "Chiều"
+        3 -> "Tối"
         else -> "Khác"
     }

@@ -24,3 +24,17 @@ this is unavoidable without a service-role key, which must never live in the mob
 ### Future cleanup
 Long-abandoned incomplete profiles (`onboarding_completed = false`, old `created_at`) can be
 pruned by a future admin-web action using the service-role key. Not built now.
+
+## Change password (in-session)
+Settings → "Đổi mật khẩu" → enter current + new + confirm. `AuthRepository.changePassword`
+**verifies the current password by re-authenticating** (`signInWith(Email)` with the current
+password — wrong password ⇒ `InvalidCredentials`), then `auth.updateUser { password = new }`.
+The current password is therefore required and checked client-side.
+
+**Required dashboard setting:** Authentication → Providers/Settings → **"Require current
+password when updating" must be OFF.** When ON, GoTrue only accepts password changes that carry
+a *reauthentication nonce* (a code emailed via `reauthenticate()`); supabase-kt's `updateUser`
+has no field for a typed current password, so a correct typed password is still rejected with
+"current password required when setting new password". Turning it OFF lets the in-app flow work
+while the app keeps enforcing the current-password check itself. (Keeping it ON would require
+adding an emailed-OTP reauthentication step.)
