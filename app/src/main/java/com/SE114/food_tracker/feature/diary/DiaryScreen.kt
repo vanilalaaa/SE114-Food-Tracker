@@ -72,8 +72,8 @@ fun DiaryScreen(
         onClearCategoryError       = { categoryViewModel.clearError() },
         onLoadDate                 = { diaryViewModel.loadDate(it) },
         onImageSelected            = { diaryViewModel.onImageSelected(it) },
-        onSaveItem                 = { n, p, c, r, no, t, shared, millis, walletId -> diaryViewModel.saveItem(n, p, c, r, no, t, shared, millis, walletId) },
-        onUpdateItem               = { id, n, p, c, r, no, t, shared, millis, walletId -> diaryViewModel.updateItem(id, n, p, c, r, no, t, shared, millis, walletId) },
+        onSaveItem                 = { n, p, c, r, no, t, shared, millis -> diaryViewModel.saveItem(n, p, c, r, no, t, shared, millis) },
+        onUpdateItem               = { id, n, p, c, r, no, t, shared, millis -> diaryViewModel.updateItem(id, n, p, c, r, no, t, shared, millis) },
         onDeleteItem               = { diaryViewModel.deleteItem(it) },
         onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
@@ -98,8 +98,8 @@ fun DiaryScreenContent(
     onLoadDate: (LocalDate) -> Unit,
     onImageSelected: (Uri) -> Unit,
     onClearPendingImage: () -> Unit,
-    onSaveItem: (String, Double, String, Int, String, Int, Boolean, Long, String?) -> Unit,
-    onUpdateItem: (String, String, Double, String, Int, String, Int, Boolean, Long, String?) -> Unit,
+    onSaveItem: (String, Double, String, Int, String, Int, Boolean, Long) -> Unit,
+    onUpdateItem: (String, String, Double, String, Int, String, Int, Boolean, Long) -> Unit,
     onDeleteItem: (String) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
@@ -294,7 +294,6 @@ fun DiaryScreenContent(
                     preSelectedCategory = preSelectedCategory,
                     categories          = categories,
                     manageCategories    = manageCategories,
-                    availableWallets    = availableWallets,
                     pendingImageUri     = pendingImageUri,
                     categoryDeleteError = categoryDeleteError,
                     onDismiss = {
@@ -303,11 +302,11 @@ fun DiaryScreenContent(
                         preSelectedCategory = null
                         onClearPendingImage()
                     },
-                    onSave = { name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis, walletId ->
+                    onSave = { name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis ->
                         if (editingItem == null) {
-                            onSaveItem(name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis, walletId)
+                            onSaveItem(name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis)
                         } else {
-                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis, walletId)
+                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis)
                         }
                         showEntryScreen     = false
                         selectedItemForEdit = null
@@ -358,8 +357,8 @@ fun DiaryScreenPreview() {
             onAddTriggered             = {},
             onLoadDate                 = {},
             onImageSelected            = {},
-            onSaveItem                 = { _, _, _, _, _, _, _, _, _ -> },
-            onUpdateItem               = { _, _, _, _, _, _, _, _, _, _ -> },
+            onSaveItem                 = { _, _, _, _, _, _, _, _ -> },
+            onUpdateItem               = { _, _, _, _, _, _, _, _, _ -> },
             onDeleteItem               = {},
             onDeleteCategory           = {},
             onToggleCategoryVisibility = {},

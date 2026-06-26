@@ -49,9 +49,6 @@ data class Item(
     @ColumnInfo(name = "is_shared")
     var isShared: Boolean = false,  // Chia sẻ nhật ký với bạn bè
 
-    @ColumnInfo(name = "wallet_id")
-    var walletId: String? = null,   // null = cá nhân, có giá trị = thuộc quỹ nhóm
-
     @ColumnInfo(name = "sync_status")
     var syncStatus: String = SyncStatus.PENDING.name,
 

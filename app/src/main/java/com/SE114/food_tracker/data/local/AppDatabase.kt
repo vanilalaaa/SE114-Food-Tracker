@@ -38,7 +38,7 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         FeedComment::class,
         FeedHiddenPost::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -50,99 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun feedDao(): FeedDAO
 
     companion object {
-        val MIGRATION_8_9 = object : Migration(8, 9) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE category ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
-            }
-        }
 
-        val MIGRATION_9_10 = object : Migration(9, 10) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.createFeedTables()
-            }
-        }
-
-        val MIGRATION_10_11 = object : Migration(10, 11) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE item ADD COLUMN owner_id TEXT NOT NULL DEFAULT ''")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_item_owner_id ON item(owner_id)")
-                // Rows created before owner_id are unscoped cross-account leftovers — the exact
-                // bug this migration fixes — and have no reliable owner. Deleting them is
-                // intentional: the correct per-user data re-pulls from Supabase on next login.
-                // System categories (owner_id NULL) are preserved.
-                db.execSQL("DELETE FROM item")
-                db.execSQL("DELETE FROM category WHERE is_system = 0")
-                db.execSQL("DELETE FROM budget")
-            }
-        }
-
-        val MIGRATION_11_12 = object : Migration(11, 12) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE feed_comment ADD COLUMN parent_comment_id TEXT")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
-            }
-        }
-
-        val MIGRATION_12_13 = object : Migration(12, 13) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE user_profile_cache ADD COLUMN profile_user_id TEXT NOT NULL DEFAULT ''")
-            }
-        }
-
-        val MIGRATION_13_14 = object : Migration(13, 14) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Chat (perf/chat-realtime): conversation ordering + per-participant read tracking.
-                db.execSQL("ALTER TABLE conversations ADD COLUMN last_message_at INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE conversations ADD COLUMN last_message_snippet TEXT")
-                db.execSQL("ALTER TABLE conversation_participants ADD COLUMN last_read_at INTEGER NOT NULL DEFAULT 0")
-                // Feed: comment moderation flags.
-                db.execSQL("ALTER TABLE feed_comment ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE feed_comment ADD COLUMN hidden_at INTEGER")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
-            }
-        }
-
-        val MIGRATION_14_15 = object : Migration(14, 15) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.createFeedHiddenPostTable()
-            }
-        }
-
-        // Both branches once shipped a different v14, so a device may sit at v13/14/15 with only
-        // part of the v16 schema. Re-apply every column/index idempotently to converge safely.
-        val MIGRATION_15_16 = object : Migration(15, 16) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                if (!db.hasColumn("feed_comment", "parent_comment_id")) {
-                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN parent_comment_id TEXT")
-                }
-                if (!db.hasColumn("feed_comment", "is_hidden")) {
-                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
-                }
-                if (!db.hasColumn("feed_comment", "hidden_at")) {
-                    db.execSQL("ALTER TABLE feed_comment ADD COLUMN hidden_at INTEGER")
-                }
-                if (!db.hasColumn("conversations", "last_message_at")) {
-                    db.execSQL("ALTER TABLE conversations ADD COLUMN last_message_at INTEGER NOT NULL DEFAULT 0")
-                }
-                if (!db.hasColumn("conversations", "last_message_snippet")) {
-                    db.execSQL("ALTER TABLE conversations ADD COLUMN last_message_snippet TEXT")
-                }
-                if (!db.hasColumn("conversation_participants", "last_read_at")) {
-                    db.execSQL("ALTER TABLE conversation_participants ADD COLUMN last_read_at INTEGER NOT NULL DEFAULT 0")
-                }
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_parent_comment_id ON feed_comment(parent_comment_id)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_feed_comment_is_hidden ON feed_comment(is_hidden)")
-                db.createFeedHiddenPostTable()
-            }
-        }
-
-        val MIGRATION_16_17 = object : Migration(16, 17) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                if (!db.hasColumn("conversations", "avatar_url")) {
-                    db.execSQL("ALTER TABLE conversations ADD COLUMN avatar_url TEXT")
-                }
-            }
-        }
     }
 }
 

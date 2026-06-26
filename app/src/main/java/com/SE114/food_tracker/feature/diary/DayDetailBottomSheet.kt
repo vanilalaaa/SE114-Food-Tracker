@@ -158,31 +158,18 @@ fun DayDetailBottomSheetContent(
         var itemToDelete by remember { mutableStateOf<DiaryItem?>(null) }
 
         itemToDelete?.let { target ->
-            if (target.walletId != null) {
-                ConfirmDialog(
-                    title        = "Không thể xóa",
-                    body         = "Món ăn này được thanh toán từ Quỹ nhóm. Bạn không thể xóa món ăn này.",
-                    confirmLabel = "Đóng",
-                    cancelLabel  = "",
-                    destructive  = false,
-                    onConfirm    = { itemToDelete = null },
-                    onDismiss    = { itemToDelete = null }
-                )
-            } else {
-                // Món ăn cá nhân bình thường
-                ConfirmDialog(
-                    title        = "Xóa món ăn?",
-                    body         = "Bạn có chắc chắn muốn xóa món ăn này không? Hành động này không thể hoàn tác.",
-                    confirmLabel = "Xóa",
-                    cancelLabel  = "Huỷ",
-                    destructive  = true,
-                    onConfirm    = {
-                        onDeleteItem(target.itemId)
-                        itemToDelete = null
-                    },
-                    onDismiss    = { itemToDelete = null }
-                )
-            }
+            ConfirmDialog(
+                title        = "Xóa món ăn?",
+                body         = "Bạn có chắc chắn muốn xóa món ăn này không? Hành động này không thể hoàn tác.",
+                confirmLabel = "Xóa",
+                cancelLabel  = "Huỷ",
+                destructive  = true,
+                onConfirm    = {
+                    onDeleteItem(target.itemId)
+                    itemToDelete = null
+                },
+                onDismiss    = { itemToDelete = null }
+            )
         }
 
         items.forEach { item ->
