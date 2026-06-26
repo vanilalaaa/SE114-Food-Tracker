@@ -117,6 +117,7 @@ dependencies {
 
     implementation(libs.androidx.emoji2.emojipicker)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation("com.github.commandiron:WheelPickerCompose:1.1.11")
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.4.X") // Hoặc phiên bản bạn đang dùng
     implementation("io.github.jan-tennert.supabase:auth-kt:2.4.X")
     implementation("io.github.jan-tennert.supabase:realtime-kt:2.4.X")
