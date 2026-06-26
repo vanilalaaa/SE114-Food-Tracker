@@ -27,7 +27,6 @@ import com.SE114.food_tracker.feature.feed.FeedScreen
 import com.SE114.food_tracker.feature.friend.FriendScreen
 import com.SE114.food_tracker.feature.chat.ChatScreen
 import com.SE114.food_tracker.feature.chat.ConversationListScreen
-import com.SE114.food_tracker.feature.chat.GroupWalletScreen
 import com.SE114.food_tracker.feature.profile.ProfileScreen
 import com.SE114.food_tracker.feature.admin.AdminDashboardScreen
 import com.SE114.food_tracker.feature.admin.AdminReportsScreen
@@ -180,14 +179,14 @@ fun AppNavGraph(
                     }
                 )
             }
-            composable("group_wallet_screen/{conversationId}") { backStackEntry ->
-                val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
-
-                GroupWalletScreen(
-                    conversationId = conversationId,
-                    onBackClick = { navController.popBackStack() }
-                )
-            }
+//            composable("group_wallet_screen/{conversationId}") { backStackEntry ->
+//                val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+//
+//                GroupWalletScreen(
+//                    conversationId = conversationId,
+//                    onBackClick = { navController.popBackStack() }
+//                )
+//            }
 
             composable(AppDestinations.Settings.route) {
                 SettingsScreen(

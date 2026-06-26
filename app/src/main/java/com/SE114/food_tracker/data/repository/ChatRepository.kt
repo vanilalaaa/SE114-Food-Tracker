@@ -254,7 +254,6 @@ class ChatRepository @Inject constructor(
                     id                 = dto.id,
                     name               = dto.name ?: "Trò chuyện 1-1",
                     isGroup            = dto.isGroup,
-                    walletId           = dto.walletId ?: prev?.walletId ?: "wallet_default",
                     avatarUrl          = dto.avatarUrl ?: prev?.avatarUrl,
                     lastMessageAt      = if (keepLocalLast) prev?.lastMessageAt ?: 0L else dto.lastMessageAt,
                     lastMessageSnippet = if (keepLocalLast) prev?.lastMessageSnippet else dto.lastMessageSnippet,
@@ -375,15 +374,15 @@ class ChatRepository @Inject constructor(
                         table = "conversation"
                     }
 
-                val walletUpdateFlow =
-                    channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
-                        table = "group_wallet"
-                    }
-
-                val transactionInsertFlow =
-                    channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-                        table = "wallet_transaction"
-                    }
+//                val walletUpdateFlow =
+//                    channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+//                        table = "group_wallet"
+//                    }
+//
+//                val transactionInsertFlow =
+//                    channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+//                        table = "wallet_transaction"
+//                    }
 
                 val participantInsert =
                     channel.postgresChangeFlow<PostgresAction.Insert>(
@@ -498,17 +497,17 @@ class ChatRepository @Inject constructor(
                     }
                 }
 
-                channelScope.launch {
-                    walletUpdateFlow.collect {
-                        _walletUpdateSignal.tryEmit(conversationId)
-                    }
-                }
-
-                channelScope.launch {
-                    transactionInsertFlow.collect {
-                        _walletUpdateSignal.tryEmit(conversationId)
-                    }
-                }
+//                channelScope.launch {
+//                    walletUpdateFlow.collect {
+//                        _walletUpdateSignal.tryEmit(conversationId)
+//                    }
+//                }
+//
+//                channelScope.launch {
+//                    transactionInsertFlow.collect {
+//                        _walletUpdateSignal.tryEmit(conversationId)
+//                    }
+//                }
 
                 channel.subscribe()
                 // Holding the per-conversation lock, no other op can be mid-flight, so register
@@ -834,8 +833,7 @@ class ChatRepository @Inject constructor(
             val localGroup = LocalConversation(
                 id       = groupUuid,
                 name     = groupName,
-                isGroup  = true,
-                walletId = "wallet_default"
+                isGroup  = true
             )
             chatDAO.insertConversation(localGroup)
 
@@ -913,13 +911,6 @@ class ChatRepository @Inject constructor(
 
             val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
 
-            val actualWalletId = currentConv?.walletId
-            if (!actualWalletId.isNullOrBlank() && actualWalletId != "wallet_default") {
-                supabaseClient.from("group_wallet").update(mapOf("name" to newName)) {
-                    filter { eq("id", actualWalletId) }
-                }
-            }
-
             currentConv?.let {
                 chatDAO.insertConversation(it.copy(name = newName))
             }
@@ -973,22 +964,8 @@ class ChatRepository @Inject constructor(
             false
         }
     }
-    suspend fun addMembersToGroup(conversationId: String, userIds: List<String>) {
-        try {
-            val participants = userIds.map { userId ->
-                SupabaseParticipantDto(conversationId, userId.lowercase(), false)
-            }
-            // Insert vào Supabase
-            supabaseClient.from("conversation_participant").insert(participants)
 
-            // Gửi tin nhắn hệ thống để thông báo trong nhóm
-            sendSystemMessage(conversationId, "Đã thêm thành viên mới vào nhóm.")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
     suspend fun kickMember(conversationId: String, userIdToKick: String, memberName: String) {
-        sendSystemMessage(conversationId, "Đã mời $memberName rời khỏi nhóm.")
         try {
             supabaseClient.from("conversation_participant").delete {
                 filter {
@@ -1000,6 +977,8 @@ class ChatRepository @Inject constructor(
             if (userIdToKick.lowercase() == getAuthenticatedUserId()) {
                 chatDAO.deleteConversationById(conversationId)
             }
+
+            sendSystemMessage(conversationId, "Đã mời $memberName rời khỏi nhóm.")
         } catch (e: Exception) { e.printStackTrace() }
     }
     suspend fun disbandGroup(conversationId: String) {
@@ -1037,154 +1016,6 @@ class ChatRepository @Inject constructor(
     suspend fun deleteConversationLocal(conversationId: String) {
         chatDAO.deleteConversationById(conversationId)
         chatDAO.deleteMessagesByConversation(conversationId)
-    }
-    suspend fun createGroupWalletForExistingChat(
-        conversationId: String,
-        memberUserIds: List<String>
-    ): Boolean {
-        return try {
-            val walletUuid    = java.util.UUID.randomUUID().toString()
-            val currentUserId = getAuthenticatedUserId()
-
-            if (currentUserId.isBlank()) return false
-
-            val currentConv = chatDAO.getConversationById(conversationId).firstOrNull()
-            val walletName  = currentConv?.name ?: "Quỹ nhóm"
-
-            val walletDto = SupabaseGroupWalletDto(
-                id        = walletUuid,
-                name      = walletName,
-                balance   = 0.0,
-                createdBy = currentUserId
-            )
-            supabaseClient.from("group_wallet").insert(walletDto)
-
-            val allMembers = (memberUserIds + currentUserId).map { it.lowercase() }.distinct()
-            val membershipRows = allMembers.map { userId ->
-                SupabaseWalletMembershipDto(
-                    walletId = walletUuid,
-                    userId   = userId,
-                    role     = if (userId == currentUserId) "owner" else "member"
-                )
-            }
-            supabaseClient.from("wallet_membership").insert(membershipRows)
-
-            val updateData = mapOf("wallet_id" to walletUuid)
-            supabaseClient.from("conversation").update(updateData) {
-                filter { eq("id", conversationId) }
-            }
-
-            currentConv?.let {
-                chatDAO.insertConversation(it.copy(walletId = walletUuid))
-            }
-            _walletUpdateSignal.tryEmit(conversationId)
-            sendSystemMessage(
-                conversationId,
-                "Quỹ nhóm '$walletName' đã được thiết lập thành công."
-            )
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    suspend fun getWalletBalance(conversationId: String): Double {
-        return try {
-            val convResponse = supabaseClient.from("conversation")
-                .select { filter { eq("id", conversationId) } }
-                .decodeSingle<SupabaseConversationDto>()
-
-            val walletId = convResponse.walletId ?: return 0.0
-
-            val walletResponse = supabaseClient.from("group_wallet")
-                .select { filter { eq("id", walletId) } }
-                .decodeSingle<Map<String, kotlinx.serialization.json.JsonElement>>()
-
-            walletResponse["balance"]?.toString()?.toDoubleOrNull() ?: 0.0
-        } catch (e: Exception) {
-            0.0
-        }
-    }
-
-    suspend fun executeWalletTransaction(
-        conversationId: String,
-        amount: Double,
-        txType: String,
-        note: String,
-        itemId: String? = null
-    ): Boolean {
-        return try {
-            val currentUserId    = getAuthenticatedUserId()
-            val conversation     = chatDAO.getConversationById(conversationId).firstOrNull()
-            val walletId         = conversation?.walletId ?: ""
-
-            if (walletId.isBlank() || walletId == "wallet_default") return false
-
-            val actualGroupMembers = fetchGroupMembersFromServer(conversationId)
-            val currentUserName    =
-                actualGroupMembers.find { it.first == currentUserId }?.second ?: "Thành viên"
-
-            val rpcArgs = WalletRpcArgs(
-                walletId = walletId,
-                amount   = amount,
-                note     = note
-            )
-
-            val messageText = if (txType == "deposit") {
-                "Hệ thống: ${currentUserName} đã nộp ${String.format("%,.0f", amount)} VND vào quỹ nhóm. Nội dung: $note"
-            } else {
-                "Hệ thống: ${currentUserName} đã rút ${String.format("%,.0f", amount)} VND từ quỹ nhóm. Nội dung: $note"
-            }
-
-            when (txType) {
-                "deposit" -> {
-                    supabaseClient.postgrest.rpc(
-                        function   = "rpc_wallet_deposit",
-                        parameters = rpcArgs
-                    )
-                    sendMessage(
-                        conversationId = conversationId,
-                        senderId       = "system",
-                        body           = messageText,
-                        imageUrl       = null,
-                        isSystem       = true
-                    )
-                }
-                "withdrawal" -> {
-                    supabaseClient.postgrest.rpc(
-                        function   = "rpc_wallet_withdraw",
-                        parameters = rpcArgs
-                    )
-                    sendMessage(
-                        conversationId = conversationId,
-                        senderId       = "system",
-                        body           = messageText,
-                        imageUrl       = null,
-                        isSystem       = true
-                    )
-                }
-            }
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    suspend fun fetchWalletTransactionsFromServer(conversationId: String): List<Map<String, kotlinx.serialization.json.JsonElement>> {
-        return try {
-            val convResponse = supabaseClient.from("conversation")
-                .select { filter { eq("id", conversationId) } }
-                .decodeSingle<SupabaseConversationDto>()
-            val walletId = convResponse.walletId ?: return emptyList()
-
-            supabaseClient.from("wallet_transaction")
-                .select {
-                    filter { eq("wallet_id", walletId) }
-                    order(column = "created_at", order = Order.DESCENDING)
-                }.decodeList()
-        } catch (e: Exception) {
-            emptyList()
-        }
     }
 
     suspend fun syncMessagesFromServer(conversationId: String) {

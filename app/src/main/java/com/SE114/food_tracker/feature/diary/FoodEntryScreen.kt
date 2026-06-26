@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
+import com.SE114.food_tracker.core.util.MoneyInputTransformation
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
 import com.SE114.food_tracker.feature.diary.components.FoodInputField
 import com.SE114.food_tracker.feature.diary.components.ManageCategoryBottomSheet
@@ -68,11 +69,10 @@ fun FoodEntryScreen(
     preSelectedCategory: DiaryCategory? = null,
     categories: List<DiaryCategory> = emptyList(),
     manageCategories: List<DiaryCategory> = categories,
-    availableWallets: List<ChatRepository.WalletWithRole> = emptyList(),
     pendingImageUri: Uri? = null,
     categoryDeleteError: String? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, pickedTimeMillis: Long, walletId: String?) -> Unit,
+    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, pickedTimeMillis: Long) -> Unit,
     onDelete: ((String) -> Unit)? = null,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
@@ -104,7 +104,6 @@ fun FoodEntryScreen(
 
     var rating           by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
     var isShared         by remember(existingItem?.itemId) { mutableStateOf(existingItem?.isShared ?: false) }
-    var selectedWalletId by remember(existingItem?.itemId) { mutableStateOf(existingItem?.walletId) }
     var nameError     by remember { mutableStateOf<String?>(null) }
     var priceError    by remember { mutableStateOf<String?>(null) }
     var categoryError by remember { mutableStateOf<String?>(null) }
@@ -187,8 +186,7 @@ fun FoodEntryScreen(
                 note.trim(),
                 autoTimeType,
                 isShared,
-                pickedTimeMillis,
-                selectedWalletId
+                pickedTimeMillis
             )
         }
     }
@@ -325,7 +323,8 @@ fun FoodEntryScreen(
                 foodName  = it
                 nameError = null
             },
-            placeholder = "VD: Phở Bò"
+            placeholder = "VD: Phở Bò",
+            maxChars    = 20 // Giới hạn tên món tối đa 20 ký tự
         )
         FieldError(nameError)
 
@@ -338,7 +337,8 @@ fun FoodEntryScreen(
                 priceError = null
             },
             placeholder  = "0",
-            trailingText = "đ"
+            trailingText = "đ",
+            visualTransformation = MoneyInputTransformation()
         )
         FieldError(priceError)
 
@@ -368,12 +368,6 @@ fun FoodEntryScreen(
             onShareChange = { isShared = it }
         )
 
-        PaymentSourceSelector(
-            availableWallets  = availableWallets,
-            selectedWalletId  = selectedWalletId,
-            onSelectionChange = { selectedWalletId = it }
-        )
-
         Spacer(Modifier.height(16.dp))
 
         Row(
@@ -401,7 +395,8 @@ fun FoodEntryScreen(
             value         = note,
             onValueChange = { note = it },
             placeholder   = "VD: Món này ngon quá!",
-            isSingleLine  = false
+            isSingleLine  = false,
+            maxChars      = 100 // Giới hạn ghi chú tối đa 100 ký tự
         )
 
         Spacer(Modifier.height(24.dp))
@@ -425,7 +420,6 @@ fun FoodEntryScreen(
         Spacer(Modifier.height(40.dp))
     }
 }
-
 @Composable
 private fun FieldError(error: String?) {
     if (error != null) {
@@ -435,26 +429,5 @@ private fun FieldError(error: String?) {
             fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
         )
-    }
-}
-
-@Preview(showSystemUi = true, device = "spec:width=411dp,height=891dp")
-@Composable
-fun FoodEntryScreenPreview() {
-    val previewCategories = listOf(
-        DiaryCategory("preview-1", "Cơm",        "🍚", isSystem = true),
-        DiaryCategory("preview-2", "Mì & Phở",   "🍜", isSystem = true),
-        DiaryCategory("preview-3", "Bánh mì",    "🥖", isSystem = true),
-        DiaryCategory("preview-4", "Đồ uống",    "🥤", isSystem = true),
-        DiaryCategory("preview-5", "Tráng miệng","🍰", isSystem = true),
-    )
-    FoodTrackerTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MainBackground) {
-            FoodEntryScreen(
-                categories = previewCategories,
-                onDismiss  = {},
-                onSave     = { _, _, _, _, _, _, _, _, _ -> }
-            )
-        }
     }
 }

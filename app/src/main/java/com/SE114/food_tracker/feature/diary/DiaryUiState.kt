@@ -28,7 +28,6 @@ data class DiaryItem(
     val note: String? = null,
     val imageUrl: String? = null,
     val isShared: Boolean = false,
-    val walletId: String? = null,
     val entryDate: Long,
     val createdAt: Long,
     val updatedAt: Long

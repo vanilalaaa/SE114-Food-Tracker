@@ -109,7 +109,6 @@ interface ChatDAO {
             c.id,
             c.is_group,
             c.name,
-            c.wallet_id,
             c.avatar_url,
             c.last_message_at,
             c.last_message_snippet,
