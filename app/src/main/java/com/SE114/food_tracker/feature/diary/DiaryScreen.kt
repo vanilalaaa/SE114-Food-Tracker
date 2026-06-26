@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -41,8 +39,8 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import com.SE114.food_tracker.data.repository.ChatRepository
 
-private val CalendarAddButtonOverlap = 28.dp
-private val CalendarAddButtonScrollSpace = 88.dp
+private val DiaryAddButtonBottomPadding = BottomBarContentPadding + 10.dp
+private val DiaryBottomContentPadding = BottomBarContentPadding + 80.dp
 
 @Composable
 fun DiaryScreen(
@@ -157,12 +155,16 @@ fun DiaryScreenContent(
         )
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MainBackground)
-            .verticalScroll(scrollState)
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
         DiaryTopBar(
             streakCount  = uiState.streak.toString(),
             currentMonth = "Tháng ${uiState.selectedDate.monthNumber} ${uiState.selectedDate.year}",
@@ -208,24 +210,18 @@ fun DiaryScreenContent(
             scale        = calendarScale
         )
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(CalendarAddButtonScrollSpace)
-        ) {
-            AddActionButton(
-                onClick = {
-                    selectedItemForEdit = null
-                    showSourceScreen = true
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 24.dp)
-                    .offset(y = -CalendarAddButtonOverlap)
-            )
+        Spacer(modifier = Modifier.height(DiaryBottomContentPadding))
         }
 
-        Spacer(modifier = Modifier.height(BottomBarContentPadding))
+        AddActionButton(
+            onClick = {
+                selectedItemForEdit = null
+                showSourceScreen = true
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = DiaryAddButtonBottomPadding)
+        )
     }
 
     // ── POPUPS / OVERLAYS ──────────────────────────────────────────────────

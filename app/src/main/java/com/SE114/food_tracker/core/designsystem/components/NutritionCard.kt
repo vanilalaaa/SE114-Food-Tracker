@@ -69,7 +69,7 @@ fun NutritionCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(160.dp)
             .padding(horizontal = 24.dp),
         color = LightPinkBG,
         shape = RoundedCornerShape(30.dp),
@@ -91,7 +91,7 @@ fun NutritionCard(
                     Icon(
                         Icons.Default.MoreVert, "Menu",
                         tint = Color.Black,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -281,7 +281,7 @@ fun NutritionCard(
                                         Slider(
                                             value = calendarScale,
                                             onValueChange = onCalendarScaleChange,
-                                            valueRange = 0.5f..1.5f,
+                                            valueRange = 0.5f..2.2f,
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .height(24.dp),
