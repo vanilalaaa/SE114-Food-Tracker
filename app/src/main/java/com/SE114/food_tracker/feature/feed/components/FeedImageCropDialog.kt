@@ -13,10 +13,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -49,6 +50,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -89,6 +91,10 @@ fun FeedImageCropDialog(
     var cropSize by remember { mutableStateOf(IntSize.Zero) }
     var zoom by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    val navigationBarBottom = with(density) {
+        WindowInsets.navigationBars.getBottom(density).toDp()
+    }
 
     LaunchedEffect(imageUri) {
         error = null
@@ -133,8 +139,12 @@ fun FeedImageCropDialog(
                 .fillMaxSize()
                 .background(Color.Black)
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 22.dp, vertical = 18.dp)
+                .padding(
+                    start = 22.dp,
+                    top = 18.dp,
+                    end = 22.dp,
+                    bottom = navigationBarBottom.coerceAtLeast(28.dp) + 18.dp
+                )
         ) {
             IconButton(
                 onClick = onDismiss,

@@ -2,12 +2,16 @@ package com.SE114.food_tracker.feature.feed
 
 import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.exifinterface.media.ExifInterface
 import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
@@ -33,10 +37,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URL
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.math.max
+import kotlin.math.roundToInt
+
+private const val FeedPostImageMaxSide = 1280
+private const val FeedPostImageQuality = 80
+private const val MinFeedPostImageQuality = 60
+private const val MaxFeedPostImageBytes = 1 * 1024 * 1024
+private const val MaxFeedPostDecodeSize = 2048
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -487,18 +500,147 @@ class FeedViewModel @Inject constructor(
 
     private suspend fun copyPickedImageToFeedStorage(uri: Uri): String =
         withContext(Dispatchers.IO) {
-            val extension = context.contentResolver.getType(uri)
-                ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-                ?: "jpg"
+            val sourceBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: error("Khong doc duoc anh da chon")
+            val shouldCompress = sourceBytes.size > MaxFeedPostImageBytes ||
+                context.readImageMaxSide(uri, sourceBytes) > FeedPostImageMaxSide
+            val outputBytes = if (shouldCompress) {
+                context.compressPickedFeedImage(uri, sourceBytes)
+            } else {
+                sourceBytes
+            }
+            val extension = if (shouldCompress) {
+                "jpg"
+            } else {
+                context.contentResolver.getType(uri)
+                    ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+                    ?: "jpg"
+            }
             val directory = File(context.filesDir, "feed_posts").apply { mkdirs() }
             val target = File(directory, "${UUID.randomUUID()}.$extension")
 
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
+            context.contentResolver.openInputStream(uri)?.use {
+                target.outputStream().use { output -> output.write(outputBytes) }
             } ?: error("Không đọc được ảnh đã chọn")
 
             Uri.fromFile(target).toString()
         }
+
+    private fun Context.readImageMaxSide(uri: Uri, bytes: ByteArray): Int {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+
+        val rotated = contentResolver.openInputStream(uri)?.use { input ->
+            val orientation = ExifInterface(input).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+            orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                orientation == ExifInterface.ORIENTATION_ROTATE_270
+        } ?: false
+
+        return if (rotated) max(options.outHeight, options.outWidth) else max(options.outWidth, options.outHeight)
+    }
+
+    private fun Context.compressPickedFeedImage(uri: Uri, sourceBytes: ByteArray): ByteArray {
+        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size, boundsOptions)
+
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = calculateFeedInSampleSize(boundsOptions, MaxFeedPostDecodeSize)
+        }
+        var decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size, decodeOptions)
+            ?: error("Anh khong hop le")
+
+        val rotationDegrees = contentResolver.openInputStream(uri)?.use { input ->
+            val orientation = ExifInterface(input).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+        } ?: 0f
+
+        if (rotationDegrees != 0f) {
+            val rotated = Bitmap.createBitmap(
+                decoded,
+                0,
+                0,
+                decoded.width,
+                decoded.height,
+                Matrix().apply { postRotate(rotationDegrees) },
+                true
+            )
+            if (rotated != decoded) {
+                decoded.recycle()
+                decoded = rotated
+            }
+        }
+
+        val maxSide = max(decoded.width, decoded.height)
+        var output = if (maxSide > FeedPostImageMaxSide) {
+            val scale = FeedPostImageMaxSide / maxSide.toFloat()
+            Bitmap.createScaledBitmap(
+                decoded,
+                (decoded.width * scale).roundToInt().coerceAtLeast(1),
+                (decoded.height * scale).roundToInt().coerceAtLeast(1),
+                true
+            ).also {
+                if (it != decoded) decoded.recycle()
+            }
+        } else {
+            decoded
+        }
+
+        var lastBytes = ByteArray(0)
+        while (true) {
+            var quality = FeedPostImageQuality
+            while (quality >= MinFeedPostImageQuality) {
+                val stream = ByteArrayOutputStream()
+                output.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                lastBytes = stream.toByteArray()
+                if (lastBytes.size <= MaxFeedPostImageBytes) {
+                    output.recycle()
+                    return lastBytes
+                }
+                quality -= 5
+            }
+
+            val currentMaxSide = max(output.width, output.height)
+            if (currentMaxSide <= 720) {
+                output.recycle()
+                return lastBytes
+            }
+
+            val resized = Bitmap.createScaledBitmap(
+                output,
+                (output.width * 0.85f).roundToInt().coerceAtLeast(1),
+                (output.height * 0.85f).roundToInt().coerceAtLeast(1),
+                true
+            )
+            output.recycle()
+            output = resized
+        }
+    }
+
+    private fun calculateFeedInSampleSize(
+        options: BitmapFactory.Options,
+        maxSize: Int
+    ): Int {
+        var inSampleSize = 1
+        val halfWidth = options.outWidth / 2
+        val halfHeight = options.outHeight / 2
+
+        while (halfWidth / inSampleSize >= maxSize || halfHeight / inSampleSize >= maxSize) {
+            inSampleSize *= 2
+        }
+
+        return inSampleSize
+    }
 
     private suspend fun savePostImageToGallery(post: FeedPostDto) {
         val imageModel = post.imageUrl.feedImageModelOrNull()

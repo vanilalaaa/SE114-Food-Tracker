@@ -78,6 +78,7 @@ fun FeedScreen(
                 pendingCropUri = uri
             }
         }
+        pendingCameraUri = null
     }
 
     FeedScreenContent(
@@ -213,7 +214,7 @@ fun FeedScreenContent(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = BottomBarContentPadding)
+                .padding(end = 20.dp, bottom = BottomBarContentPadding + 20.dp)
         ) {
             AddActionButton(
                 onClick = onOpenComposer,

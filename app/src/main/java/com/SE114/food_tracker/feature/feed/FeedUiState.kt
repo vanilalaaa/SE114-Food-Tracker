@@ -7,7 +7,7 @@ import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.data.repository.FeedRepository
 
 const val MaxPostTitleLength = 20
-const val MaxPostCaptionLength = 35
+const val MaxPostCaptionLength = 50
 
 data class FeedUiState(
     val currentUserId: String = "",

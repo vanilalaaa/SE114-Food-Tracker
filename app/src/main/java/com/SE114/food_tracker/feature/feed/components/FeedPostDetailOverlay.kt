@@ -353,6 +353,7 @@ private fun FeedPostDetailPage(
     val navigationBarBottom = with(density) {
         WindowInsets.navigationBars.getBottom(density).toDp()
     }
+    val actionBarBottomPadding = navigationBarBottom.coerceAtLeast(32.dp) + 56.dp
 
     Box(
         modifier = Modifier
@@ -368,7 +369,7 @@ private fun FeedPostDetailPage(
                     start = 22.dp,
                     top = 22.dp,
                     end = 22.dp,
-                    bottom = navigationBarBottom + 42.dp
+                    bottom = actionBarBottomPadding
                 ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
