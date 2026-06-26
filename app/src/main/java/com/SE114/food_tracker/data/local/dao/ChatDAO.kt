@@ -165,6 +165,8 @@ interface ChatDAO {
           AND (last_message_at < :messageAt OR last_message_at IS NULL)
     """)
     suspend fun updateLastMessage(conversationId: String, messageAt: Long, snippet: String?)
+    @Query("DELETE FROM messages WHERE conversation_id = :conversationId")
+    suspend fun deleteMessagesByConversation(conversationId: String)
 
     // ── PARTICIPANT / UNREAD QUERIES ──────────────────────────────────────────
 

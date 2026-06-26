@@ -575,9 +575,18 @@ class ChatRepository @Inject constructor(
     fun subscribeToGlobalConversationsRealtime() {
         val currentUserId = getAuthenticatedUserId()
         if (currentUserId.isBlank()) return
-        // The repo is a singleton but every ChatViewModel calls this; keep exactly one
-        // global channel so message inserts aren't processed by several collectors.
-        if (!globalChannelStarted.compareAndSet(false, true)) return
+        // The repo is a singleton and every ChatViewModel calls this. Keep exactly one global
+        // channel for the current user; on an in-process account switch, tear the previous
+        // user's channel down and rebuild so the new user actually receives list realtime.
+        synchronized(globalChannelLock) {
+            if (globalChannelUserId == currentUserId && globalChannelHandle != null) return
+            globalChannelHandle?.let { stale ->
+                stale.scope.cancel()
+                repositoryScope.launch { runCatching { stale.channel.unsubscribe() } }
+            }
+            globalChannelHandle = null
+            globalChannelUserId = currentUserId
+        }
 
         val globalScope = CoroutineScope(
             SupervisorJob(repositoryScope.coroutineContext[Job]) + Dispatchers.IO + realtimeErrorHandler
@@ -964,8 +973,22 @@ class ChatRepository @Inject constructor(
             false
         }
     }
+    suspend fun addMembersToGroup(conversationId: String, userIds: List<String>) {
+        try {
+            val participants = userIds.map { userId ->
+                SupabaseParticipantDto(conversationId, userId.lowercase(), false)
+            }
+            // Insert vào Supabase
+            supabaseClient.from("conversation_participant").insert(participants)
 
+            // Gửi tin nhắn hệ thống để thông báo trong nhóm
+            sendSystemMessage(conversationId, "Đã thêm thành viên mới vào nhóm.")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
     suspend fun kickMember(conversationId: String, userIdToKick: String, memberName: String) {
+        sendSystemMessage(conversationId, "Đã mời $memberName rời khỏi nhóm.")
         try {
             supabaseClient.from("conversation_participant").delete {
                 filter {
@@ -977,11 +1000,31 @@ class ChatRepository @Inject constructor(
             if (userIdToKick.lowercase() == getAuthenticatedUserId()) {
                 chatDAO.deleteConversationById(conversationId)
             }
-
-            sendSystemMessage(conversationId, "Đã mời $memberName rời khỏi nhóm.")
         } catch (e: Exception) { e.printStackTrace() }
     }
+    suspend fun disbandGroup(conversationId: String) {
+        try {
+            // 1. Gửi tin nhắn hệ thống thông báo giải tán nhóm (để UI nhận biết)
+            sendSystemMessage(conversationId, "Trưởng nhóm đã giải tán nhóm.")
 
+            // 2. Xóa các bản ghi liên quan (thứ tự quan trọng)
+
+            // Xóa tin nhắn
+            supabaseClient.from("message").delete { filter { eq("conversation_id", conversationId) } }
+
+            // Xóa thành viên
+            supabaseClient.from("conversation_participant").delete { filter { eq("conversation_id", conversationId) } }
+
+            // Xóa phòng chat
+            supabaseClient.from("conversation").delete { filter { eq("id", conversationId) } }
+
+            // 3. Xóa Local
+            deleteConversationLocal(conversationId)
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
     suspend fun sendSystemMessage(conversationId: String, content: String) {
         sendMessage(
             conversationId = conversationId,
@@ -991,7 +1034,10 @@ class ChatRepository @Inject constructor(
             isSystem       = true
         )
     }
-
+    suspend fun deleteConversationLocal(conversationId: String) {
+        chatDAO.deleteConversationById(conversationId)
+        chatDAO.deleteMessagesByConversation(conversationId)
+    }
     suspend fun createGroupWalletForExistingChat(
         conversationId: String,
         memberUserIds: List<String>
@@ -1304,7 +1350,10 @@ class ChatRepository @Inject constructor(
         val currentUserId = getAuthenticatedUserId()
         if (currentUserId.isBlank()) return
 
-        val now = System.currentTimeMillis()
+        // Advance the local marker to at least the newest known message: message timestamps
+        // come from the server/sender clock, the device clock may lag, and comparing the two
+        // would otherwise leave a just-read message counted as unread.
+        val now = maxOf(System.currentTimeMillis(), chatDAO.getLatestMessageTime(conversationId) ?: 0L)
 
         chatDAO.insertParticipantIfAbsent(
             ConversationParticipant(

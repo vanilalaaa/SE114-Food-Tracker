@@ -25,6 +25,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.firstOrNull
 import timber.log.Timber
 
+
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
@@ -79,6 +80,7 @@ class ChatViewModel @Inject constructor(
 
     private val _groupMembers = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val groupMembers: StateFlow<List<Pair<String, String>>> = _groupMembers.asStateFlow()
+
     private val _isCurrentAdmin = MutableStateFlow(false)
     val isCurrentAdmin: StateFlow<Boolean> = _isCurrentAdmin.asStateFlow()
 
@@ -153,11 +155,23 @@ class ChatViewModel @Inject constructor(
             onResult(chatRepository.removeGroupAvatar(conversationId))
         }
     }
-
+    fun addMembers(conversationId: String, userIds: List<String>) {
+        viewModelScope.launch {
+            chatRepository.addMembersToGroup(conversationId, userIds)
+            loadGroupMembers(conversationId)
+        }
+    }
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
         viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
     }
-
+    fun disbandGroup(conversationId: String) {
+        viewModelScope.launch {
+            if (isCurrentAdmin.value) {
+                chatRepository.disbandGroup(conversationId)
+                fetchConversationsFromServer()
+            }
+        }
+    }
     fun getConversationState(conversationId: String): Flow<Conversation?> {
         return chatRepository.getLocalConversation(conversationId)
     }

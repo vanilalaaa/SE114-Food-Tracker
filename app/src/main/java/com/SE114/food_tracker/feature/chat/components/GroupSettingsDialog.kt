@@ -20,7 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
-
+import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.Edit
 @Composable
 fun GroupSettingsDialog(
     conversationName: String,
@@ -28,6 +29,8 @@ fun GroupSettingsDialog(
     onDismissRequest: () -> Unit,
     onRenameGroup: (String) -> Unit,
     onKickMember: (userId: String, name: String) -> Unit,
+    isAdmin: Boolean,
+    onDisbandGroup: () -> Unit,
     currentAvatarUrl: String? = null,
     onChangeAvatar: (imageUri: String) -> Unit = {},
     onRemoveAvatar: () -> Unit = {},
@@ -86,7 +89,14 @@ fun GroupSettingsDialog(
                         color = StatPinkDark,
                         modifier = Modifier.clickable { avatarPicker.launch("image/*") }
                     ) {
-                        Text("✏️", fontSize = 14.sp, modifier = Modifier.padding(5.dp))
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Edit,
+                            contentDescription = "Chỉnh sửa ảnh đại diện",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .size(16.dp)
+                        )
                     }
                 }
 
@@ -187,19 +197,35 @@ fun GroupSettingsDialog(
                                         modifier = Modifier
                                             .clickable { onKickMember(member.first, member.second) }
                                     ) {
-                                        Text(
-                                            text = "Mời ra ❌",
-                                            color = StatRed,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(
-                                                horizontal = 12.dp,
-                                                vertical = 6.dp
-                                            )
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Default.PersonRemove,
+                                            contentDescription = "Mời ra khỏi nhóm",
+                                            tint = StatRed,
+                                            modifier = Modifier
+                                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                                .size(18.dp)
                                         )
                                     }
                                 }
                             }
+                        }
+                    }
+                    if (isAdmin) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(thickness = 1.dp, color = StatRed.copy(alpha = 0.3f))
+
+                        Button(
+                            onClick = onDisbandGroup,
+                            colors = ButtonDefaults.buttonColors(containerColor = StatRed),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        ) {
+                            Text(
+                                "Giải tán nhóm",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
                         }
                     }
                 }
@@ -232,7 +258,9 @@ fun GroupSettingsDialogPreview() {
             memberList = previewMembers,
             onDismissRequest = {},
             onRenameGroup = {},
-            onKickMember = { _, _ -> }
+            onKickMember = { _, _ -> },
+            isAdmin = true,
+            onDisbandGroup = {}
         )
     }
 }

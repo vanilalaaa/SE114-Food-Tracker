@@ -36,6 +36,7 @@ import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.filled.Image
+import kotlinx.coroutines.flow.firstOrNull
 
 // Per-message character cap, in line with modern chat apps (Discord ~2,000, Telegram/Slack ~4,000).
 private const val MAX_MESSAGE_LENGTH = 2000
@@ -89,7 +90,10 @@ fun ChatScreen(
         isGroup = isGroup,
         hasWallet = hasWallet,
         isAdmin = isAdmin,
-        memberList = memberList.map { Pair(it.first, it.second) }, // Map Triple sang Pair cho khớp signature cũ nhe Vy
+        onDisbandGroup = {
+            viewModel.disbandGroup(conversationId)
+        },
+        memberList = memberList.map { Pair(it.first, it.second) },
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {
@@ -149,6 +153,7 @@ fun ChatScreenContent(
     isGroup: Boolean,
     hasWallet: Boolean,
     isAdmin: Boolean,
+    onDisbandGroup: () -> Unit,
     memberList: List<Pair<String, String>>,
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit,
@@ -249,7 +254,9 @@ fun ChatScreenContent(
             },
             onKickMember = { userId, name ->
                 memberToKick = Pair(userId, name)
-            }
+            },
+            isAdmin = isAdmin,
+            onDisbandGroup = onDisbandGroup
         )
     }
 
@@ -506,6 +513,7 @@ fun ChatScreenPreview() {
             onRetryMessage = {},
             onRenameGroup = { _, _ -> },
             onKickMember = { _, _, _ -> },
+            onDisbandGroup = {},
             viewModel = viewModel()
         )
     }
