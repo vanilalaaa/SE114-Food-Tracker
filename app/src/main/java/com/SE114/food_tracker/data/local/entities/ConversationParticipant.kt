@@ -15,8 +15,11 @@ data class ConversationParticipant(
     val userId: String,
 
     @ColumnInfo(name = "is_admin")
-    val isAdmin: Boolean = false, // Cờ kiểm tra Admin nhóm
+    val isAdmin: Boolean = false,
 
     @ColumnInfo(name = "joined_at")
-    val joinedAt: Long = System.currentTimeMillis()
+    val joinedAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "last_read_at")
+    val lastReadAt: Long = 0L
 )

@@ -18,6 +18,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.TransactionItem
 import com.SE114.food_tracker.feature.chat.components.WalletTransactionDialog
@@ -65,6 +68,19 @@ fun GroupWalletScreen(
     LaunchedEffect(conversationId) {
         viewModel.loadGroupMembers(conversationId)
         viewModel.loadWalletData(conversationId)
+    }
+
+    // Reload wallet data every time this screen resumes (handles purchases made
+    // from DiaryScreen while GroupWalletScreen was already open in the back stack).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, conversationId) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadWalletData(conversationId)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val walletBalance by viewModel.walletBalanceFlow.collectAsState()

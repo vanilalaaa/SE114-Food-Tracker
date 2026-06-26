@@ -53,7 +53,9 @@ import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
 import com.SE114.food_tracker.feature.diary.components.FoodInputField
 import com.SE114.food_tracker.feature.diary.components.ManageCategoryBottomSheet
+import com.SE114.food_tracker.feature.diary.components.PaymentSourceSelector
 import com.SE114.food_tracker.feature.diary.components.ShareToggle
+import com.SE114.food_tracker.data.repository.ChatRepository
 import com.SE114.food_tracker.feature.diary.components.StarRatingBar
 import com.SE114.food_tracker.feature.diary.components.TimeSelector
 import com.SE114.food_tracker.feature.diary.components.WheelTimePickerDialog
@@ -66,10 +68,11 @@ fun FoodEntryScreen(
     preSelectedCategory: DiaryCategory? = null,
     categories: List<DiaryCategory> = emptyList(),
     manageCategories: List<DiaryCategory> = categories,
+    availableWallets: List<ChatRepository.WalletWithRole> = emptyList(),
     pendingImageUri: Uri? = null,
     categoryDeleteError: String? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, pickedTimeMillis: Long) -> Unit,
+    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, pickedTimeMillis: Long, walletId: String?) -> Unit,
     onDelete: ((String) -> Unit)? = null,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
@@ -99,8 +102,9 @@ fun FoodEntryScreen(
         )
     }
 
-    var rating        by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
-    var isShared      by remember(existingItem?.itemId) { mutableStateOf(existingItem?.isShared ?: false) }
+    var rating           by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
+    var isShared         by remember(existingItem?.itemId) { mutableStateOf(existingItem?.isShared ?: false) }
+    var selectedWalletId by remember(existingItem?.itemId) { mutableStateOf(existingItem?.walletId) }
     var nameError     by remember { mutableStateOf<String?>(null) }
     var priceError    by remember { mutableStateOf<String?>(null) }
     var categoryError by remember { mutableStateOf<String?>(null) }
@@ -183,7 +187,8 @@ fun FoodEntryScreen(
                 note.trim(),
                 autoTimeType,
                 isShared,
-                pickedTimeMillis
+                pickedTimeMillis,
+                selectedWalletId
             )
         }
     }
@@ -363,6 +368,12 @@ fun FoodEntryScreen(
             onShareChange = { isShared = it }
         )
 
+        PaymentSourceSelector(
+            availableWallets  = availableWallets,
+            selectedWalletId  = selectedWalletId,
+            onSelectionChange = { selectedWalletId = it }
+        )
+
         Spacer(Modifier.height(16.dp))
 
         Row(
@@ -442,7 +453,7 @@ fun FoodEntryScreenPreview() {
             FoodEntryScreen(
                 categories = previewCategories,
                 onDismiss  = {},
-                onSave     = { _, _, _, _, _, _, _, _ -> }
+                onSave     = { _, _, _, _, _, _, _, _, _ -> }
             )
         }
     }

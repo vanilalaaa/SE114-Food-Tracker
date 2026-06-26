@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.data.local.dao.ChatDAO
+import com.SE114.food_tracker.data.local.dao.ConversationWithUnread
 import com.SE114.food_tracker.data.local.entities.Conversation
 import com.SE114.food_tracker.data.local.entities.Message
 import com.SE114.food_tracker.data.local.entities.MessageSyncStatus
@@ -21,7 +22,8 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import timber.log.Timber
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -48,33 +50,29 @@ class ChatViewModel @Inject constructor(
         fetchConversationsFromServer()
         chatRepository.subscribeToGlobalConversationsRealtime()
 
-        // THÀNH VIÊN
         viewModelScope.launch {
             chatRepository.memberUpdateSignal.collect { convId: String ->
-                // Tự động load lại danh sách thành viên vào StateFlow
                 loadGroupMembers(convId)
-                // Kéo ngay tin nhắn hệ thống (Mời vào/Kick ra) về
                 refreshChatData(convId)
             }
         }
 
-        // QUỸ NHÓM
         viewModelScope.launch {
             chatRepository.walletUpdateSignal.collect { convId: String ->
-                // Nạp lại data ví tĩnh thành data động
                 loadWalletData(convId)
-                // Kéo ngay tin nhắn hệ thống (Nạp/Rút quỹ) về
                 refreshChatData(convId)
             }
         }
     }
 
-    fun fetchConversationsFromServer() {
+    fun fetchConversationsFromServer(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 chatRepository.fetchAndSaveConversationsToLocal()
             } catch (e: Exception) {
-                println("Lỗi kéo danh sách hội thoại từ server: ${e.localizedMessage}")
+                Timber.tag("Chat").e(e, "Failed to fetch conversations")
+            } finally {
+                onComplete()
             }
         }
     }
@@ -109,13 +107,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private var connectedConversationId: String? = null
+
     fun connectToConversation(conversationId: String) {
+        connectedConversationId = conversationId
         viewModelScope.launch {
-            // subscribeToChatRealtime is idempotent (guarded by activeChannels check).
             chatRepository.subscribeToChatRealtime(conversationId)
-            // FIX: Run initial REST back-fill AFTER subscribe so that any message arriving
-            // during the REST fetch is still caught by Realtime and not lost.
-            // Fire-and-forget — does NOT block the Flow from reaching the UI.
             try {
                 chatRepository.syncMessagesFromServer(conversationId)
                 chatRepository.fetchGroupMembersFromServer(conversationId).also { members ->
@@ -125,6 +122,13 @@ class ChatViewModel @Inject constructor(
                 e.printStackTrace()
             }
         }
+    }
+
+    // This VM is keyed per conversation (hiltViewModel(key = id)), so onCleared fires when
+    // the chat is popped — the point to release its realtime channel and collectors.
+    override fun onCleared() {
+        super.onCleared()
+        connectedConversationId?.let { chatRepository.unsubscribeFromChatRealtime(it) }
     }
 
     fun createGroup(name: String, members: List<String>) {
@@ -138,6 +142,18 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { chatRepository.updateGroupName(conversationId, newName) }
     }
 
+    fun updateGroupAvatar(conversationId: String, imageUri: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            onResult(chatRepository.updateGroupAvatar(conversationId, imageUri))
+        }
+    }
+
+    fun removeGroupAvatar(conversationId: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            onResult(chatRepository.removeGroupAvatar(conversationId))
+        }
+    }
+
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
         viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
     }
@@ -146,12 +162,9 @@ class ChatViewModel @Inject constructor(
         return chatRepository.getLocalConversation(conversationId)
     }
 
-
     fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
-        // connectToConversation handles subscribe + REST back-fill in one shot.
-        // Called once; idempotent on repeated recompositions thanks to activeChannels guard.
-        connectToConversation(conversationId)
-
+        // The realtime connection is owned by ChatScreen's LaunchedEffect(conversationId);
+        // connecting here too would fire a second concurrent subscribe for the same conversation.
         return chatRepository.getMessagesWithProfileStream(conversationId).map { joinEntities ->
             joinEntities.map { entity ->
                 val finalName = when {
@@ -159,7 +172,6 @@ class ChatViewModel @Inject constructor(
                     !entity.cacheName.isNullOrBlank() -> entity.cacheName
                     else -> "Thành viên"
                 }
-
                 MessageUiModel(
                     localId = entity.id ?: java.util.UUID.randomUUID().toString(),
                     senderId = entity.senderId ?: "",
@@ -175,28 +187,80 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    fun sendTextMessage(conversationId: String, text: String) {
+
+    fun sendTextMessage(
+        conversationId: String,
+        text: String,
+        isOneToOne: Boolean = false,
+        friendUserId: String? = null
+    ) {
         viewModelScope.launch {
-            chatRepository.sendMessage(conversationId, currentUserId, body = text, imageUrl = null)
+            var targetConvId = conversationId
+            if (isOneToOne && !friendUserId.isNullOrBlank()) {
+                val existingId = chatRepository.getOrCreateOneToOneChat(friendUserId)
+                if (existingId != null) targetConvId = existingId
+            }
+            if (targetConvId.isBlank()) {
+                println("LỖI: Không lấy được targetConvId!")
+                return@launch
+            }
+            chatRepository.sendMessage(targetConvId, currentUserId, body = text, imageUrl = null)
         }
     }
+
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
-            chatRepository.sendMessage(
-                conversationId, currentUserId, body = null, imageUrl = imageUri
-            )
+            chatRepository.sendMessage(conversationId, currentUserId, body = null, imageUrl = imageUri)
         }
     }
 
     fun retryFailedMessage(messageEntity: Message) {
-        viewModelScope.launch {
-            chatRepository.retryMessage(messageEntity)
-        }
+        viewModelScope.launch { chatRepository.retryMessage(messageEntity) }
+    }
+
+    // ── CONVERSATION LIST ─────────────────────────────────────────────────────
+
+    fun getConversationsWithUnreadFlow(): Flow<List<ConversationWithUnread>> {
+        val userId = currentUserId
+        return chatDAO.getAllConversationsWithUnread(userId)
     }
 
     fun getConversationsFlow(): Flow<List<Conversation>> {
         return chatDAO.getAllConversations()
     }
+
+    /**
+     * Open a 1-1 chat with a friend from the search suggestions. Resolves (or creates) the real
+     * conversation on the server first, then hands back its id — sending to a conversation_id that
+     * doesn't exist yet violates the message→conversation foreign key, which is why first messages
+     * to a brand-new 1-1 used to fail.
+     */
+    fun openConversationWithFriend(
+        friendUserId: String,
+        friendName: String,
+        onResolved: (conversationId: String, name: String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val conversationId = chatRepository.getOrCreateOneToOneChat(friendUserId)
+            if (conversationId.isNullOrBlank()) {
+                Timber.tag("Chat").e("Could not open 1-1 chat with %s", friendUserId)
+                return@launch
+            }
+            onResolved(conversationId, friendName)
+            // Pull the just-created conversation into Room so it shows in the list.
+            fetchConversationsFromServer()
+        }
+    }
+
+    // ── MARK AS READ ──────────────────────────────────────────────────────────
+
+    fun markAsRead(conversationId: String) {
+        viewModelScope.launch {
+            chatRepository.markAsRead(conversationId)
+        }
+    }
+
+    // ── WALLET ────────────────────────────────────────────────────────────────
 
     private val _walletBalanceFlow = MutableStateFlow(0.0)
     val walletBalanceFlow: StateFlow<Double> = _walletBalanceFlow.asStateFlow()
@@ -206,8 +270,7 @@ class ChatViewModel @Inject constructor(
             val balance = chatRepository.getWalletBalance(conversationId)
             _walletBalanceFlow.value = balance
             walletBalance = balance
-            _walletTransactions.value =
-                chatRepository.fetchWalletTransactionsFromServer(conversationId)
+            _walletTransactions.value = chatRepository.fetchWalletTransactionsFromServer(conversationId)
         }
     }
 
@@ -220,9 +283,8 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val transactionType = if (isDeposit) "deposit" else "withdrawal"
-                val conversation = chatDAO.getConversationById(conversationId).first()
+                val conversation = chatDAO.getConversationById(conversationId).firstOrNull()
                 val actualWalletId = conversation?.walletId
-
                 if (actualWalletId.isNullOrBlank() || actualWalletId == "wallet_default") return@launch
 
                 val success = chatRepository.executeWalletTransaction(
@@ -232,10 +294,7 @@ class ChatViewModel @Inject constructor(
                     note = note,
                     itemId = null
                 )
-
-                if (success) {
-                    loadWalletData(conversationId)
-                }
+                if (success) loadWalletData(conversationId)
                 isTransactionSuccess = success
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -247,44 +306,31 @@ class ChatViewModel @Inject constructor(
         isTransactionSuccess = null
     }
 
-    suspend fun isCurrentUserAdmin(conversationId: String): Boolean {
-        return try {
-            chatRepository.isCurrentUserAdminOf(conversationId)
-        } catch (e: Exception) {
-            false
-        }
-    }
+    suspend fun isCurrentUserAdmin(conversationId: String): Boolean =
+        runCatching { chatRepository.isCurrentUserAdminOf(conversationId) }.getOrDefault(false)
 
     fun createGroupWallet(conversationId: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            try {
-                val success = chatRepository.createGroupWalletForExistingChat(
+            val success = runCatching {
+                chatRepository.createGroupWalletForExistingChat(
                     conversationId = conversationId,
                     memberUserIds = emptyList()
                 )
-                if (success) {
-                    fetchConversationsFromServer()
-                }
-                onResult(success)
-            } catch (e: Exception) {
-                onResult(false)
-            }
+            }.getOrDefault(false)
+            if (success) fetchConversationsFromServer()
+            onResult(success)
         }
     }
 
-    private fun formatToTime(timestamp: Long): String {
-        return SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(timestamp))
-    }
+    private fun formatToTime(timestamp: Long): String =
+        SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(timestamp))
 
     private fun formatToDate(timestamp: Long): String {
         val target = Calendar.getInstance().apply { timeInMillis = timestamp }
         val now = Calendar.getInstance()
         return if (target.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
             target.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
-        ) {
-            "Hôm nay"
-        } else {
-            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(timestamp))
-        }
+        ) "Hôm nay"
+        else SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(timestamp))
     }
 }

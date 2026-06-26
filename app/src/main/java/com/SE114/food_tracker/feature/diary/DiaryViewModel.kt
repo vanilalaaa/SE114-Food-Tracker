@@ -5,12 +5,15 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
+import com.SE114.food_tracker.data.repository.ChatRepository
+import com.SE114.food_tracker.core.network.NetworkMonitor
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.core.sync.SyncStatus
+import com.SE114.food_tracker.data.remote.SupabaseItemService
 import com.SE114.food_tracker.data.repository.ImageRepository
 import com.SE114.food_tracker.data.repository.ItemRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,12 +46,16 @@ import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.String
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DiaryViewModel @Inject constructor(
     private val itemRepository: ItemRepository,
     private val imageRepository: ImageRepository,
+    private val chatRepository: ChatRepository,
+    private val supabaseItemService: SupabaseItemService,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -62,15 +69,20 @@ class DiaryViewModel @Inject constructor(
     private val _pendingImageUri = MutableStateFlow<Uri?>(null)
     val pendingImageUri: StateFlow<Uri?> = _pendingImageUri.asStateFlow()
 
+    private val _availableWallets = MutableStateFlow<List<ChatRepository.WalletWithRole>>(emptyList())
+    val availableWallets: StateFlow<List<ChatRepository.WalletWithRole>> = _availableWallets.asStateFlow()
+
     private var _pendingImageBytes: ByteArray? = null
     private var _imageCompressionJob: Job? = null
 
+    // TỐI ƯU: Loại bỏ mutationTrigger, để Room Flow tự động cập nhật bất cứ khi nào DB thay đổi
     private val selectedDayItems: Flow<List<DiaryItem>> =
         _selectedDate.flatMapLatest { date ->
             val range = date.utcDayRange()
             itemRepository.getDiaryItemsByDay(range.start, range.end)
         }
 
+    // Dữ liệu tháng hiện tại để hiển thị lên NutritionCard (sticker vật lý)
     private val selectedMonthItems: Flow<List<DiaryItem>> =
         _selectedDate.flatMapLatest { date ->
             val monthStart     = LocalDate(date.year, date.monthNumber, 1)
@@ -81,6 +93,7 @@ class DiaryViewModel @Inject constructor(
             )
         }
 
+    // TỐI ƯU: Loại bỏ mutationTrigger tại đây luôn
     private val datesWithData: Flow<Set<Int>> =
         _selectedDate.flatMapLatest { date ->
             val monthStart     = LocalDate(date.year, date.monthNumber, 1)
@@ -152,6 +165,11 @@ class DiaryViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { computeStreak() }
+        viewModelScope.launch {
+            runCatching { chatRepository.getUserWalletsWithRoles() }
+                .onSuccess { _availableWallets.value = it }
+                .onFailure { Timber.e(it, "[DiaryVM] failed to load wallets") }
+        }
     }
 
     fun loadDate(date: LocalDate) {
@@ -197,13 +215,27 @@ class DiaryViewModel @Inject constructor(
         note: String,
         timeType: Int,
         isShared: Boolean = false,
-        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds() // ← Thêm tham số nhận dạng thời gian thực ăn
+        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
+        walletId: String? = null
     ) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value     = null
 
             try {
+                if (walletId != null) {
+                    val online = networkMonitor.isOnline.first()
+                    if (!online) {
+                        _error.value = "Cần có mạng để chi từ quỹ nhóm"
+                        return@launch
+                    }
+                    val balance = chatRepository.getWalletBalanceById(walletId)
+                    if (balance < price) {
+                        _error.value = "Số dư quỹ không đủ (còn ${String.format("%,.0f", balance)} VND, cần ${String.format("%,.0f", price)} VND)"
+                        return@launch
+                    }
+                }
+
                 _imageCompressionJob?.join()
                 val imageBytes = _pendingImageBytes
 
@@ -235,16 +267,34 @@ class DiaryViewModel @Inject constructor(
                     note       = note.ifBlank { null },
                     imageUrl   = finalImageUrl,
                     isShared   = isShared,
+                    walletId   = walletId,
                     syncStatus = SyncStatus.PENDING.name,
                     entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
                     createdAt  = pickedTimeMillis, // ← SỬA: Thay thế 'now' thành mốc thời gian người dùng chọn
                     updatedAt  = now
                 )
 
+                // Thực hiện ghi vào DB và dọn dẹp
                 itemRepository.insert(item)
                 clearPendingImage()
                 computeStreak()
                 SyncScheduler.triggerImmediateSync(context)
+
+                if (walletId != null) {
+                    chatRepository.executePurchaseTransaction(
+                        walletId = walletId,
+                        amount   = price,
+                        itemId   = itemId,   // Vẫn truyền vào — ChatRepository hiện tại sẽ bỏ qua nó một cách an toàn
+                        note     = name,
+                        imageUrl = finalImageUrl
+                    ).onFailure { err ->
+                        Timber.e(err, "[DiaryVM] Gọi RPC thanh toán thất bại")
+                        _error.value = "Trừ quỹ thất bại: ${err.message}"
+                    }
+                } else {
+                    // Món ăn thông thường: Để WorkManager xử lý việc đồng bộ như bình thường
+                    SyncScheduler.triggerImmediateSync(context)
+                }
 
             } catch (t: Throwable) {
                 _error.value = t.message
@@ -264,7 +314,8 @@ class DiaryViewModel @Inject constructor(
         note: String,
         timeType: Int,
         isShared: Boolean,
-        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds()
+        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
+        walletId: String? = null
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -303,6 +354,7 @@ class DiaryViewModel @Inject constructor(
                         imageUrl   = finalImageUrl,
                         isShared   = isShared,
                         syncStatus = SyncStatus.PENDING.name,
+                        walletId   = walletId,
                         createdAt  = pickedTimeMillis,
                         updatedAt  = Clock.System.now().toEpochMilliseconds()
                     )
@@ -342,22 +394,29 @@ class DiaryViewModel @Inject constructor(
             val systemTimeZone = TimeZone.currentSystemDefault()
             val today = Clock.System.todayIn(systemTimeZone)
 
+            // 1. Lấy chuỗi ID người dùng hiện tại
             val ownerId = itemRepository.getCurrentUserId().orEmpty()
+
+            // 2. TỐI ƯU HIỆU NĂNG: Chỉ lấy danh sách các Epoch thuần túy (Kiểu Long) thay vì cả bảng Item
             val distinctEpochs = itemRepository.getDistinctEntryDates(ownerId)
 
+            // 3.
             val activeDates = distinctEpochs.map { epoch ->
                 Instant.fromEpochMilliseconds(epoch)
                     .toLocalDateTime(systemTimeZone)
                     .date
             }.toSet()
 
+            // 4. Thuật toán đếm lùi chuỗi ngày liên tục (Streak) trên RAM
             var streak = 0
             var cursor = today
 
+            // UX bảo vệ chuỗi: Nếu hôm nay chưa ăn/nhập gì, lùi lại bắt đầu xét từ hôm qua
             if (!activeDates.contains(cursor)) {
                 cursor = cursor.plus(DatePeriod(days = -1))
             }
 
+            // Vòng lặp đếm lùi siêu tốc cho đến khi đứt chuỗi
             while (activeDates.contains(cursor)) {
                 streak++
                 cursor = cursor.plus(DatePeriod(days = -1))
