@@ -46,6 +46,7 @@ import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.String
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -214,6 +215,7 @@ class DiaryViewModel @Inject constructor(
         note: String,
         timeType: Int,
         isShared: Boolean = false,
+        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
         walletId: String? = null
     ) {
         viewModelScope.launch {
@@ -268,11 +270,11 @@ class DiaryViewModel @Inject constructor(
                     walletId   = walletId,
                     syncStatus = SyncStatus.PENDING.name,
                     entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
-                    createdAt  = now,
+                    createdAt  = pickedTimeMillis, // ← SỬA: Thay thế 'now' thành mốc thời gian người dùng chọn
                     updatedAt  = now
                 )
 
-                // Lưu vào Room trước để giao diện (UI) cập nhật lập tức
+                // Thực hiện ghi vào DB và dọn dẹp
                 itemRepository.insert(item)
                 clearPendingImage()
                 computeStreak()
@@ -312,6 +314,7 @@ class DiaryViewModel @Inject constructor(
         note: String,
         timeType: Int,
         isShared: Boolean,
+        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
         walletId: String? = null
     ) {
         viewModelScope.launch {
@@ -350,8 +353,9 @@ class DiaryViewModel @Inject constructor(
                         note       = note.ifBlank { null },
                         imageUrl   = finalImageUrl,
                         isShared   = isShared,
-                        walletId   = walletId,
                         syncStatus = SyncStatus.PENDING.name,
+                        walletId   = walletId,
+                        createdAt  = pickedTimeMillis,
                         updatedAt  = Clock.System.now().toEpochMilliseconds()
                     )
                 )

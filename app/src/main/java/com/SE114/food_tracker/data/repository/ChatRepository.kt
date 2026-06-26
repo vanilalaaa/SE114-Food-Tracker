@@ -784,11 +784,17 @@ class ChatRepository @Inject constructor(
             if (!existingId.isNullOrBlank()) return existingId
 
             val newChatUuid = UUID.randomUUID().toString()
-            supabaseClient.from("conversation").insert(mapOf(
-                "id"       to newChatUuid,
-                "is_group" to false,
-                "name"     to null
-            ))
+            // Insert via the @Serializable DTO, not a heterogeneous Map<String, Any?>: a mixed
+            // String/Boolean/null map has no kotlinx serializer ("Serializer for class 'Any'"),
+            // which is why creating a brand-new 1-1 chat failed.
+            supabaseClient.from("conversation").insert(
+                SupabaseConversationDto(
+                    id       = newChatUuid,
+                    name     = null,
+                    isGroup  = false,
+                    walletId = null
+                )
+            )
             supabaseClient.from("conversation_participant").insert(listOf(
                 SupabaseParticipantDto(newChatUuid, currentUserId, false),
                 SupabaseParticipantDto(newChatUuid, targetFriendId, false)

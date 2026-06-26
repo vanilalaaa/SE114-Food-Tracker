@@ -74,8 +74,8 @@ fun DiaryScreen(
         onClearCategoryError       = { categoryViewModel.clearError() },
         onLoadDate                 = { diaryViewModel.loadDate(it) },
         onImageSelected            = { diaryViewModel.onImageSelected(it) },
-        onSaveItem                 = { n, p, c, r, no, t, shared, walletId -> diaryViewModel.saveItem(n, p, c, r, no, t, shared, walletId) },
-        onUpdateItem               = { id, n, p, c, r, no, t, shared, walletId -> diaryViewModel.updateItem(id, n, p, c, r, no, t, shared, walletId) },
+        onSaveItem                 = { n, p, c, r, no, t, shared, millis, walletId -> diaryViewModel.saveItem(n, p, c, r, no, t, shared, millis, walletId) },
+        onUpdateItem               = { id, n, p, c, r, no, t, shared, millis, walletId -> diaryViewModel.updateItem(id, n, p, c, r, no, t, shared, millis, walletId) },
         onDeleteItem               = { diaryViewModel.deleteItem(it) },
         onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
@@ -100,8 +100,8 @@ fun DiaryScreenContent(
     onLoadDate: (LocalDate) -> Unit,
     onImageSelected: (Uri) -> Unit,
     onClearPendingImage: () -> Unit,
-    onSaveItem: (String, Double, String, Int, String, Int, Boolean, String?) -> Unit,
-    onUpdateItem: (String, String, Double, String, Int, String, Int, Boolean, String?) -> Unit,
+    onSaveItem: (String, Double, String, Int, String, Int, Boolean, Long, String?) -> Unit,
+    onUpdateItem: (String, String, Double, String, Int, String, Int, Boolean, Long, String?) -> Unit,
     onDeleteItem: (String) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
@@ -307,11 +307,11 @@ fun DiaryScreenContent(
                         preSelectedCategory = null
                         onClearPendingImage()
                     },
-                    onSave = { name, price, categoryId, rating, note, timeType, isShared, walletId ->
+                    onSave = { name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis, walletId ->
                         if (editingItem == null) {
-                            onSaveItem(name, price, categoryId, rating, note, timeType, isShared, walletId)
+                            onSaveItem(name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis, walletId)
                         } else {
-                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType, isShared, walletId)
+                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType, isShared, pickedTimeMillis, walletId)
                         }
                         showEntryScreen     = false
                         selectedItemForEdit = null
@@ -362,8 +362,8 @@ fun DiaryScreenPreview() {
             onAddTriggered             = {},
             onLoadDate                 = {},
             onImageSelected            = {},
-            onSaveItem                 = { _, _, _, _, _, _, _, _ -> },
-            onUpdateItem               = { _, _, _, _, _, _, _, _, _ -> },
+            onSaveItem                 = { _, _, _, _, _, _, _, _, _ -> },
+            onUpdateItem               = { _, _, _, _, _, _, _, _, _, _ -> },
             onDeleteItem               = {},
             onDeleteCategory           = {},
             onToggleCategoryVisibility = {},
