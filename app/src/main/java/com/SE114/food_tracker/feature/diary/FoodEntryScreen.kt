@@ -130,23 +130,21 @@ fun FoodEntryScreen(
 
     // Tự động phân loại timeType khớp với constraint của Database (0: Sáng, 1: Trưa/Chiều, 2: Tối)
     val autoTimeType = when (selectedHour) {
-        in 5..10  -> 0
-        in 11..16 -> 1
-        else      -> 2
+        in 5..10  -> 0  // Sáng
+        in 11..13 -> 1  // Trưa
+        in 14..17 -> 2  // Chiều
+        else      -> 3  // Tối
     }
-
-    // Nhãn hiển thị chi tiết cho UI người dùng
     val sessionLabel = when (selectedHour) {
         in 5..10  -> "Sáng"
-        in 11..12 -> "Trưa"
-        in 13..16 -> "Chiều"
+        in 11..13 -> "Trưa"
+        in 14..17 -> "Chiều"
         else      -> "Tối"
     }
-
     val sessionIcon = when (selectedHour) {
         in 5..10  -> "🌅"
-        in 11..12 -> "☀️"
-        in 13..16 -> "⛅"
+        in 11..13 -> "☀️"
+        in 14..17 -> "⛅"
         else      -> "🌙"
     }
 

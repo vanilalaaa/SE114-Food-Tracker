@@ -293,8 +293,9 @@ private fun SwipeToRevealDeleteRow(
 
 private fun Int.toTimeLabel(): String = when (this) {
     0    -> "Sáng"
-    1    -> "Trưa/Chiều"
-    2    -> "Tối"
+    1    -> "Trưa"
+    2    -> "Chiều"
+    3    -> "Tối"
     else -> "Khác"
 }
 
