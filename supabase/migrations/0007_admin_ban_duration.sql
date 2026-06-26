@@ -1,7 +1,7 @@
--- 0006_admin_ban_duration.sql
+-- 0007_admin_ban_duration.sql
 --
 -- Temporary bans (auto-expiring) + a lifetime ban counter on top of the boolean
--- ban from 0005. A ban now carries an optional duration; permanent bans keep the
+-- ban from 0005_admin. A ban now carries an optional duration; permanent bans keep the
 -- is_banned flag, temporary bans set banned_until and lift themselves once it passes.
 -- Run MANUALLY via Supabase Dashboard → SQL Editor (the CLI is not configured for
 -- this project). Idempotent and safe to re-run.

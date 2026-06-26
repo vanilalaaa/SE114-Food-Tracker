@@ -1,11 +1,11 @@
--- Per-user read position for conversations. last_read_at was introduced in 0005 as
+-- Per-user read position for conversations. last_read_at was introduced in 0006 as
 -- BIGINT epoch-millis to stay consistent with the millis-based Room model (message
 -- created_at, conversation last_message_at are all BIGINT millis); this migration keeps
 -- that type and adds the gated RPC clients call to advance their own marker.
 --
 -- Run MANUALLY via Supabase Dashboard -> SQL Editor (no CLI configured). Idempotent.
 
--- Defensive: the column already exists from 0005; keep this self-contained.
+-- Defensive: the column already exists from 0006; keep this self-contained.
 alter table public.conversation_participant
     add column if not exists last_read_at bigint not null default 0;
 
