@@ -67,7 +67,9 @@ fun AddMemberDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    if (selectedMembers.contains(friend.first)) selectedMembers.remove(friend.first)
+                                    if (selectedMembers.contains(friend.first)) selectedMembers.remove(
+                                        friend.first
+                                    )
                                     else selectedMembers.add(friend.first)
                                 }
                                 .padding(vertical = 8.dp),

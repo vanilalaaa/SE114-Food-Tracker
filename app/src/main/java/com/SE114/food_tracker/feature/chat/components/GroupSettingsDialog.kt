@@ -22,6 +22,8 @@ import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PersonAdd
+
 @Composable
 fun GroupSettingsDialog(
     conversationName: String,
@@ -31,6 +33,8 @@ fun GroupSettingsDialog(
     onKickMember: (userId: String, name: String) -> Unit,
     isAdmin: Boolean,
     onDisbandGroup: () -> Unit,
+    friendList: List<Pair<String, String>>,
+    onAddMembers: (List<String>) -> Unit,
     currentAvatarUrl: String? = null,
     onChangeAvatar: (imageUri: String) -> Unit = {},
     onRemoveAvatar: () -> Unit = {},
@@ -69,11 +73,17 @@ fun GroupSettingsDialog(
                             model = currentAvatarUrl,
                             contentDescription = "Ảnh đại diện nhóm",
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(76.dp).clip(CircleShape).background(LightPeach)
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(CircleShape)
+                                .background(LightPeach)
                         )
                     } else {
                         Box(
-                            modifier = Modifier.size(76.dp).clip(CircleShape).background(LightPeach),
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(CircleShape)
+                                .background(LightPeach),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -159,10 +169,16 @@ fun GroupSettingsDialog(
                 // Kiểm tra nếu danh sách trống từ server
                 if (memberList.isEmpty()) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Chưa tải được danh sách thành viên", color = HintGray, fontSize = 13.sp)
+                        Text(
+                            "Chưa tải được danh sách thành viên",
+                            color = HintGray,
+                            fontSize = 13.sp
+                        )
                     }
                 } else {
                     Column(
@@ -210,6 +226,36 @@ fun GroupSettingsDialog(
                             }
                         }
                     }
+                    var showAddMemberDialog by remember { mutableStateOf(false) }
+
+                    if (showAddMemberDialog) {
+                        AddMemberDialog(
+                            friendList = friendList,
+                            onDismiss = { showAddMemberDialog = false },
+                            onConfirm = { userIds ->
+                                onAddMembers(userIds)
+                                showAddMemberDialog = false
+                            }
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { showAddMemberDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = StatPinkDark),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, StatPinkDark)
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.PersonAdd,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Thêm thành viên")
+                    }
                     if (isAdmin) {
                         Spacer(modifier = Modifier.height(16.dp))
                         HorizontalDivider(thickness = 1.dp, color = StatRed.copy(alpha = 0.3f))
@@ -218,7 +264,9 @@ fun GroupSettingsDialog(
                             onClick = onDisbandGroup,
                             colors = ButtonDefaults.buttonColors(containerColor = StatRed),
                             shape = RoundedCornerShape(24.dp),
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
                         ) {
                             Text(
                                 "Giải tán nhóm",
@@ -252,6 +300,10 @@ fun GroupSettingsDialogPreview() {
         Pair("azun_id", "Azun (Data) 🥑"),
         Pair("vy_id", "Vy Nguyễn (BA) 🥰")
     )
+    val previewFriends = listOf(
+        Pair("friend_1", "Tịnh Zăn"),
+        Pair("friend_2", "Hải Đăng")
+    )
     FoodTrackerTheme {
         GroupSettingsDialog(
             conversationName = "Team SE114 - Food Tracker 🥑",
@@ -260,7 +312,9 @@ fun GroupSettingsDialogPreview() {
             onRenameGroup = {},
             onKickMember = { _, _ -> },
             isAdmin = true,
-            onDisbandGroup = {}
+            onDisbandGroup = {},
+            friendList = previewFriends,
+            onAddMembers = {}
         )
     }
 }
