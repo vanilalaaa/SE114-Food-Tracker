@@ -75,6 +75,9 @@ interface ChatDAO {
     @Query("SELECT * FROM messages WHERE id = :serverId LIMIT 1")
     suspend fun getMessageByServerId(serverId: String): Message?
 
+    @Query("SELECT MAX(created_at) FROM messages WHERE conversation_id = :conversationId")
+    suspend fun getLatestMessageTime(conversationId: String): Long?
+
     // ── CONVERSATION QUERIES ──────────────────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -134,6 +137,9 @@ interface ChatDAO {
     @Query("SELECT * FROM conversations WHERE id = :conversationId")
     fun getConversationById(conversationId: String): Flow<Conversation?>
 
+    @Query("SELECT * FROM conversations WHERE id IN (:ids)")
+    suspend fun getConversationsByIds(ids: List<String>): List<Conversation>
+
     @Query("DELETE FROM conversations WHERE id = :conversationId")
     suspend fun deleteConversationById(conversationId: String)
 
@@ -154,10 +160,12 @@ interface ChatDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProfilesToCache(profiles: List<UserProfileCacheEntity>)
 
+    /** Forward-only: a read marker must never move backwards (guards against clock skew
+     *  between device and server, and out-of-order realtime read-sync events). */
     @Query("""
         UPDATE conversation_participants
         SET last_read_at = :readAt
-        WHERE conversation_id = :conversationId AND user_id = :userId
+        WHERE conversation_id = :conversationId AND user_id = :userId AND :readAt > last_read_at
     """)
     suspend fun markConversationRead(conversationId: String, userId: String, readAt: Long)
 
