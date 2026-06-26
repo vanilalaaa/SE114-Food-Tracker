@@ -2,10 +2,12 @@ package com.SE114.food_tracker.feature.diary
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -18,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -28,6 +31,7 @@ import com.SE114.food_tracker.core.designsystem.components.DiaryTopBar
 import com.SE114.food_tracker.core.designsystem.components.NutritionCard
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
+import com.SE114.food_tracker.feature.diary.components.AddActionButton
 import com.SE114.food_tracker.feature.diary.components.CalendarCard
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
@@ -180,22 +184,33 @@ fun DiaryScreenContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        CalendarCard(
-            selectedYear  = uiState.selectedDate.year,
-            selectedMonth = uiState.selectedDate.monthNumber,
-            onDateClick   = { day ->
-                runCatching {
-                    LocalDate(uiState.selectedDate.year, uiState.selectedDate.monthNumber, day)
-                }.getOrNull()?.let { selectedDate ->
-                    onLoadDate(selectedDate)
-                    showDetailSheet = true
-                }
-            },
-            monthlyItems = filteredMonthlyItems,
-            scale        = calendarScale
-        )
+        Box {
+            CalendarCard(
+                selectedYear  = uiState.selectedDate.year,
+                selectedMonth = uiState.selectedDate.monthNumber,
+                onDateClick   = { day ->
+                    runCatching {
+                        LocalDate(uiState.selectedDate.year, uiState.selectedDate.monthNumber, day)
+                    }.getOrNull()?.let { selectedDate ->
+                        onLoadDate(selectedDate)
+                        showDetailSheet = true
+                    }
+                },
+                monthlyItems = filteredMonthlyItems,
+                scale        = calendarScale
+            )
+            AddActionButton(
+                onClick = {
+                    selectedItemForEdit = null
+                    showSourceScreen = true
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 24.dp)
+            )
+        }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(BottomBarContentPadding))
     }
 
     // ── POPUPS / OVERLAYS ──────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.data.local.dao.FriendItemDto
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
@@ -204,7 +205,12 @@ fun FriendScreenContent(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
+            contentPadding = PaddingValues(
+                top = 16.dp,
+                bottom = BottomBarContentPadding,
+                start = 16.dp,
+                end = 16.dp
+            )
         ) {
         item {
             Row(
