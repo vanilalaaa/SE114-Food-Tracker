@@ -148,6 +148,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun removeGroupAvatar(conversationId: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            onResult(chatRepository.removeGroupAvatar(conversationId))
+        }
+    }
+
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
         viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
     }

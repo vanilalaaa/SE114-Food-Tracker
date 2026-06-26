@@ -229,6 +229,15 @@ fun ChatScreenContent(
                     ).show()
                 }
             },
+            onRemoveAvatar = {
+                viewModel.removeGroupAvatar(conversationId) { success ->
+                    Toast.makeText(
+                        context,
+                        if (success) "Đã gỡ ảnh đại diện nhóm!" else "Lỗi gỡ ảnh, thử lại nhé!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
             onKickMember = { userId, name ->
                 memberToKick = Pair(userId, name)
             }

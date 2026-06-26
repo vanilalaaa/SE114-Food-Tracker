@@ -949,6 +949,25 @@ class ChatRepository @Inject constructor(
         }
     }
 
+    /** Remove the group avatar (back to the colored initial). Stores "" rather than NULL so the
+     *  server snapshot propagates the cleared value through the fetch merge instead of being
+     *  treated as "unchanged"; the UI treats blank as no avatar. */
+    suspend fun removeGroupAvatar(conversationId: String): Boolean {
+        return try {
+            supabaseClient.from("conversation").update(mapOf("avatar_url" to "")) {
+                filter { eq("id", conversationId) }
+            }
+            chatDAO.getConversationById(conversationId).firstOrNull()?.let {
+                chatDAO.insertConversation(it.copy(avatarUrl = ""))
+            }
+            sendSystemMessage(conversationId, "Ảnh đại diện nhóm đã được gỡ.")
+            true
+        } catch (e: Exception) {
+            Timber.tag("Chat").e(e, "removeGroupAvatar failed")
+            false
+        }
+    }
+
     suspend fun kickMember(conversationId: String, userIdToKick: String, memberName: String) {
         try {
             supabaseClient.from("conversation_participant").delete {

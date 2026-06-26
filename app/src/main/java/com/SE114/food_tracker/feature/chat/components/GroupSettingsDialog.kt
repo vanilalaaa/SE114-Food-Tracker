@@ -30,6 +30,7 @@ fun GroupSettingsDialog(
     onKickMember: (userId: String, name: String) -> Unit,
     currentAvatarUrl: String? = null,
     onChangeAvatar: (imageUri: String) -> Unit = {},
+    onRemoveAvatar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var groupNameInput by remember { mutableStateOf(conversationName) }
@@ -86,6 +87,20 @@ fun GroupSettingsDialog(
                         modifier = Modifier.clickable { avatarPicker.launch("image/*") }
                     ) {
                         Text("✏️", fontSize = 14.sp, modifier = Modifier.padding(5.dp))
+                    }
+                }
+
+                if (!currentAvatarUrl.isNullOrBlank()) {
+                    TextButton(
+                        onClick = onRemoveAvatar,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(
+                            text = "Gỡ ảnh đại diện",
+                            color = StatRed,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
 
