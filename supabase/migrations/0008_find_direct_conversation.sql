@@ -2,8 +2,7 @@
 -- the caller and p_friend in a single round-trip, replacing the client-side scan
 -- that ran two selects per participation row (N+1). Returns the conversation id,
 -- or null when the two users have no direct chat yet.
---
--- Run MANUALLY via Supabase Dashboard -> SQL Editor (no CLI configured). Idempotent.
+
 create or replace function public.find_direct_conversation(p_friend uuid)
 returns uuid
 language sql

@@ -3,15 +3,6 @@
 -- Temporary bans (auto-expiring) + a lifetime ban counter on top of the boolean
 -- ban from 0005_admin. A ban now carries an optional duration; permanent bans keep the
 -- is_banned flag, temporary bans set banned_until and lift themselves once it passes.
--- Run MANUALLY via Supabase Dashboard → SQL Editor (the CLI is not configured for
--- this project). Idempotent and safe to re-run.
---
--- Model:
---   permanent ban  -> is_banned = true,  banned_until = null
---   temporary ban  -> is_banned = false, banned_until = now() + duration
---   not banned      -> is_banned = false, banned_until = null
---   "currently banned" = is_banned OR (banned_until > now())
--- ban_count counts every ban applied (not decremented on unban / expiry).
 
 -- 1. New lifecycle columns ----------------------------------------------------
 alter table public.profile

@@ -3,8 +3,7 @@
 -- global listener writes incoming messages to Room so the list reorders + shows unread live.
 -- If these tables aren't in the supabase_realtime publication, that listener never fires and the
 -- list only updates on pull-to-refresh.
---
--- Run MANUALLY via Supabase Dashboard -> SQL Editor (no CLI configured). Idempotent.
+
 do $$
 declare
   t text;

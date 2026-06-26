@@ -2,8 +2,7 @@
 -- BIGINT epoch-millis to stay consistent with the millis-based Room model (message
 -- created_at, conversation last_message_at are all BIGINT millis); this migration keeps
 -- that type and adds the gated RPC clients call to advance their own marker.
---
--- Run MANUALLY via Supabase Dashboard -> SQL Editor (no CLI configured). Idempotent.
+
 
 -- Defensive: the column already exists from 0006; keep this self-contained.
 alter table public.conversation_participant
