@@ -11,11 +11,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.* import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +36,7 @@ import com.SE114.food_tracker.feature.chat.components.MessageBubble
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material.icons.filled.Image
 
 @Composable
 fun ChatScreen(
@@ -50,7 +53,8 @@ fun ChatScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val conversationState by viewModel.getConversationState(conversationId).collectAsState(initial = null)
+    val conversationState by viewModel.getConversationState(conversationId)
+        .collectAsState(initial = null)
     val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
     val currentUserId = viewModel.currentUserId
 
@@ -77,13 +81,14 @@ fun ChatScreen(
         conversationId = conversationId,
         // Groups use the live stored name (reflects renames); 1-1 chats use the resolved peer
         // name passed in (the stored name is the generic "Trò chuyện 1-1" placeholder).
-        conversationName = if (isGroup) conversationState?.name ?: conversationName else conversationName,
+        conversationName = if (isGroup) conversationState?.name
+            ?: conversationName else conversationName,
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,
         hasWallet = hasWallet,
         isAdmin = isAdmin,
-        memberList = memberList.map { Pair(it.first, it.second) }, // Map Triple sang Pair cho khớp signature cũ nhe Vy
+        memberList = memberList.map { Pair(it.first, it.second) },
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {
@@ -174,7 +179,10 @@ fun ChatScreenContent(
                 Text("Xác nhận mời ra khỏi nhóm", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             },
             text = {
-                Text("Bạn có chắc chắn muốn mời ${memberToKick?.second} rời khỏi nhóm Quỹ này không?", fontSize = 14.sp)
+                Text(
+                    "Bạn có chắc chắn muốn mời ${memberToKick?.second} rời khỏi nhóm Quỹ này không?",
+                    fontSize = 14.sp
+                )
             },
             confirmButton = {
                 Button(
@@ -185,7 +193,11 @@ fun ChatScreenContent(
                             } else {
                                 onKickMember(conversationId, userId, name)
                             }
-                            Toast.makeText(context, "Đã mời $name rời khỏi nhóm!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "Đã mời $name rời khỏi nhóm!",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                         memberToKick = null
                         showSettingsDialog = false
@@ -242,7 +254,11 @@ fun ChatScreenContent(
                     if (isGroup) {
                         if (hasWallet) {
                             IconButton(onClick = onWalletClick) {
-                                Text("💰", fontSize = 22.sp)
+                                Icon(
+                                    imageVector = Icons.Default.AccountBalanceWallet,
+                                    contentDescription = "Wallet",
+                                    tint = StatPinkDark
+                                )
                             }
                         } else if (isAdmin) {
                             TextButton(onClick = onCreateWalletClick) {
@@ -288,7 +304,9 @@ fun ChatScreenContent(
                         isRefreshing = false
                     }
                 },
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
                 LazyColumn(
                     modifier = Modifier
@@ -374,7 +392,11 @@ fun ChatScreenContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
-                        Text("🖼️", fontSize = 22.sp)
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = "Send Image",
+                            tint = StatPinkDark
+                        )
                     }
 
                     OutlinedTextField(
@@ -414,6 +436,7 @@ fun ChatScreenContent(
         }
     }
 }
+
 @Preview(showSystemUi = true)
 @Composable
 fun ChatScreenPreview() {

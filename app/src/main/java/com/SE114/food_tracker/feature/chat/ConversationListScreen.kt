@@ -31,6 +31,7 @@ import com.SE114.food_tracker.feature.chat.components.ConversationItem
 import com.SE114.food_tracker.feature.friend.FriendViewModel
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import java.util.UUID
+import androidx.compose.material.icons.filled.GroupAdd
 
 @Composable
 fun ConversationListScreen(
@@ -53,31 +54,46 @@ fun ConversationListScreen(
             val actualProfile = try {
                 friend::class.members.find { it.name == "profile" || it.name == "friendProfile" || it.name == "user" }
                     ?.call(friend)
-            } catch (e: Exception) { null }
+            } catch (e: Exception) {
+                null
+            }
 
             val finalId = when {
                 actualProfile != null -> {
                     try {
-                        actualProfile::class.members.find { it.name == "userId" }?.call(actualProfile)
-                    } catch (e: Exception) { null } ?: try {
+                        actualProfile::class.members.find { it.name == "userId" }
+                            ?.call(actualProfile)
+                    } catch (e: Exception) {
+                        null
+                    } ?: try {
                         actualProfile::class.members.find { it.name == "id" }?.call(actualProfile)
-                    } catch (e: Exception) { null }
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
+
                 else -> try {
                     friend::class.members.find { it.name == "friendId" || it.name == "userId" || it.name == "id" }
                         ?.call(friend)
-                } catch (e: Exception) { null }
+                } catch (e: Exception) {
+                    null
+                }
             }?.toString() ?: UUID.randomUUID().toString()
 
             val finalName = when {
                 actualProfile != null -> try {
                     actualProfile::class.members.find { it.name == "displayName" || it.name == "name" }
                         ?.call(actualProfile)
-                } catch (e: Exception) { null }
+                } catch (e: Exception) {
+                    null
+                }
+
                 else -> try {
                     friend::class.members.find { it.name == "friendName" || it.name == "displayName" }
                         ?.call(friend)
-                } catch (e: Exception) { null }
+                } catch (e: Exception) {
+                    null
+                }
             }?.toString() ?: "Thành viên nhóm"
 
             Pair(finalId, finalName)
@@ -92,7 +108,12 @@ fun ConversationListScreen(
                 newGroupName = ""
             },
             title = {
-                Text("Nhóm Chat mới", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = StatPinkDark)
+                Text(
+                    "Nhóm Chat mới",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = StatPinkDark
+                )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -104,15 +125,29 @@ fun ConversationListScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = StatPinkDark)
                     )
-                    Text("Chọn thành viên nhóm:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary)
+                    Text(
+                        "Chọn thành viên nhóm:",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextSecondary
+                    )
                     LazyColumn(
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (friendListCheck.isEmpty()) {
                             item {
-                                Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("Không tìm thấy bạn bè nào để thêm", color = HintGray, fontSize = 13.sp)
+                                Box(
+                                    modifier = Modifier.fillParentMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "Không tìm thấy bạn bè nào để thêm",
+                                        color = HintGray,
+                                        fontSize = 13.sp
+                                    )
                                 }
                             }
                         } else {
@@ -137,7 +172,11 @@ fun ConversationListScreen(
                                         colors = CheckboxDefaults.colors(checkedColor = StatPinkDark)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(text = friend.second, fontSize = 14.sp, color = TextPrimary)
+                                    Text(
+                                        text = friend.second,
+                                        fontSize = 14.sp,
+                                        color = TextPrimary
+                                    )
                                 }
                             }
                         }
@@ -149,14 +188,20 @@ fun ConversationListScreen(
                 Button(
                     onClick = {
                         if (isValid) {
-                            viewModel.createGroup(name = newGroupName, members = selectedMembers.toList())
+                            viewModel.createGroup(
+                                name = newGroupName,
+                                members = selectedMembers.toList()
+                            )
                             newGroupName = ""
                             selectedMembers.clear()
                             showCreateGroupDialog = false
                         }
                     },
                     enabled = isValid,
-                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark, disabledContainerColor = HintGray)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = StatPinkDark,
+                        disabledContainerColor = HintGray
+                    )
                 ) { Text("Tạo Nhóm", color = Color.White) }
             },
             dismissButton = {
@@ -228,7 +273,13 @@ fun ConversationListScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tin nhắn cuộc trò chuyện", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "Tin nhắn cuộc trò chuyện",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     if (onBackClick != null) {
                         IconButton(onClick = onBackClick) {
@@ -237,7 +288,12 @@ fun ConversationListScreenContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onCreateGroupClick) { Text("➕", fontSize = 20.sp) }
+                    IconButton(onClick = onCreateGroupClick) {
+                        Icon(
+                            imageVector = Icons.Default.GroupAdd,
+                            contentDescription = "Create Group"
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
             )
@@ -245,15 +301,23 @@ fun ConversationListScreenContent(
         containerColor = MainBackground,
         modifier = modifier
     ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = { Text("Tìm kiếm phòng chat hoặc bạn bè...", fontSize = 14.sp) },
                 leadingIcon = {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = "Search Icon", tint = Color.Gray)
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search Icon",
+                        tint = Color.Gray
+                    )
                 },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 shape = RoundedCornerShape(24.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -270,10 +334,16 @@ fun ConversationListScreenContent(
                     isRefreshing = true
                     onRefreshData {
                         isRefreshing = false
-                        Toast.makeText(context, "Đã cập nhật hội thoại mới nhất! 💬", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            "Đã cập nhật hội thoại mới nhất! 💬",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 },
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
                 if (filteredConversations.isEmpty() && filteredNewFriends.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -289,7 +359,10 @@ fun ConversationListScreenContent(
                         )
                     }
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
                         if (filteredConversations.isNotEmpty()) {
                             if (searchQuery.isNotBlank()) {
                                 item {
@@ -298,7 +371,10 @@ fun ConversationListScreenContent(
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = StatPinkDark,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                        modifier = Modifier.padding(
+                                            horizontal = 16.dp,
+                                            vertical = 6.dp
+                                        )
                                     )
                                 }
                             }
@@ -306,7 +382,10 @@ fun ConversationListScreenContent(
                                 ConversationItem(
                                     conversation = conversation,
                                     onClick = {
-                                        onConversationClick(conversation.id, conversation.displayName ?: "Người dùng")
+                                        onConversationClick(
+                                            conversation.id,
+                                            conversation.displayName ?: "Người dùng"
+                                        )
                                     }
                                 )
                             }
@@ -357,9 +436,14 @@ fun ConversationListScreenPreview() {
         ConversationListScreenContent(
             conversationList = listOf(
                 ConversationWithUnread(
-                    id = "1", isGroup = false, name = "Azun (Data)", walletId = "w1",
-                    lastMessageAt = System.currentTimeMillis(), lastMessageSnippet = "Ăn bún bò Huế đi!",
-                    createdAt = System.currentTimeMillis(), unreadCount = 5
+                    id = "1",
+                    isGroup = false,
+                    name = "Azun (Data)",
+                    walletId = "w1",
+                    lastMessageAt = System.currentTimeMillis(),
+                    lastMessageSnippet = "Ăn bún bò Huế đi!",
+                    createdAt = System.currentTimeMillis(),
+                    unreadCount = 5
                 ),
                 ConversationWithUnread(
                     id = "2", isGroup = true, name = "Quỹ Nhóm 4 Food Tracker", walletId = "w2",

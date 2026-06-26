@@ -27,6 +27,8 @@ import com.SE114.food_tracker.feature.chat.components.WalletTransactionDialog
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 
 // DATA CLASS ĐỂ ĐỊNH HƯỚNG DỮ LIỆU HIỂN THỊ TRÊN UI
 data class GroupWalletUiTxModel(
@@ -55,7 +57,7 @@ fun GroupWalletScreen(
     // Lắng nghe danh sách thành viên từ StateFlow tập trung của ViewModel
     val memberList by viewModel.groupMembers.collectAsState()
 
-    // 🔥 ĐÃ SỬA: Chuyển đổi danh sách thành viên sang Map một cách an toàn nhất, ép key về String UUID chuẩn
+    // Chuyển đổi danh sách thành viên sang Map một cách an toàn nhất, ép key về String UUID chuẩn
     val memberMap = remember(memberList) {
         try {
             memberList.associate { it.first.toString().trim() to it.second.toString() }
@@ -87,7 +89,6 @@ fun GroupWalletScreen(
     val walletName = conversationState?.name?.let { "Quỹ của $it" } ?: "Quỹ Nhóm Tài Chính"
     val hasWallet = conversationState?.walletId != null
 
-    // 🔥 ĐÃ SỬA PHÂN QUYỀN: Xóa bỏ hoàn toàn "|| true". Dùng quyền isAdmin thật được trả về từ luồng check hệ thống!
     val isAdmin by viewModel.isCurrentAdmin.collectAsState()
 
     GroupWalletScreenContent(
@@ -137,22 +138,26 @@ fun GroupWalletScreenContent(
             val createdAt = try {
                 if (rawCreatedAt.isNotBlank()) {
                     val cleanIso = rawCreatedAt.take(23).replace("T", " ")
-                    val parser = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
-                        timeZone = TimeZone.getTimeZone("UTC")
-                    }
-                    val formatter = SimpleDateFormat("hh:mm a — dd/MM/yyyy", Locale.getDefault()).apply {
-                        timeZone = TimeZone.getTimeZone("GMT+7")
-                    }
+                    val parser =
+                        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
+                            timeZone = TimeZone.getTimeZone("UTC")
+                        }
+                    val formatter =
+                        SimpleDateFormat("hh:mm a — dd/MM/yyyy", Locale.getDefault()).apply {
+                            timeZone = TimeZone.getTimeZone("GMT+7")
+                        }
                     val dateObj = parser.parse(cleanIso)
                     if (dateObj != null) formatter.format(dateObj) else "Vừa xong"
-                } else { "Vừa xong" }
+                } else {
+                    "Vừa xong"
+                }
             } catch (e: Exception) {
                 "Vừa xong"
             }
 
-            // 🔥 ĐÃ SỬA HIỂN THỊ TÊN: Làm sạch chuỗi actor_id loại bỏ dấu ngoặc kép thừa để tra cứu Map chuẩn xác
             val actorId = tx["actor_id"]?.toString()?.replace("\"", "")?.trim() ?: ""
-            val actorName = memberMap[actorId] ?: if (amount > 0) "Thành viên nhóm" else "Trưởng nhóm"
+            val actorName =
+                memberMap[actorId] ?: if (amount > 0) "Thành viên nhóm" else "Trưởng nhóm"
 
             GroupWalletUiTxModel(txId, actorName, type, amount, note, createdAt)
         }
@@ -194,7 +199,10 @@ fun GroupWalletScreenContent(
 
         if (!hasWallet) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Card(
@@ -222,7 +230,10 @@ fun GroupWalletScreenContent(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = innerPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding())
+                    .padding(
+                        top = innerPadding.calculateTopPadding(),
+                        bottom = innerPadding.calculateBottomPadding()
+                    )
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 16.dp)
@@ -232,13 +243,20 @@ fun GroupWalletScreenContent(
                         colors = CardDefaults.cardColors(containerColor = CardWhite),
                         shape = RoundedCornerShape(24.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(text = walletName, fontSize = 14.sp, color = TextLabelGray, fontWeight = FontWeight.Medium)
+                            Text(
+                                text = walletName,
+                                fontSize = 14.sp,
+                                color = TextLabelGray,
+                                fontWeight = FontWeight.Medium
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "${String.format("%,.0f", walletBalance)} VND",
@@ -256,9 +274,15 @@ fun GroupWalletScreenContent(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(24.dp)
                                 ) {
-                                    Text("📥 Nộp tiền", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDownward,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Nộp tiền", fontWeight = FontWeight.Bold)
                                 }
-                                // 🔥 KHÓA CHẶT PHÂN QUYỀN: Chỉ hiển thị nút Rút Quỹ cho Trưởng nhóm thực thụ
+
                                 if (isAdmin) {
                                     Button(
                                         onClick = { showTransactionDialog = "withdrawal" },
@@ -266,7 +290,13 @@ fun GroupWalletScreenContent(
                                         modifier = Modifier.weight(1f),
                                         shape = RoundedCornerShape(24.dp)
                                     ) {
-                                        Text("📤 Rút quỹ", color = StatPinkDark, fontWeight = FontWeight.Bold)
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowUpward,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Rút quỹ", fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -276,7 +306,9 @@ fun GroupWalletScreenContent(
 
                 item {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         listOf("Tất cả", "Nộp tiền", "Chi tiêu").forEach { filter ->
@@ -317,10 +349,16 @@ fun GroupWalletScreenContent(
                 if (filteredTransactions.isEmpty()) {
                     item {
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "Chưa có lịch sử giao dịch nào.", color = HintGray, fontSize = 13.sp)
+                            Text(
+                                text = "Chưa có lịch sử giao dịch nào.",
+                                color = HintGray,
+                                fontSize = 13.sp
+                            )
                         }
                     }
                 } else {
