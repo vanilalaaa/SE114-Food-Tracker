@@ -286,7 +286,8 @@ fun ChatScreenContent(
             )
         },
         containerColor = MainBackground,
-        modifier = modifier
+       // modifier = modifier
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -328,7 +329,6 @@ fun ChatScreenContent(
                         Column(
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            // 🔥 ĐA FIX TRIỆT ĐỂ LUỒNG TRỄ: UI lấy thẳng tên thật đã map hoàn chỉnh trong object tin nhắn truyền xuống
                             if (!isMine && isGroup && !message.isSystem && message.senderId != "system") {
                                 Text(
                                     text = message.senderName,
@@ -382,7 +382,9 @@ fun ChatScreenContent(
             Surface(
                 color = MainBackground,
                 tonalElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
             ) {
                 Row(
                     modifier = Modifier
