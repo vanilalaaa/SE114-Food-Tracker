@@ -1,8 +1,6 @@
 -- 0001_profile_lifecycle_and_rls.sql
 --
 -- Profile lifecycle + row/column security for public.profile.
--- Run MANUALLY via Supabase Dashboard → SQL Editor (the Supabase CLI is not
--- configured for this project). The script is idempotent and safe to re-run.
 
 -- 1. Schema adjustments to the existing public.profile (ALTER only) ------------
 

@@ -33,6 +33,7 @@ import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
+import com.SE114.food_tracker.data.repository.ChatRepository
 
 @Composable
 fun DiaryScreen(
@@ -47,14 +48,16 @@ fun DiaryScreen(
     val pendingImageUri   by diaryViewModel.pendingImageUri.collectAsStateWithLifecycle()
     val categoryError     by categoryViewModel.error.collectAsStateWithLifecycle()
 
-    val categories = categoryState.ifEmpty { uiState.categories }
+    val categories       = categoryState.ifEmpty { uiState.categories }
     val manageCategories = allCategoryState.ifEmpty { categories }
+    val availableWallets by diaryViewModel.availableWallets.collectAsStateWithLifecycle()
 
     DiaryScreenContent(
         uiState                    = uiState,
         pendingImageUri            = pendingImageUri,
         categories                 = categories,
         manageCategories           = manageCategories,
+        availableWallets           = availableWallets,
         categoryDeleteError        = categoryError,
         triggerAdd                 = triggerAdd,
         onAddTriggered             = onAddTriggered,
@@ -62,8 +65,8 @@ fun DiaryScreen(
         onClearCategoryError       = { categoryViewModel.clearError() },
         onLoadDate                 = { diaryViewModel.loadDate(it) },
         onImageSelected            = { diaryViewModel.onImageSelected(it) },
-        onSaveItem                 = { n, p, c, r, no, t, shared -> diaryViewModel.saveItem(n, p, c, r, no, t, shared) },
-        onUpdateItem               = { id, n, p, c, r, no, t, shared -> diaryViewModel.updateItem(id, n, p, c, r, no, t, shared) },
+        onSaveItem                 = { n, p, c, r, no, t, shared, walletId -> diaryViewModel.saveItem(n, p, c, r, no, t, shared, walletId) },
+        onUpdateItem               = { id, n, p, c, r, no, t, shared, walletId -> diaryViewModel.updateItem(id, n, p, c, r, no, t, shared, walletId) },
         onDeleteItem               = { diaryViewModel.deleteItem(it) },
         onDeleteCategory           = { categoryViewModel.deleteCategory(it) },
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
@@ -80,6 +83,7 @@ fun DiaryScreenContent(
     pendingImageUri: Uri?,
     categories: List<DiaryCategory>,
     manageCategories: List<DiaryCategory>,
+    availableWallets: List<ChatRepository.WalletWithRole> = emptyList(),
     categoryDeleteError: String?,
     triggerAdd: Boolean,
     onAddTriggered: () -> Unit,
@@ -87,8 +91,8 @@ fun DiaryScreenContent(
     onLoadDate: (LocalDate) -> Unit,
     onImageSelected: (Uri) -> Unit,
     onClearPendingImage: () -> Unit,
-    onSaveItem: (String, Double, String, Int, String, Int, Boolean) -> Unit,
-    onUpdateItem: (String, String, Double, String, Int, String, Int, Boolean) -> Unit,
+    onSaveItem: (String, Double, String, Int, String, Int, Boolean, String?) -> Unit,
+    onUpdateItem: (String, String, Double, String, Int, String, Int, Boolean, String?) -> Unit,
     onDeleteItem: (String) -> Unit,
     onDeleteCategory: (DiaryCategory) -> Unit,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
@@ -268,6 +272,7 @@ fun DiaryScreenContent(
                     preSelectedCategory = preSelectedCategory,
                     categories          = categories,
                     manageCategories    = manageCategories,
+                    availableWallets    = availableWallets,
                     pendingImageUri     = pendingImageUri,
                     categoryDeleteError = categoryDeleteError,
                     onDismiss = {
@@ -276,11 +281,11 @@ fun DiaryScreenContent(
                         preSelectedCategory = null
                         onClearPendingImage()
                     },
-                    onSave = { name, price, categoryId, rating, note, timeType, isShared ->
+                    onSave = { name, price, categoryId, rating, note, timeType, isShared, walletId ->
                         if (editingItem == null) {
-                            onSaveItem(name, price, categoryId, rating, note, timeType, isShared)
+                            onSaveItem(name, price, categoryId, rating, note, timeType, isShared, walletId)
                         } else {
-                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType, isShared)
+                            onUpdateItem(editingItem.itemId, name, price, categoryId, rating, note, timeType, isShared, walletId)
                         }
                         showEntryScreen     = false
                         selectedItemForEdit = null
@@ -331,8 +336,8 @@ fun DiaryScreenPreview() {
             onAddTriggered             = {},
             onLoadDate                 = {},
             onImageSelected            = {},
-            onSaveItem                 = { _, _, _, _, _, _, _ -> },
-            onUpdateItem               = { _, _, _, _, _, _, _, _ -> },
+            onSaveItem                 = { _, _, _, _, _, _, _, _ -> },
+            onUpdateItem               = { _, _, _, _, _, _, _, _, _ -> },
             onDeleteItem               = {},
             onDeleteCategory           = {},
             onToggleCategoryVisibility = {},

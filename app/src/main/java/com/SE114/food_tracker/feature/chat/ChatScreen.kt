@@ -35,14 +35,21 @@ import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
+// Per-message character cap, in line with modern chat apps (Discord ~2,000, Telegram/Slack ~4,000).
+private const val MAX_MESSAGE_LENGTH = 2000
+
 @Composable
 fun ChatScreen(
     conversationId: String,
     conversationName: String,
+    targetFriendId: String? = null,
     viewModel: ChatViewModel,
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        println("DEBUG_SCREEN: Đang mở chat với ID: '$conversationId'")
+    }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -56,15 +63,25 @@ fun ChatScreen(
             conversationState?.walletId?.isNotBlank() == true
 
     LaunchedEffect(conversationId) {
+        viewModel.connectToConversation(conversationId)
         viewModel.loadGroupMembers(conversationId)
+    }
+
+    // Mark read on open and again whenever a newer message lands while the chat is on screen.
+    val latestMessageId = messages.lastOrNull()?.localId
+    LaunchedEffect(conversationId, latestMessageId) {
+        viewModel.markAsRead(conversationId)
     }
 
     val memberList by viewModel.groupMembers.collectAsState()
     val isAdmin by viewModel.isCurrentAdmin.collectAsState()
-
+    val friendId = memberList.firstOrNull { it.first != currentUserId }?.first
     ChatScreenContent(
         conversationId = conversationId,
-        conversationName = conversationState?.name ?: conversationName,
+        // Groups use the live stored name (reflects renames); 1-1 chats use the resolved peer
+        // name passed in (the stored name is the generic "Trò chuyện 1-1" placeholder).
+        conversationName = if (isGroup) conversationState?.name ?: conversationName else conversationName,
+        groupAvatarUrl = conversationState?.avatarUrl,
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,
@@ -90,8 +107,13 @@ fun ChatScreen(
                 }
             }
         },
+
         onSendMessage = { text ->
-            viewModel.sendTextMessage(conversationId, text)
+            viewModel.sendTextMessage(
+                conversationId = conversationId,
+                text = text,
+                isOneToOne = false
+            )
         },
         onSendImage = { imageUri ->
             viewModel.sendImageMessage(conversationId, imageUri)
@@ -119,6 +141,7 @@ fun ChatScreen(
 fun ChatScreenContent(
     conversationId: String,
     conversationName: String,
+    groupAvatarUrl: String? = null,
     messageList: List<MessageUiModel>,
     myId: String,
     isGroup: Boolean,
@@ -190,11 +213,30 @@ fun ChatScreenContent(
     if (showSettingsDialog) {
         GroupSettingsDialog(
             conversationName = conversationName,
+            currentAvatarUrl = groupAvatarUrl,
             memberList = memberList,
             onDismissRequest = { showSettingsDialog = false },
             onRenameGroup = { newName ->
                 onRenameGroup(conversationId, newName)
                 showSettingsDialog = false
+            },
+            onChangeAvatar = { uri ->
+                viewModel.updateGroupAvatar(conversationId, uri) { success ->
+                    Toast.makeText(
+                        context,
+                        if (success) "Đã cập nhật ảnh đại diện nhóm! 🖼️" else "Lỗi cập nhật ảnh, thử lại nhé!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            onRemoveAvatar = {
+                viewModel.removeGroupAvatar(conversationId) { success ->
+                    Toast.makeText(
+                        context,
+                        if (success) "Đã gỡ ảnh đại diện nhóm!" else "Lỗi gỡ ảnh, thử lại nhé!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             },
             onKickMember = { userId, name ->
                 memberToKick = Pair(userId, name)
@@ -238,12 +280,14 @@ fun ChatScreenContent(
                         }
                     }
 
-                    IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = StatPinkDark
-                        )
+                    if (isGroup) {
+                        IconButton(onClick = { showSettingsDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = StatPinkDark
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
@@ -359,7 +403,8 @@ fun ChatScreenContent(
 
                     OutlinedTextField(
                         value = textInput,
-                        onValueChange = { textInput = it },
+                        // Cap input length (truncates pastes too); the counter below appears near the limit.
+                        onValueChange = { textInput = it.take(MAX_MESSAGE_LENGTH) },
                         placeholder = { Text("Nhập tin nhắn...", fontSize = 14.sp) },
                         modifier = Modifier
                             .weight(1f)
@@ -371,7 +416,18 @@ fun ChatScreenContent(
                             focusedBorderColor = StatPinkDark,
                             unfocusedBorderColor = Color(0xFFE0E0E0)
                         ),
-                        maxLines = 4
+                        maxLines = 4,
+                        supportingText = if (textInput.length > MAX_MESSAGE_LENGTH - 200) {
+                            {
+                                Text(
+                                    text = "${textInput.length}/$MAX_MESSAGE_LENGTH",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.End,
+                                    fontSize = 11.sp,
+                                    color = if (textInput.length >= MAX_MESSAGE_LENGTH) StatRed else TextLabelGray
+                                )
+                            }
+                        } else null
                     )
 
                     IconButton(
