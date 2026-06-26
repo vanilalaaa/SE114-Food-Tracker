@@ -103,19 +103,29 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    private val syncedConversations = mutableSetOf<String>()
+
+    private var connectedConversationId: String? = null
+
     fun connectToConversation(conversationId: String) {
+        connectedConversationId = conversationId
         viewModelScope.launch {
             chatRepository.subscribeToChatRealtime(conversationId)
-            if (!syncedConversations.contains(conversationId)) {
-                println("DEBUG: Bắt đầu sync lần đầu cho $conversationId")
+            try {
                 chatRepository.syncMessagesFromServer(conversationId)
-                syncedConversations.add(conversationId)
-            }
-            chatRepository.fetchGroupMembersFromServer(conversationId).also { members ->
-                _groupMembers.value = members
+                chatRepository.fetchGroupMembersFromServer(conversationId).also { members ->
+                    _groupMembers.value = members
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
+    }
+
+    // This VM is keyed per conversation (hiltViewModel(key = id)), so onCleared fires when
+    // the chat is popped — the point to release its realtime channel and collectors.
+    override fun onCleared() {
+        super.onCleared()
+        connectedConversationId?.let { chatRepository.unsubscribeFromChatRealtime(it) }
     }
 
     fun createGroup(name: String, members: List<String>) {
@@ -138,8 +148,8 @@ class ChatViewModel @Inject constructor(
     }
 
     fun getMessagesState(conversationId: String): Flow<List<MessageUiModel>> {
-        connectToConversation(conversationId)
-
+        // The realtime connection is owned by ChatScreen's LaunchedEffect(conversationId);
+        // connecting here too would fire a second concurrent subscribe for the same conversation.
         return chatRepository.getMessagesWithProfileStream(conversationId).map { joinEntities ->
             joinEntities.map { entity ->
                 val finalName = when {
@@ -162,9 +172,7 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    // 1. Tạo một StateFlow để UI lắng nghe ID hiện tại
-    private val _activeConversationId = MutableStateFlow<String?>(null)
-    val activeConversationId = _activeConversationId.asStateFlow()
+
     fun sendTextMessage(
         conversationId: String,
         text: String,
@@ -175,18 +183,13 @@ class ChatViewModel @Inject constructor(
             var targetConvId = conversationId
             if (isOneToOne && !friendUserId.isNullOrBlank()) {
                 val existingId = chatRepository.getOrCreateOneToOneChat(friendUserId)
-                if (existingId != null) {
-                    targetConvId = existingId
-                    // CẬP NHẬT ID MỚI VÀO ĐÂY
-                    _activeConversationId.value = targetConvId
-                }
+                if (existingId != null) targetConvId = existingId
             }
             if (targetConvId.isBlank()) {
                 println("LỖI: Không lấy được targetConvId!")
                 return@launch
             }
             chatRepository.sendMessage(targetConvId, currentUserId, body = text, imageUrl = null)
-           // connectToConversation(targetConvId)
         }
     }
 

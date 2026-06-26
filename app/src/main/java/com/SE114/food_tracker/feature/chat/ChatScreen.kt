@@ -44,56 +44,71 @@ fun ChatScreen(
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        println("DEBUG_SCREEN: Đang mở chat với ID: '$conversationId'")
+    }
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val conversationState by viewModel.getConversationState(conversationId).collectAsState(initial = null)
+    val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
     val currentUserId = viewModel.currentUserId
 
-    // 1. Logic tách ID: Nếu convId là UUID người dùng (dài 36 ký tự) -> coi như chưa có phòng
-    val isRawFriendId = conversationId.length == 36 && conversationId.contains("-")
-    val actualConvId = if (isRawFriendId) "" else conversationId
-    val friendIdForChat = if (isRawFriendId) conversationId else targetFriendId
+    val isGroup = conversationState?.isGroup ?: false
+    val hasWallet = conversationState?.walletId != null &&
+            conversationState?.walletId != "wallet_default" &&
+            conversationState?.walletId?.isNotBlank() == true
 
-    // 2. Lắng nghe activeConversationId từ ViewModel để UI tự refresh khi phòng chat được tạo
-    val activeConvId by viewModel.activeConversationId.collectAsState()
-    val finalConvId = activeConvId ?: actualConvId
-
-    val conversationState by viewModel.getConversationState(finalConvId).collectAsState(initial = null)
-    val messages by viewModel.getMessagesState(finalConvId).collectAsState(initial = emptyList())
-    val memberList by viewModel.groupMembers.collectAsState()
-    val isAdmin by viewModel.isCurrentAdmin.collectAsState()
-
-    // 3. Connect vào phòng chat (cả lần đầu hoặc khi phòng chat thay đổi)
-    LaunchedEffect(finalConvId) {
-        if (finalConvId.isNotBlank()) {
-            viewModel.connectToConversation(finalConvId)
-            viewModel.loadGroupMembers(finalConvId)
-        }
+    LaunchedEffect(conversationId) {
+        viewModel.connectToConversation(conversationId)
+        viewModel.loadGroupMembers(conversationId)
     }
 
-    val isGroup = conversationState?.isGroup ?: false
-    val hasWallet = conversationState?.walletId?.let { it != "wallet_default" && it.isNotBlank() } ?: false
+    // Mark read on open and again whenever a newer message lands while the chat is on screen.
+    val latestMessageId = messages.lastOrNull()?.localId
+    LaunchedEffect(conversationId, latestMessageId) {
+        viewModel.markAsRead(conversationId)
+    }
 
+    val memberList by viewModel.groupMembers.collectAsState()
+    val isAdmin by viewModel.isCurrentAdmin.collectAsState()
+    val friendId = memberList.firstOrNull { it.first != currentUserId }?.first
     ChatScreenContent(
-        conversationId = finalConvId,
-        conversationName = conversationState?.name ?: conversationName,
+        conversationId = conversationId,
+        // Groups use the live stored name (reflects renames); 1-1 chats use the resolved peer
+        // name passed in (the stored name is the generic "Trò chuyện 1-1" placeholder).
+        conversationName = if (isGroup) conversationState?.name ?: conversationName else conversationName,
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,
         hasWallet = hasWallet,
         isAdmin = isAdmin,
-        memberList = memberList,
+        memberList = memberList.map { Pair(it.first, it.second) }, // Map Triple sang Pair cho khớp signature cũ nhe Vy
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {
-            viewModel.createGroupWallet(finalConvId) { success ->
-                Toast.makeText(context, if (success) "Đã tạo Quỹ Nhóm! 💰" else "Lỗi tạo ví!", Toast.LENGTH_SHORT).show()
+            viewModel.createGroupWallet(conversationId) { success ->
+                if (success) {
+                    Toast.makeText(
+                        context,
+                        "Khởi tạo Quỹ Nhóm thành công! 💰",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Lỗi tạo ví, vui lòng thử lại!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         },
+
         onSendMessage = { text ->
             viewModel.sendTextMessage(
-                conversationId = finalConvId,
+                conversationId = conversationId,
                 text = text,
-                isOneToOne = !isGroup,
-                friendUserId = friendIdForChat
+                isOneToOne = false
             )
         },
         onSendImage = { imageUri ->

@@ -22,10 +22,9 @@ data class MessageWithProfile(
 )
 
 /**
- * Conversation with the current user's unread status pre-computed.
- * isUnread = lastMessageAt > lastReadAt (from conversation_participants).
- *
- * Used by ConversationListScreen so UI never has to do timestamp math.
+ * Conversation row plus the current user's unread state and (for 1-1 chats) the other
+ * participant's name/avatar, all pre-computed in SQL so the UI never does timestamp math
+ * or extra lookups.
  */
 data class ConversationWithUnread(
     @ColumnInfo(name = "id") val id: String,
@@ -35,12 +34,17 @@ data class ConversationWithUnread(
     @ColumnInfo(name = "last_message_at") val lastMessageAt: Long,
     @ColumnInfo(name = "last_message_snippet") val lastMessageSnippet: String?,
     @ColumnInfo(name = "created_at") val createdAt: Long,
-    /**
-     * true when there is at least one message newer than the user's last read timestamp.
-     * SQLite: (lastMessageAt > lastReadAt) is returned as 1/0 from the CASE expression.
-     */
-    @ColumnInfo(name = "is_unread") val isUnread: Boolean
-)
+    /** Count of messages newer than the user's last read time and not sent by the user. */
+    @ColumnInfo(name = "unread_count") val unreadCount: Int = 0,
+    /** The 1-1 peer's display name; null for groups (use [name] there). */
+    @ColumnInfo(name = "peer_name") val peerName: String? = null,
+    /** The 1-1 peer's avatar url; null for groups or when not cached yet. */
+    @ColumnInfo(name = "peer_avatar") val peerAvatar: String? = null
+) {
+    val isUnread: Boolean get() = unreadCount > 0
+    /** Name to show in the list: the resolved 1-1 peer name, else the stored conversation name. */
+    val displayName: String? get() = peerName ?: name
+}
 
 @Dao
 interface ChatDAO {
@@ -71,10 +75,16 @@ interface ChatDAO {
     @Query("SELECT * FROM messages WHERE id = :serverId LIMIT 1")
     suspend fun getMessageByServerId(serverId: String): Message?
 
+    @Query("SELECT MAX(created_at) FROM messages WHERE conversation_id = :conversationId")
+    suspend fun getLatestMessageTime(conversationId: String): Long?
+
     // ── CONVERSATION QUERIES ──────────────────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConversation(conversation: Conversation)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertConversations(conversations: List<Conversation>)
 
     /**
      * All conversations the user participates in, joined with their read timestamp
@@ -92,10 +102,23 @@ interface ChatDAO {
             c.last_message_at,
             c.last_message_snippet,
             c.created_at,
-            CASE
-                WHEN c.last_message_at > COALESCE(cp.last_read_at, 0) THEN 1
-                ELSE 0
-            END AS is_unread
+            (SELECT COUNT(*) FROM messages m
+                WHERE m.conversation_id = c.id
+                  AND m.created_at > COALESCE(cp.last_read_at, 0)
+                  AND m.sender_id <> :currentUserId
+            ) AS unread_count,
+            CASE WHEN c.is_group = 0 THEN (
+                SELECT prof.display_name FROM conversation_participants other
+                JOIN user_profile_cache prof ON prof.user_id = other.user_id
+                WHERE other.conversation_id = c.id AND other.user_id <> :currentUserId
+                LIMIT 1
+            ) ELSE NULL END AS peer_name,
+            CASE WHEN c.is_group = 0 THEN (
+                SELECT prof.avatar_url FROM conversation_participants other
+                JOIN user_profile_cache prof ON prof.user_id = other.user_id
+                WHERE other.conversation_id = c.id AND other.user_id <> :currentUserId
+                LIMIT 1
+            ) ELSE NULL END AS peer_avatar
         FROM conversations c
         LEFT JOIN conversation_participants cp
             ON cp.conversation_id = c.id AND cp.user_id = :currentUserId
@@ -114,6 +137,9 @@ interface ChatDAO {
 
     @Query("SELECT * FROM conversations WHERE id = :conversationId")
     fun getConversationById(conversationId: String): Flow<Conversation?>
+
+    @Query("SELECT * FROM conversations WHERE id IN (:ids)")
+    suspend fun getConversationsByIds(ids: List<String>): List<Conversation>
 
     @Query("DELETE FROM conversations WHERE id = :conversationId")
     suspend fun deleteConversationById(conversationId: String)
@@ -135,10 +161,12 @@ interface ChatDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProfilesToCache(profiles: List<UserProfileCacheEntity>)
 
+    /** Forward-only: a read marker must never move backwards (guards against clock skew
+     *  between device and server, and out-of-order realtime read-sync events). */
     @Query("""
         UPDATE conversation_participants
         SET last_read_at = :readAt
-        WHERE conversation_id = :conversationId AND user_id = :userId
+        WHERE conversation_id = :conversationId AND user_id = :userId AND :readAt > last_read_at
     """)
     suspend fun markConversationRead(conversationId: String, userId: String, readAt: Long)
 

@@ -1,7 +1,5 @@
 package com.SE114.food_tracker.feature.chat.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,16 +7,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.dao.ConversationWithUnread
 
@@ -29,13 +30,7 @@ fun ConversationItem(
     modifier: Modifier = Modifier
 ) {
     val isUnread = conversation.isUnread
-
-    // Animate the dot color so the transition feels smooth
-    val dotAlpha by animateColorAsState(
-        targetValue = if (isUnread) StatPinkDark else Color.Transparent,
-        animationSpec = tween(durationMillis = 300),
-        label = "unread_dot"
-    )
+    val title = conversation.displayName ?: "Không có tên"
 
     val snippetColor = if (isUnread) TextPrimary else TextLabelGray
     val snippetWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal
@@ -53,20 +48,34 @@ fun ConversationItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(if (conversation.isGroup) LightPeach else LightGreenStat),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = (conversation.name ?: "U").take(1).uppercase(),
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = if (conversation.isGroup) Color.White else TextPrimaryStat
+        // Avatar — the 1-1 peer's photo when available, otherwise a colored initial.
+        if (!conversation.isGroup && !conversation.peerAvatar.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(conversation.peerAvatar)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
             )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (conversation.isGroup) LightPeach else LightGreenStat),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = title.take(1).uppercase(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = if (conversation.isGroup) Color.White else TextPrimaryStat
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -74,7 +83,7 @@ fun ConversationItem(
         // Name + snippet
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = conversation.name ?: "Không có tên",
+                text = title,
                 fontSize = 15.sp,
                 fontWeight = nameWeight,
                 color = Color.Black
@@ -92,13 +101,24 @@ fun ConversationItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Unread dot — always sized, color animates to transparent when read
-        Box(
-            modifier = Modifier
-                .size(9.dp)
-                .clip(CircleShape)
-                .background(dotAlpha)
-        )
+        // Unread badge — stands out when there are unread messages, absent once read.
+        if (conversation.unreadCount > 0) {
+            Box(
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+                    .clip(CircleShape)
+                    .background(StatPinkDark)
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (conversation.unreadCount > 99) "99+" else conversation.unreadCount.toString(),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 
     HorizontalDivider(
@@ -114,17 +134,17 @@ private fun fakeConversation(
     id: String,
     name: String,
     isGroup: Boolean,
-    isUnread: Boolean,
+    unreadCount: Int,
     snippet: String? = null
 ) = ConversationWithUnread(
     id = id,
     isGroup = isGroup,
     name = name,
     walletId = null,
-    lastMessageAt = if (isUnread) System.currentTimeMillis() else 0L,
+    lastMessageAt = if (unreadCount > 0) System.currentTimeMillis() else 0L,
     lastMessageSnippet = snippet,
     createdAt = System.currentTimeMillis(),
-    isUnread = isUnread
+    unreadCount = unreadCount
 )
 
 @Preview(showBackground = true)
@@ -136,7 +156,7 @@ fun ConversationItemUnreadPreview() {
                 id = "1",
                 name = "Azun (Data)",
                 isGroup = false,
-                isUnread = true,
+                unreadCount = 3,
                 snippet = "Ăn bún bò Huế đi!"
             ),
             onClick = {}
@@ -153,7 +173,7 @@ fun ConversationItemReadPreview() {
                 id = "2",
                 name = "Quỹ Nhóm Food Tracker",
                 isGroup = true,
-                isUnread = false,
+                unreadCount = 0,
                 snippet = "Hệ thống: Azun đã nộp 100,000 VND"
             ),
             onClick = {}
