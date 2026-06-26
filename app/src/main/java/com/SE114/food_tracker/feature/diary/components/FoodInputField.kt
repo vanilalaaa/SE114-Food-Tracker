@@ -13,6 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.*
+import androidx.compose.ui.text.input.VisualTransformation
 
 @Composable
 fun FoodInputField(
@@ -24,6 +25,7 @@ fun FoodInputField(
     trailingText: String? = null,
     labelIcon: Any? = null,
     maxChars: Int? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -81,6 +83,8 @@ fun FoodInputField(
                     }
                 }
             },
+            visualTransformation = visualTransformation,
+
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White,

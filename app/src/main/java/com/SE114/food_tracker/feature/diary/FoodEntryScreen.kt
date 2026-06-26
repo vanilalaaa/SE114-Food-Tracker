@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
+import com.SE114.food_tracker.core.util.MoneyInputTransformation
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
 import com.SE114.food_tracker.feature.diary.components.FoodInputField
 import com.SE114.food_tracker.feature.diary.components.ManageCategoryBottomSheet
@@ -339,7 +340,8 @@ fun FoodEntryScreen(
                 priceError = null
             },
             placeholder  = "0",
-            trailingText = "đ"
+            trailingText = "đ",
+            visualTransformation = MoneyInputTransformation()
         )
         FieldError(priceError)
 
