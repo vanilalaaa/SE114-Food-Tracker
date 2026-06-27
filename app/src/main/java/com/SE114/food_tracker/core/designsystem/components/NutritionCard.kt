@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -69,8 +68,8 @@ fun NutritionCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
-            .padding(horizontal = 24.dp),
+            .height(165.dp)
+            .padding(horizontal = 16.dp),
         color = LightPinkBG,
         shape = RoundedCornerShape(30.dp),
         shadowElevation = 2.dp
@@ -91,7 +90,7 @@ fun NutritionCard(
                     Icon(
                         Icons.Default.MoreVert, "Menu",
                         tint = Color.Black,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -255,9 +254,9 @@ fun NutritionCard(
                                                 .weight(1f)
                                                 .height(24.dp),
                                             colors = SliderDefaults.colors(
-                                                thumbColor = Color.Gray,
-                                                activeTrackColor = Color.DarkGray,
-                                                inactiveTrackColor = Color.LightGray
+                                                thumbColor = Orange,
+                                                activeTrackColor = Orange,
+                                                inactiveTrackColor = LightOrange
                                             )
                                         )
                                         Spacer(Modifier.width(8.dp))
@@ -286,9 +285,9 @@ fun NutritionCard(
                                                 .weight(1f)
                                                 .height(24.dp),
                                             colors = SliderDefaults.colors(
-                                                thumbColor = Color.Gray,
-                                                activeTrackColor = Color.DarkGray,
-                                                inactiveTrackColor = Color.LightGray
+                                                thumbColor = Orange,
+                                                activeTrackColor = Orange,
+                                                inactiveTrackColor = LightOrange
                                             )
                                         )
                                         Spacer(Modifier.width(8.dp))

@@ -43,6 +43,8 @@ data class DiaryUiState(
     val totalSpend: Double = 0.0,
     val itemCount: Int = 0,
     val streak: Int = 0,
+    val boxScale: Float = 1f,
+    val calendarScale: Float = 1f,
     val isLoading: Boolean = false,
     val error: String? = null,
     // Local URI of a picked/captured image waiting to be saved with the next item.

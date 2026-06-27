@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
@@ -16,9 +17,10 @@ fun ConfirmDialog(
     cancelLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-    destructive: Boolean = false
+    destructive: Boolean = false,
+    confirmColorOverride: Color? = null
 ) {
-    val confirmColor =
+    val confirmColor = confirmColorOverride ?:
         if (destructive) MaterialTheme.colorScheme.error
         else MaterialTheme.colorScheme.primary
 

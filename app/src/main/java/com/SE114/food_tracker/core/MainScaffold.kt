@@ -1,5 +1,7 @@
 package com.SE114.food_tracker.core
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Scaffold
@@ -8,10 +10,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -24,7 +26,6 @@ import com.SE114.food_tracker.core.navigation.AppDestinations
 import com.SE114.food_tracker.core.navigation.AppNavGraph
 import com.SE114.food_tracker.core.util.CurrencyDisplay
 import com.SE114.food_tracker.core.util.LocalCurrencyDisplay
-import com.SE114.food_tracker.feature.diary.components.AddActionButton
 import com.SE114.food_tracker.feature.settings.CurrencyViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
 
@@ -99,10 +100,28 @@ fun MainScaffold() {
 
     val selectedRoute = bottomBarRouteFor(currentRoute)
     val selectedIndex = BAR_ROUTES.indexOf(selectedRoute).coerceAtLeast(0)
-    val showBottomBar = currentRoute != null && currentRoute !in NO_BOTTOM_BAR_ROUTES
-
-    // FAB state lives here; DiaryScreen receives a callback to trigger the add flow
-    var triggerDiaryAdd by remember { mutableStateOf(false) }
+    val showBottomBar = currentRoute in BAR_ROUTES
+    val onBottomItemSelected: (Int) -> Unit = { index ->
+        val targetRoute = BAR_ROUTES[index]
+        if (selectedRoute == targetRoute && currentRoute != targetRoute) {
+            val poppedToTabRoot = navController.popBackStack(
+                route = targetRoute,
+                inclusive = false
+            )
+            if (!poppedToTabRoot) {
+                navController.navigate(targetRoute) {
+                    launchSingleTop = true
+                }
+            }
+        } else {
+            navController.navigate(targetRoute) {
+                // Diary is the main graph's start destination.
+                popUpTo(AppDestinations.Diary.route) { saveState = true }
+                launchSingleTop = true
+                restoreState = targetRoute != AppDestinations.Feed.route
+            }
+        }
+    }
 
     // Auth guard: if the session drops while inside the app, return to login and clear the back
     // stack. A non-null blockedReason (banned/soft-deleted sign-out) is carried to the Login screen.
@@ -115,49 +134,28 @@ fun MainScaffold() {
     }
 
     CompositionLocalProvider(LocalCurrencyDisplay provides currencyDisplay) {
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            if (showBottomBar) {
-                BottomBar(
-                    selectedIndex = selectedIndex,
-                    onItemSelected = { index ->
-                        val targetRoute = BAR_ROUTES[index]
-                        if (selectedRoute == targetRoute && currentRoute != targetRoute) {
-                            val poppedToTabRoot = navController.popBackStack(
-                                route = targetRoute,
-                                inclusive = false
-                            )
-                            if (!poppedToTabRoot) {
-                                navController.navigate(targetRoute) {
-                                    launchSingleTop = true
-                                }
-                            }
-                        } else {
-                            navController.navigate(targetRoute) {
-                                // Diary is the main graph's start destination.
-                                popUpTo(AppDestinations.Diary.route) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = targetRoute != AppDestinations.Feed.route
-                            }
-                        }
-                    }
+        Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                AppNavGraph(
+                    navController = navController,
+                    modifier = Modifier.fillMaxSize()
                 )
-            }
-        },
-        floatingActionButton = {
-            // FAB only visible on the Diary destination
-            if (currentRoute == AppDestinations.Diary.route) {
-                AddActionButton(onClick = { triggerDiaryAdd = true })
+
+                if (showBottomBar) {
+                    BottomBar(
+                        selectedIndex = selectedIndex,
+                        onItemSelected = onBottomItemSelected,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp)
+                    )
+                }
             }
         }
-    ) { padding ->
-        AppNavGraph(
-            navController = navController,
-            modifier = Modifier.padding(padding),
-            triggerDiaryAdd = triggerDiaryAdd,
-            onDiaryAddHandled = { triggerDiaryAdd = false }
-        )
-    }
     }
 }

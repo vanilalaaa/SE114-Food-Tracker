@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import com.SE114.food_tracker.data.repository.ChatRepository
+import com.SE114.food_tracker.core.datastore.UserPreferences
 import com.SE114.food_tracker.core.network.NetworkMonitor
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -56,11 +57,14 @@ class DiaryViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val supabaseItemService: SupabaseItemService,
     private val networkMonitor: NetworkMonitor,
+    private val userPreferences: UserPreferences,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _selectedDate       = MutableStateFlow(Clock.System.todayIn(TimeZone.currentSystemDefault()))
     private val _selectedCategoryId = MutableStateFlow<String?>(null)
+    private val _boxScale           = MutableStateFlow(1f)
+    private val _calendarScale      = MutableStateFlow(1f)
     private val _isLoading          = MutableStateFlow(false)
     private val _error              = MutableStateFlow<String?>(null)
     private val _streak             = MutableStateFlow(0)
@@ -130,6 +134,10 @@ class DiaryViewModel @Inject constructor(
             )
         }.combine(datesWithData) { content, datesWithData ->
             content.copy(datesWithData = datesWithData)
+        }.combine(combine(_boxScale, _calendarScale) { boxScale, calendarScale ->
+            boxScale to calendarScale
+        }) { content, scales ->
+            content.copy(boxScale = scales.first, calendarScale = scales.second)
         }.let { content ->
             combine(content, _isLoading, _error, _streak, _pendingImageUri) {
                     diaryContent, isLoading, error, streak, pendingImageUri ->
@@ -147,6 +155,8 @@ class DiaryViewModel @Inject constructor(
                     totalSpend         = filteredItems.sumOf { it.price },
                     itemCount          = filteredItems.size,
                     streak             = streak,
+                    boxScale           = diaryContent.boxScale,
+                    calendarScale      = diaryContent.calendarScale,
                     isLoading          = isLoading,
                     error              = error,
                     pendingImageUri    = pendingImageUri
@@ -164,6 +174,12 @@ class DiaryViewModel @Inject constructor(
             )
 
     init {
+        viewModelScope.launch {
+            userPreferences.diaryBoxScale.collect { _boxScale.value = it.coerceIn(0.5f, 1.5f) }
+        }
+        viewModelScope.launch {
+            userPreferences.diaryCalendarScale.collect { _calendarScale.value = it.coerceIn(0.5f, 1.5f) }
+        }
         viewModelScope.launch { computeStreak() }
         viewModelScope.launch {
             runCatching { chatRepository.getUserWalletsWithRoles() }
@@ -179,6 +195,18 @@ class DiaryViewModel @Inject constructor(
 
     fun selectCategoryFilter(catId: String?) {
         _selectedCategoryId.value = catId
+    }
+
+    fun updateBoxScale(scale: Float) {
+        val safeScale = scale.coerceIn(0.5f, 1.5f)
+        _boxScale.value = safeScale
+        viewModelScope.launch { userPreferences.setDiaryBoxScale(safeScale) }
+    }
+
+    fun updateCalendarScale(scale: Float) {
+        val safeScale = scale.coerceIn(0.5f, 1.5f)
+        _calendarScale.value = safeScale
+        viewModelScope.launch { userPreferences.setDiaryCalendarScale(safeScale) }
     }
 
     fun onImageSelected(uri: Uri) {
@@ -486,6 +514,8 @@ class DiaryViewModel @Inject constructor(
         val items: List<DiaryItem>,
         val monthlyItems: List<DiaryItem>,
         val categories: List<DiaryCategory>,
-        val datesWithData: Set<Int>
+        val datesWithData: Set<Int>,
+        val boxScale: Float = 1f,
+        val calendarScale: Float = 1f
     )
 }

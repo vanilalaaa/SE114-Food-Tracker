@@ -19,6 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.R
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
@@ -60,7 +61,7 @@ fun ProfilePostsTab(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 80.dp),
+                    contentPadding = PaddingValues(bottom = BottomBarContentPadding),
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {

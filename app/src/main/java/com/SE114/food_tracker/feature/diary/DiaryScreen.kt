@@ -2,14 +2,17 @@ package com.SE114.food_tracker.feature.diary
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -18,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -28,12 +32,16 @@ import com.SE114.food_tracker.core.designsystem.components.DiaryTopBar
 import com.SE114.food_tracker.core.designsystem.components.NutritionCard
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
+import com.SE114.food_tracker.feature.diary.components.AddActionButton
 import com.SE114.food_tracker.feature.diary.components.CalendarCard
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import com.SE114.food_tracker.data.repository.ChatRepository
+
+private val DiaryAddButtonBottomPadding = BottomBarContentPadding + 10.dp
+private val DiaryBottomContentPadding = BottomBarContentPadding + 80.dp
 
 @Composable
 fun DiaryScreen(
@@ -72,7 +80,9 @@ fun DiaryScreen(
         onToggleCategoryVisibility = { categoryViewModel.toggleVisibility(it) },
         onEditCategory             = { category, newName, newIconUrl -> categoryViewModel.editCategory(category, newName, newIconUrl) },
         onCreateCategory           = { name, emoji -> categoryViewModel.addCategory(name, emoji) },
-        onSelectCategoryFilter     = { catId -> diaryViewModel.selectCategoryFilter(catId) }
+        onSelectCategoryFilter     = { catId -> diaryViewModel.selectCategoryFilter(catId) },
+        onBoxScaleChange           = { diaryViewModel.updateBoxScale(it) },
+        onCalendarScaleChange      = { diaryViewModel.updateCalendarScale(it) }
     )
 }
 
@@ -98,15 +108,15 @@ fun DiaryScreenContent(
     onToggleCategoryVisibility: (DiaryCategory) -> Unit,
     onEditCategory: (DiaryCategory, String, String) -> Unit,
     onCreateCategory: (String, String) -> Unit,
-    onSelectCategoryFilter: (String?) -> Unit
+    onSelectCategoryFilter: (String?) -> Unit,
+    onBoxScaleChange: (Float) -> Unit,
+    onCalendarScaleChange: (Float) -> Unit
 ) {
     var showDetailSheet     by remember { mutableStateOf(false) }
     var showEntryScreen     by remember { mutableStateOf(false) }
     var showSourceScreen    by remember { mutableStateOf(false) }
     var selectedItemForEdit by remember { mutableStateOf<DiaryItem?>(null) }
     var showDatePicker      by remember { mutableStateOf(false) }
-    var boxScale            by remember { mutableStateOf(1f) }
-    var calendarScale       by remember { mutableStateOf(1f) }
     val scrollState         = rememberScrollState()
     var preSelectedCategory by remember { mutableStateOf<DiaryCategory?>(null) }
 
@@ -148,27 +158,38 @@ fun DiaryScreenContent(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MainBackground)
-            .verticalScroll(scrollState)
-    ) {
-        DiaryTopBar(
-            streakCount  = uiState.streak.toString(),
-            currentMonth = "Tháng ${uiState.selectedDate.monthNumber} ${uiState.selectedDate.year}",
-            onMonthClick = { showDatePicker = true },
-            onPreviousClick = {
-                val previousMonthDate = uiState.selectedDate.minus(DatePeriod(months = 1))
-                runCatching { LocalDate(previousMonthDate.year, previousMonthDate.monthNumber, 1) }
-                    .getOrNull()?.let { onLoadDate(it) }
-            },
-            onNextClick = {
-                val nextMonthDate = uiState.selectedDate.plus(DatePeriod(months = 1))
-                runCatching { LocalDate(nextMonthDate.year, nextMonthDate.monthNumber, 1) }
-                    .getOrNull()?.let { onLoadDate(it) }
-            }
-        )
+    Scaffold(
+        topBar = {
+            DiaryTopBar(
+                streakCount  = uiState.streak.toString(),
+                currentMonth = "Tháng ${uiState.selectedDate.monthNumber} ${uiState.selectedDate.year}",
+                onMonthClick = { showDatePicker = true },
+                onPreviousClick = {
+                    val previousMonthDate = uiState.selectedDate.minus(DatePeriod(months = 1))
+                    runCatching { LocalDate(previousMonthDate.year, previousMonthDate.monthNumber, 1) }
+                        .getOrNull()?.let { onLoadDate(it) }
+                },
+                onNextClick = {
+                    val nextMonthDate = uiState.selectedDate.plus(DatePeriod(months = 1))
+                    runCatching { LocalDate(nextMonthDate.year, nextMonthDate.monthNumber, 1) }
+                        .getOrNull()?.let { onLoadDate(it) }
+                }
+            )
+        },
+        containerColor = MainBackground
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MainBackground)
+                .padding(innerPadding)
+        ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
+        Spacer(modifier = Modifier.height(8.dp))
 
         NutritionCard(
             unfilteredItems    = uiState.monthlyItems,
@@ -176,10 +197,10 @@ fun DiaryScreenContent(
             categories         = categories,
             selectedCategoryId = uiState.selectedCategoryId,
             onCategorySelect   = onSelectCategoryFilter,
-            boxScale           = boxScale,
-            calendarScale      = calendarScale,
-            onBoxScaleChange   = { boxScale = it },
-            onCalendarScaleChange = { calendarScale = it }
+            boxScale           = uiState.boxScale,
+            calendarScale      = uiState.calendarScale,
+            onBoxScaleChange   = onBoxScaleChange,
+            onCalendarScaleChange = onCalendarScaleChange
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -196,10 +217,22 @@ fun DiaryScreenContent(
                 }
             },
             monthlyItems = filteredMonthlyItems,
-            scale        = calendarScale
+            scale        = uiState.calendarScale
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(DiaryBottomContentPadding))
+        }
+
+        AddActionButton(
+            onClick = {
+                selectedItemForEdit = null
+                showSourceScreen = true
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = DiaryAddButtonBottomPadding)
+        )
+        }
     }
 
     // ── POPUPS / OVERLAYS ──────────────────────────────────────────────────
@@ -342,7 +375,9 @@ fun DiaryScreenPreview() {
             onToggleCategoryVisibility = {},
             onEditCategory             = { _, _, _ -> },
             onCreateCategory           = { _, _ -> },
-            onSelectCategoryFilter     = {}
+            onSelectCategoryFilter     = {},
+            onBoxScaleChange           = {},
+            onCalendarScaleChange      = {}
         )
     }
 }
