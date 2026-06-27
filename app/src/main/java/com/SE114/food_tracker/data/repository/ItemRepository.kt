@@ -106,6 +106,9 @@ class ItemRepository @Inject constructor(
 
     fun getPersonalExpenseByCategory(start: Long, end: Long): Flow<List<CategoryExpense>> =
         itemDAO.getPersonalExpenseByCategory(owner(), start, end)
+
+    fun observeDistinctEntryDates(): Flow<List<Long>> =
+        itemDAO.observeDistinctEntryDates(owner())
 }
 
 private fun Int.toDiaryTimeLabel(): String =

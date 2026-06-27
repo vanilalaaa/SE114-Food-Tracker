@@ -190,4 +190,12 @@ interface ItemDAO {
           AND is_deleted = 0
     """)
     fun getTotalExpenseForRange(ownerId: String, startDate: Long, endDate: Long): Flow<Double?>
+
+    @Query("""
+    SELECT DISTINCT entry_date 
+    FROM item 
+    WHERE owner_id = :ownerId AND is_deleted = 0 
+    ORDER BY entry_date DESC
+""")
+    fun observeDistinctEntryDates(ownerId: String): Flow<List<Long>>
 }
