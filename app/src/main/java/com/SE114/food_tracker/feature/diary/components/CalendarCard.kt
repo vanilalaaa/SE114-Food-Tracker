@@ -1,12 +1,8 @@
 package com.SE114.food_tracker.feature.diary.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -34,6 +30,14 @@ import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
 import kotlinx.datetime.toLocalDateTime
+
+private val CalendarTodayNumberSize = 32.dp
+private val CalendarDataCellWidth = 40.dp
+private val CalendarDataCellHeight = 65.dp
+private val CalendarCardPadding = 16.dp
+private val CalendarHeaderHeight = 18.dp
+private val CalendarHeaderGridSpacing = 5.dp
+private val CalendarRowSpacing = 2.dp
 
 @Composable
 fun CalendarCard(
@@ -84,20 +88,35 @@ fun CalendarCard(
 
         List(emptySlotsBefore) { null } + (1..lastDayOfMonth).toList()
     }
+    val calendarRows = remember(calendarGridItems) {
+        val rowCount = (calendarGridItems.size + 6) / 7
+        (0 until rowCount).map { rowIndex ->
+            (0 until 7).map { columnIndex ->
+                calendarGridItems.getOrNull(rowIndex * 7 + columnIndex)
+            }
+        }
+    }
+    val calendarHeight = CalendarCardPadding * 2 +
+            CalendarHeaderHeight +
+            CalendarHeaderGridSpacing +
+            CalendarDataCellHeight * calendarRows.size +
+            CalendarRowSpacing * (calendarRows.size - 1).coerceAtLeast(0)
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
-            .height(410.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .height(calendarHeight),
         shape = RoundedCornerShape(28.dp),
         color = Color.White,
         shadowElevation = 8.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(CalendarCardPadding)) {
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(CalendarHeaderHeight),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 days.forEach {
@@ -110,66 +129,34 @@ fun CalendarCard(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(5.dp))
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(7),
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(CalendarRowSpacing)
             ) {
-                items(calendarGridItems) { date ->
-                    if (date != null) {
-                        val isToday = (date == today.dayOfMonth && selectedMonth == today.monthNumber && selectedYear == today.year)
-                        val dayPreviews = previewsByDay[date].orEmpty()
-                        val hasData = dayPreviews.isNotEmpty() || hasDataDates.contains(date)
-
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (hasData) CalendarHighlight else Color.Transparent)
-                                .clickable { onDateClick(date) }
-                                .padding(vertical = 4.dp)
-                        ) {
+                calendarRows.forEach { week ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        week.forEach { date ->
                             Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.Center
                             ) {
-                                if (isToday) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .background(MintGreen, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = date.toString(),
-                                            color = Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                } else {
-                                    Text(
-                                        text = date.toString(),
-                                        color = TextPrimary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Normal
-                                    )
-                                }
+                                CalendarDateCell(
+                                    date = date,
+                                    today = today,
+                                    selectedYear = selectedYear,
+                                    selectedMonth = selectedMonth,
+                                    previews = date?.let { previewsByDay[it].orEmpty() }.orEmpty(),
+                                    hasData = date?.let { previewsByDay[it].orEmpty().isNotEmpty() || hasDataDates.contains(it) } == true,
+                                    scale = scale,
+                                    onDateClick = onDateClick
+                                )
                             }
-
-                            Spacer(Modifier.height(4.dp))
-
-                            FoodPreviewStack(
-                                previews = dayPreviews,
-                                hasData = hasData,
-                                scale = scale
-                            )
                         }
-                    } else {
-                        Spacer(modifier = Modifier.size(36.dp))
                     }
                 }
             }
@@ -178,41 +165,129 @@ fun CalendarCard(
 }
 
 @Composable
-private fun FoodPreviewStack(
+private fun CalendarDateCell(
+    date: Int?,
+    today: LocalDate,
+    selectedYear: Int,
+    selectedMonth: Int,
     previews: List<CalendarFoodPreview>,
     hasData: Boolean,
-    scale: Float
+    scale: Float,
+    onDateClick: (Int) -> Unit
 ) {
-    if (!hasData) {
-        Spacer(modifier = Modifier.height(42.dp))
+    if (date == null) {
+        Spacer(
+            modifier = Modifier.size(
+                width = CalendarDataCellWidth,
+                height = CalendarDataCellHeight
+            )
+        )
         return
     }
 
-    val avatarSize = (30f * scale.coerceIn(0.9f, 1.15f)).dp
-    val horizontalStep = (avatarSize.value * 0.56f).dp
-    val verticalStep = (avatarSize.value * 0.44f).dp
-    val stackWidth = (avatarSize.value + horizontalStep.value * 1.5f).dp
-    val stackHeight = (avatarSize.value + verticalStep.value).dp
+    val isToday = date == today.dayOfMonth &&
+            selectedMonth == today.monthNumber &&
+            selectedYear == today.year
 
     Box(
-        modifier = Modifier.size(width = stackWidth, height = stackHeight),
-        contentAlignment = Alignment.TopCenter
+        modifier = Modifier
+            .size(
+                width = CalendarDataCellWidth,
+                height = CalendarDataCellHeight
+            )
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (hasData) CalendarHighlight else Color.Transparent)
+            .clickable { onDateClick(date) }
     ) {
-        previews.take(4).forEachIndexed { index, preview ->
-            val xOffset = when (index) {
-                0 -> 0.dp
-                1 -> horizontalStep
-                2 -> (horizontalStep.value * 0.5f).dp
-                else -> (horizontalStep.value * 1.5f).dp
+        if (isToday) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .size(CalendarTodayNumberSize)
+                    .background(MintGreen, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = date.toString(),
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
-            val yOffset = if (index < 2) 0.dp else verticalStep
+        } else {
+            Text(
+                text = date.toString(),
+                color = TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 7.dp)
+            )
+        }
+
+        FoodPreviewStack(
+            previews = previews,
+            hasData = hasData,
+            scale = scale,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
+private fun FoodPreviewStack(
+    previews: List<CalendarFoodPreview>,
+    hasData: Boolean,
+    scale: Float,
+    modifier: Modifier = Modifier
+) {
+    if (!hasData || previews.isEmpty()) {
+        return
+    }
+
+    val avatarSize = (28f * scale.coerceIn(0.5f, 2.2f)).dp
+    val step = (avatarSize.value * 0.44f).dp
+    val totalCount = previews.size
+    val visiblePreviews = previews.take(2)
+    val visibleCount = visiblePreviews.size
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        val positions = if (visibleCount == 2) {
+            listOf(
+                (step / 2) to 0.dp,
+                -(step / 2) to 0.dp
+            )
+        } else {
+            listOf(0.dp to 0.dp)
+        }
+
+        visiblePreviews.forEachIndexed { index, preview ->
+            val (xOffset, yOffset) = positions[index]
 
             CalendarFoodAvatar(
                 preview = preview,
                 size = avatarSize,
                 modifier = Modifier
                     .offset(x = xOffset, y = yOffset)
-                    .zIndex(index.toFloat())
+                    .zIndex((visibleCount - index).toFloat())
+            )
+        }
+
+        if (totalCount >= 3) {
+            Text(
+                text = "x$totalCount",
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .zIndex((visibleCount + 1).toFloat())
+                    .background(Color.Black.copy(alpha = 0.36f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
             )
         }
     }
@@ -228,8 +303,7 @@ private fun CalendarFoodAvatar(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(LightPeach)
-            .border(2.dp, Color.White, CircleShape),
+            .background(LightPeach),
         contentAlignment = Alignment.Center
     ) {
         if (!preview.imageUrl.isNullOrBlank()) {

@@ -11,8 +11,9 @@ val LightPeachStat = Color(0xFFFFEADF)
 
 // --- 2. NHẬN DIỆN ---
 val OrangeMain = Color(0xFFEF9463)
+val Orange = Color(0xFFD5967C)
+val LightOrange = Color(0xFFF8E2D9)
 val MintGreen = Color(0xFFA9CFB8)
-val LightGreen = Color(0xFF81CAA7)
 val LightGreenStat = Color(0xFFC9E4D4)
 
 // --- 4. TRANG TRÍ ---
@@ -30,7 +31,6 @@ val HintGray = Color(0xFFB7B6B6)
 val TextPrimaryStat = Color(0xFF1A1C1C)
 val TextLabelGray = Color(0xFF777777)
 val HintGrayStat = Color(0xFFB8B3B3)
-val SearchBarBg = Color(0xFFFFFFFF)
 val TextWarning = Color(0xFF9B1C1C)
 
 // --- 5. BIỂU ĐỒ & THỐNG KÊ ---

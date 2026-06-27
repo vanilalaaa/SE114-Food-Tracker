@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.SE114.food_tracker.core.designsystem.components.AppTopBar
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.dao.ConversationWithUnread
 import com.SE114.food_tracker.data.local.entities.Conversation
@@ -188,10 +190,7 @@ fun ConversationListScreen(
                 Button(
                     onClick = {
                         if (isValid) {
-                            viewModel.createGroup(
-                                name = newGroupName,
-                                members = selectedMembers.toList()
-                            )
+                            viewModel.createGroup(name = newGroupName, members = selectedMembers.toList())
                             newGroupName = ""
                             selectedMembers.clear()
                             showCreateGroupDialog = false
@@ -278,30 +277,27 @@ fun ConversationListScreenContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Tin nhắn cuộc trò chuyện",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    if (onBackClick != null) {
+            AppTopBar(
+                title = "Cuộc trò chuyện",
+                navigationIcon = if (onBackClick != null) {
+                    {
                         IconButton(onClick = onBackClick) {
                             Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
                         }
                     }
-                },
+                } else null,
                 actions = {
-                    IconButton(onClick = onCreateGroupClick) {
+                    IconButton(
+                        onClick = onCreateGroupClick,
+                        modifier = Modifier.size(56.dp)
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.GroupAdd,
-                            contentDescription = "Create Group"
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Tạo nhóm",
+                            modifier = Modifier.size(34.dp)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
+                }
             )
         },
         containerColor = MainBackground,

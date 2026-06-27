@@ -30,6 +30,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.SE114.food_tracker.core.designsystem.components.AppTopBar
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.GroupSettingsDialog
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
@@ -261,17 +262,9 @@ fun ChatScreenContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = conversationName,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(text = "Đang trực tuyến", fontSize = 11.sp, color = Color(0xFF4CAF50))
-                    }
-                },
+            AppTopBar(
+                title = conversationName,
+                subtitle = "Đang trực tuyến",
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
@@ -304,8 +297,7 @@ fun ChatScreenContent(
                             )
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
+                }
             )
         },
         containerColor = MainBackground,

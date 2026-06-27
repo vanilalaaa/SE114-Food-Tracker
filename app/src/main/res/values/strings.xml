@@ -285,4 +285,9 @@
     <string name="admin_report_also_ban">Đồng thời khóa người bị báo cáo</string>
     <string name="admin_report_ban_label">Khóa người bị báo cáo</string>
     <string name="admin_report_ban_none">Không khóa</string>
+    <string name="bottom_bar_diary">Nh&#7853;t k&#253;</string>
+    <string name="bottom_bar_stats">Th&#7889;ng k&#234;</string>
+    <string name="bottom_bar_feed">B&#224;i vi&#7871;t</string>
+    <string name="bottom_bar_chat">Chat</string>
+    <string name="bottom_bar_settings">C&#224;i &#273;&#7863;t</string>
 </resources>

@@ -36,7 +36,8 @@ fun AppButton(
     variant: AppButtonVariant = AppButtonVariant.Primary,
     enabled: Boolean = true,
     loading: Boolean = false,
-    leadingIcon: ImageVector? = null
+    leadingIcon: ImageVector? = null,
+    colors: ButtonColors? = null
 ) {
     val clickable = enabled && !loading
     val content: @Composable () -> Unit = {
@@ -62,7 +63,7 @@ fun AppButton(
             onClick = onClick,
             enabled = clickable,
             modifier = modifier.height(52.dp),
-            colors = ButtonDefaults.buttonColors(),
+            colors = colors ?: ButtonDefaults.buttonColors(),
             content = { content() }
         )
 
@@ -70,7 +71,7 @@ fun AppButton(
             onClick = onClick,
             enabled = clickable,
             modifier = modifier.height(52.dp),
-            colors = destructiveColors(),
+            colors = colors ?: destructiveColors(),
             content = { content() }
         )
 

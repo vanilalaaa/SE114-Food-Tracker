@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
@@ -14,10 +15,12 @@ import com.SE114.food_tracker.core.designsystem.theme.MintGreen
 @Composable
 fun AddActionButton(
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     contentDescription: String = "Thêm món ăn"
 ) {
     FloatingActionButton(
         onClick = onClick,
+        modifier = modifier,
         containerColor = MintGreen,
         contentColor = Color.White,
         shape = CircleShape

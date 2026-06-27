@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -52,10 +53,13 @@ import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
 import com.SE114.food_tracker.core.designsystem.components.AppScaffold
+import com.SE114.food_tracker.core.designsystem.components.AppTopBar
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.HintGrayStat
+import com.SE114.food_tracker.core.designsystem.theme.SettingActionOrange
 import com.SE114.food_tracker.core.util.AppCurrency
 import com.SE114.food_tracker.data.repository.Profile
 import com.SE114.food_tracker.feature.settings.components.CurrencySelectionDialog
@@ -107,7 +111,11 @@ private fun SettingsContent(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showCurrencyDialog by remember { mutableStateOf(false) }
 
-    AppScaffold { innerPadding ->
+    AppScaffold(
+        topBar = {
+            AppTopBar(title = stringResource(R.string.settings_title))
+        }
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -116,12 +124,6 @@ private fun SettingsContent(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = stringResource(R.string.settings_title),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-
             ProfileInfoBlock(profile = profile, onClick = onProfileClick)
 
             SettingsRow(
@@ -154,14 +156,21 @@ private fun SettingsContent(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
 
             AppButton(
                 text = stringResource(R.string.settings_logout),
                 onClick = { showLogoutDialog = true },
                 modifier = Modifier.fillMaxWidth(),
-                variant = AppButtonVariant.Destructive
+                variant = AppButtonVariant.Destructive,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SettingActionOrange,
+                    contentColor = CardWhite
+                )
             )
+
+            Spacer(modifier = Modifier.height(BottomBarContentPadding))
+
         }
     }
 
@@ -186,7 +195,8 @@ private fun SettingsContent(
                 onLogout()
             },
             onDismiss = { showLogoutDialog = false },
-            destructive = true
+            destructive = true,
+            confirmColorOverride = SettingActionOrange
         )
     }
 }
