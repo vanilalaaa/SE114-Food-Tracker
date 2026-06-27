@@ -142,6 +142,7 @@ class FeedViewModel @Inject constructor(
 
     init {
         subscribeToRealtimePosts()
+        subscribeToRealtimeFriendships()
         startAutoRefresh()
     }
 
@@ -319,6 +320,15 @@ class FeedViewModel @Inject constructor(
         feedRepository.subscribeToFeedRealtime()
         viewModelScope.launch {
             feedRepository.postRealtimeEvents.collect {
+                scheduleRealtimeRefresh()
+            }
+        }
+    }
+
+    private fun subscribeToRealtimeFriendships() {
+        friendRepository.subscribeToFriendshipRealtime()
+        viewModelScope.launch {
+            friendRepository.friendshipRealtimeEvents.collect {
                 scheduleRealtimeRefresh()
             }
         }
