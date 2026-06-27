@@ -26,33 +26,22 @@ class MoneyInputTransformation : VisualTransformation {
         val offsetMapping = object : OffsetMapping {
             override fun originalToTransformed(offset: Int): Int {
                 if (offset <= 0) return 0
-                var commas = 0
-                // Đếm số dấu phẩy được thêm vào trước vị trí offset gốc
-                for (i in 0 until offset) {
-                    // Cứ mỗi 3 chữ số tính từ phải qua trái (trừ chữ số đầu tiên) sẽ xuất hiện 1 dấu phẩy
-                    val digitsBeforeEnd = rawText.length - i
-                    if (digitsBeforeEnd > 3 && (digitsBeforeEnd - 1) % 3 == 0) {
-                        commas++
-                    }
+                // Đếm xem có bao nhiêu ký tự số từ đầu chuỗi gốc đến vị trí offset hiện tại
+                val digitsBeforeOffset = rawText.take(offset).length
+                var digitCount = 0
+                // Tìm vị trí tương ứng trong chuỗi đã định dạng chứa đúng bấy nhiêu chữ số
+                formatted.forEachIndexed { index, char ->
+                    if (char.isDigit()) digitCount++
+                    if (digitCount == digitsBeforeOffset) return index + 1
                 }
-                // Vị trí mới = Vị trí cũ + Số lượng dấu phẩy xuất hiện phía trước nó
-                val transformedOffset = offset + (formatted.length - rawText.length)
-                return transformedOffset.coerceIn(0, formatted.length)
+                return formatted.length
             }
 
             override fun transformedToOriginal(offset: Int): Int {
                 if (offset <= 0) return 0
-                var commas = 0
-                val originalTextLength = rawText.length
-
-                // Thuật toán quét ngược từ chuỗi đã định dạng về chuỗi thô ban đầu
-                for (i in 0 until offset) {
-                    if (i < formatted.length && formatted[i] == ',') {
-                        commas++
-                    }
-                }
-                val originalOffset = offset - commas
-                return originalOffset.coerceIn(0, originalTextLength)
+                // Đếm số lượng chữ số xuất hiện trong chuỗi định dạng từ đầu đến vị trí offset
+                val digitsBeforeOffset = formatted.take(offset).count { it.isDigit() }
+                return digitsBeforeOffset.coerceIn(0, rawText.length)
             }
         }
 
