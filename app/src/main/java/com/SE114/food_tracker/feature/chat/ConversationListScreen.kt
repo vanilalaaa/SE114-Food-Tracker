@@ -80,8 +80,7 @@ fun ConversationListScreen(
                 } catch (e: Exception) {
                     null
                 }
-            }?.toString() ?: UUID.randomUUID().toString()
-
+            }?.toString()?.lowercase()?.trim() ?: "stable_friend_${friend.hashCode()}"
             val finalName = when {
                 actualProfile != null -> try {
                     actualProfile::class.members.find { it.name == "displayName" || it.name == "name" }
@@ -190,7 +189,10 @@ fun ConversationListScreen(
                 Button(
                     onClick = {
                         if (isValid) {
-                            viewModel.createGroup(name = newGroupName, members = selectedMembers.toList())
+                            viewModel.createGroup(
+                                name = newGroupName,
+                                members = selectedMembers.toList()
+                            )
                             newGroupName = ""
                             selectedMembers.clear()
                             showCreateGroupDialog = false
@@ -303,9 +305,11 @@ fun ConversationListScreenContent(
         containerColor = MainBackground,
         modifier = modifier
     ) { innerPadding ->
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -384,7 +388,10 @@ fun ConversationListScreenContent(
                                 ConversationItem(
                                     conversation = conversation,
                                     onClick = {
-                                        onConversationClick(conversation.id, conversation.displayName ?: "Người dùng")
+                                        onConversationClick(
+                                            conversation.id,
+                                            conversation.displayName ?: "Người dùng"
+                                        )
                                     }
                                 )
                             }
@@ -435,9 +442,15 @@ fun ConversationListScreenPreview() {
         ConversationListScreenContent(
             conversationList = listOf(
                 ConversationWithUnread(
-                    id = "1", isGroup = false, name = "Azun (Data)", walletId = "w1",
-                    lastMessageAt = System.currentTimeMillis(), lastMessageSnippet = "Ăn bún bò Huế đi!",
-                    createdAt = System.currentTimeMillis(), isUnread = true, unreadCount = 5
+                    id = "1",
+                    isGroup = false,
+                    name = "Azun (Data)",
+                    walletId = "w1",
+                    lastMessageAt = System.currentTimeMillis(),
+                    lastMessageSnippet = "Ăn bún bò Huế đi!",
+                    createdAt = System.currentTimeMillis(),
+                    isUnread = true,
+                    unreadCount = 5
                 ),
                 ConversationWithUnread(
                     id = "2", isGroup = true, name = "Quỹ Nhóm 4 Food Tracker", walletId = "w2",

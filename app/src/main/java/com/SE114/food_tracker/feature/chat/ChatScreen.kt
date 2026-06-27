@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Delete // THÊM IMPORT ICON XÓA
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -42,7 +43,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.SE114.food_tracker.feature.friend.FriendViewModel
 import kotlinx.coroutines.flow.firstOrNull
 
-// Per-message character cap, in line with modern chat apps (Discord ~2,000, Telegram/Slack ~4,000).
 private const val MAX_MESSAGE_LENGTH = 2000
 
 @Composable
@@ -56,7 +56,11 @@ fun ChatScreen(
     onWalletClick: () -> Unit
 ) {
     LaunchedEffect(Unit) {
-        println("DEBUG_SCREEN: Đang mở chat với ID: '$conversationId'")
+        viewModel.navigationEvent.collect { event ->
+            if (event == "DISBANDED" || event == "LEFT") {
+                onBackClick() // Tự động thoát ra ngay lập tức
+            }
+        }
     }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -79,7 +83,6 @@ fun ChatScreen(
         viewModel.loadGroupMembers(conversationId)
     }
 
-    // Mark read on open and again whenever a newer message lands while the chat is on screen.
     val latestMessageId = messages.lastOrNull()?.localId
     LaunchedEffect(conversationId, latestMessageId) {
         viewModel.markAsRead(conversationId)
@@ -88,10 +91,9 @@ fun ChatScreen(
     val memberList by viewModel.groupMembers.collectAsState()
     val isAdmin by viewModel.isCurrentAdmin.collectAsState()
     val friendId = memberList.firstOrNull { it.first != currentUserId }?.first
+
     ChatScreenContent(
         conversationId = conversationId,
-        // Groups use the live stored name (reflects renames); 1-1 chats use the resolved peer
-        // name passed in (the stored name is the generic "Trò chuyện 1-1" placeholder).
         conversationName = if (isGroup) conversationState?.name
             ?: conversationName else conversationName,
         groupAvatarUrl = conversationState?.avatarUrl,
@@ -101,6 +103,9 @@ fun ChatScreen(
         isAdmin = isAdmin,
         onDisbandGroup = {
             viewModel.disbandGroup(conversationId)
+        },
+        onDeleteDirectChat = {
+            viewModel.deleteDirectChat(conversationId) // Gọi hàm xóa 1-1 từ ViewModel
         },
         memberList = memberList.map { Pair(it.first, it.second) },
         friendList = friendList,
@@ -150,6 +155,7 @@ fun ChatScreenContent(
     isGroup: Boolean,
     isAdmin: Boolean,
     onDisbandGroup: () -> Unit,
+    onDeleteDirectChat: () -> Unit, // Callback xóa 1-1
     memberList: List<Pair<String, String>>,
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit,
@@ -168,6 +174,7 @@ fun ChatScreenContent(
     val context = LocalContext.current
     var textInput by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showDeleteDirectDialog by remember { mutableStateOf(false) } // State Dialog xóa 1-1
 
     var memberToKick by remember { mutableStateOf<Pair<String, String>?>(null) }
 
@@ -175,6 +182,41 @@ fun ChatScreenContent(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { onSendImage(it.toString()) }
+    }
+
+    // Dialog xác nhận xóa cuộc trò chuyện 1-1
+    if (showDeleteDirectDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDirectDialog = false },
+            title = {
+                Text("Xóa cuộc trò chuyện", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "Bạn có chắc chắn muốn xóa toàn bộ lịch sử cuộc trò chuyện này không? Hành động này không thể hoàn tác.",
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteDirectDialog = false
+                        onDeleteDirectChat()
+                        Toast.makeText(context, "Đã xóa cuộc trò chuyện thành công!", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatRed)
+                ) {
+                    Text("Xóa", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDirectDialog = false }) {
+                    Text("Hủy", color = TextLabelGray)
+                }
+            },
+            containerColor = CardWhite,
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 
     if (memberToKick != null) {
@@ -198,11 +240,6 @@ fun ChatScreenContent(
                             } else {
                                 onKickMember(conversationId, userId, name)
                             }
-                            Toast.makeText(
-                                context,
-                                "Đã mời $name rời khỏi nhóm!",
-                                Toast.LENGTH_SHORT
-                            ).show()
                         }
                         memberToKick = null
                         showSettingsDialog = false
@@ -271,23 +308,6 @@ fun ChatScreenContent(
                     }
                 },
                 actions = {
-//                    if (isGroup) {
-//                        if (hasWallet) {
-//                            IconButton(onClick = onWalletClick) {
-//                                Text("💰", fontSize = 22.sp)
-//                            }
-//                        } else if (isAdmin) {
-//                            TextButton(onClick = onCreateWalletClick) {
-//                                Text(
-//                                    "Tạo Quỹ",
-//                                    color = StatPinkDark,
-//                                    fontWeight = FontWeight.Bold,
-//                                    fontSize = 14.sp
-//                                )
-//                            }
-//                        }
-//                    }
-
                     if (isGroup) {
                         IconButton(onClick = { showSettingsDialog = true }) {
                             Icon(
@@ -296,12 +316,20 @@ fun ChatScreenContent(
                                 tint = StatPinkDark
                             )
                         }
+                    } else {
+                        // NÚT XÓA TRÒ CHUYỆN HIỂN THỊ KHI LÀ CHAT 1-1
+                        IconButton(onClick = { showDeleteDirectDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete Chat",
+                                tint = StatRed
+                            )
+                        }
                     }
                 }
             )
         },
         containerColor = MainBackground,
-        // modifier = modifier
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
@@ -366,7 +394,7 @@ fun ChatScreenContent(
                                 MessageBubble(
                                     message = message,
                                     isMine = isMine,
-                                    senderName = message.senderName, // Truyền trực tiếp dữ liệu realtime
+                                    senderName = message.senderName,
                                     onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
                                 )
                             }
@@ -418,7 +446,6 @@ fun ChatScreenContent(
 
                     OutlinedTextField(
                         value = textInput,
-                        // Cap input length (truncates pastes too); the counter below appears near the limit.
                         onValueChange = { textInput = it.take(MAX_MESSAGE_LENGTH) },
                         placeholder = { Text("Nhập tin nhắn...", fontSize = 14.sp) },
                         modifier = Modifier
@@ -500,6 +527,7 @@ fun ChatScreenPreview() {
             onRenameGroup = { _, _ -> },
             onKickMember = { _, _, _ -> },
             onDisbandGroup = {},
+            onDeleteDirectChat = {},
             friendList = emptyList(),
             onAddMembers = {},
             viewModel = viewModel()

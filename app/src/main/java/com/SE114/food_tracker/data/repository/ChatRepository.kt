@@ -238,6 +238,13 @@ class ChatRepository @Inject constructor(
                 .decodeList<SupabaseParticipantDto>()
                 .map { it.conversationId }
                 .distinct()
+            // Tìm và xóa các phòng chat local ma do bị kick hoặc giải tán
+            val localConvs = chatDAO.getAllConversations().firstOrNull() ?: emptyList()
+            val localIds = localConvs.map { it.id }
+            val orphanedIds = localIds.filter { it !in convIds.toSet() }
+            orphanedIds.forEach { id ->
+                deleteConversationLocal(id)
+            }
             if (convIds.isEmpty()) return
 
             // One round-trip for every conversation the user belongs to, replacing the
@@ -746,6 +753,11 @@ class ChatRepository @Inject constructor(
         imageUrl: String?,
         isSystem: Boolean = false
     ) {
+        val isMember = chatDAO.isUserInConversation(conversationId, getAuthenticatedUserId())
+        if (!isMember) {
+            Timber.tag("Chat").e("Không thể nhắn tin: Người dùng không thuộc hội thoại này")
+            return
+        }
         val localId = UUID.randomUUID().toString()
         val pendingMessage = Message(
             localId = localId,
@@ -1018,17 +1030,25 @@ class ChatRepository @Inject constructor(
 
     suspend fun kickMember(conversationId: String, userIdToKick: String, memberName: String) {
         try {
+            val currentUserId = getAuthenticatedUserId()
+            val targetId = userIdToKick.lowercase().trim()
+
+            // Thực hiện xóa quyền trên Server trước
             supabaseClient.from("conversation_participant").delete {
                 filter {
                     eq("conversation_id", conversationId)
-                    eq("user_id", userIdToKick.lowercase())
+                    eq("user_id", targetId)
                 }
             }
 
-            if (userIdToKick.lowercase() == getAuthenticatedUserId()) {
-                chatDAO.deleteConversationById(conversationId)
+            // NẾU LÀ CHÍNH MÌNH RỜI NHÓM
+            if (targetId == currentUserId) {
+                // Xóa sạch bộ nhớ Local lập tức và thoát luôn
+                deleteConversationLocal(conversationId)
+                return // BẮT BUỘC RETURN: Không gửi tin nhắn hệ thống nữa để tránh tự tạo lại phòng chat rác
             }
 
+            // NẾU LÀ MỜI NGƯỜI KHÁC RA
             sendSystemMessage(conversationId, "Đã mời $memberName rời khỏi nhóm.")
         } catch (e: Exception) {
             e.printStackTrace()
@@ -1037,30 +1057,36 @@ class ChatRepository @Inject constructor(
 
     suspend fun disbandGroup(conversationId: String) {
         try {
-            // 1. Gửi tin nhắn hệ thống thông báo giải tán nhóm (để UI nhận biết)
+            // Gửi tin nhắn hệ thống thông báo giải tán trước
             sendSystemMessage(conversationId, "Trưởng nhóm đã giải tán nhóm.")
 
-            // 2. Xóa các bản ghi liên quan (thứ tự quan trọng)
-
-            // Xóa tin nhắn
-            supabaseClient.from("message")
-                .delete { filter { eq("conversation_id", conversationId) } }
-
-            // Xóa thành viên
-            supabaseClient.from("conversation_participant")
-                .delete { filter { eq("conversation_id", conversationId) } }
-
-            // Xóa phòng chat
+            // Xóa sạch dữ liệu trên Server
+            supabaseClient.from("message").delete { filter { eq("conversation_id", conversationId) } }
+            supabaseClient.from("conversation_participant").delete { filter { eq("conversation_id", conversationId) } }
             supabaseClient.from("conversation").delete { filter { eq("id", conversationId) } }
 
-            // 3. Xóa Local
+            // Xóa sạch Local lập tức
             deleteConversationLocal(conversationId)
-
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
-
+    suspend fun deleteOneToOneChat(conversationId: String) {
+        try {
+            val currentUserId = getAuthenticatedUserId()
+            // Xóa mối liên kết của mình với cuộc trò chuyện này trên server
+            supabaseClient.from("conversation_participant").delete {
+                filter {
+                    eq("conversation_id", conversationId)
+                    eq("user_id", currentUserId)
+                }
+            }
+            // Dọn sạch local để biến mất hoàn toàn khỏi danh sách chat
+            deleteConversationLocal(conversationId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
     suspend fun sendSystemMessage(conversationId: String, content: String) {
         sendMessage(
             conversationId = conversationId,
@@ -1072,8 +1098,13 @@ class ChatRepository @Inject constructor(
     }
 
     suspend fun deleteConversationLocal(conversationId: String) {
-        chatDAO.deleteConversationById(conversationId)
-        chatDAO.deleteMessagesByConversation(conversationId)
+        try {
+            chatDAO.deleteParticipantsByConversation(conversationId)
+            chatDAO.deleteConversationById(conversationId)
+            chatDAO.deleteMessagesByConversation(conversationId)
+        } catch (e: Exception) {
+            Timber.e(e, "Lỗi khi dọn dẹp dữ liệu local phòng chat")
+        }
     }
 
     suspend fun syncMessagesFromServer(conversationId: String) {
@@ -1116,6 +1147,10 @@ class ChatRepository @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            // Bắt lỗi để dọn sạch local phòng chat
+            if (e.message?.contains("policy", ignoreCase = true) == true || e.toString().contains("PostgrestException")) {
+                deleteConversationLocal(conversationId)
+            }
         }
     }
 

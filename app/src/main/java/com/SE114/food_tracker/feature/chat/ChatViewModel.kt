@@ -14,8 +14,10 @@ import com.SE114.food_tracker.data.repository.ChatRepository
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -137,7 +139,11 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { chatRepository.updateGroupName(conversationId, newName) }
     }
 
-    fun updateGroupAvatar(conversationId: String, imageUri: String, onResult: (Boolean) -> Unit = {}) {
+    fun updateGroupAvatar(
+        conversationId: String,
+        imageUri: String,
+        onResult: (Boolean) -> Unit = {}
+    ) {
         viewModelScope.launch {
             onResult(chatRepository.updateGroupAvatar(conversationId, imageUri))
         }
@@ -148,6 +154,7 @@ class ChatViewModel @Inject constructor(
             onResult(chatRepository.removeGroupAvatar(conversationId))
         }
     }
+
     fun addMembers(conversationId: String, userIds: List<String>) {
         viewModelScope.launch {
             // Lấy danh sách mới nhất từ server trước khi lọc
@@ -163,17 +170,35 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
+
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
-        viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
+        viewModelScope.launch {
+            // 1. Thực hiện kick thành viên trên server trước
+            chatRepository.kickMember(conversationId, userId, name)
+
+            // 2. Kiểm tra nếu người bị kick là chính mình thì mới bắn event chuyển màn hình
+            if (userId.lowercase() == currentUserId) {
+                _navigationEvent.emit("LEFT")
+            }
+        }
     }
+    fun deleteDirectChat(conversationId: String) {
+        viewModelScope.launch {
+            chatRepository.deleteOneToOneChat(conversationId)
+            _navigationEvent.emit("LEFT")
+        }
+    }
+    private val _navigationEvent = MutableSharedFlow<String?>()
+    val navigationEvent = _navigationEvent.asSharedFlow()
     fun disbandGroup(conversationId: String) {
         viewModelScope.launch {
             if (isCurrentAdmin.value) {
                 chatRepository.disbandGroup(conversationId)
-                fetchConversationsFromServer()
+                _navigationEvent.emit("DISBANDED")
             }
         }
     }
+
     fun getConversationState(conversationId: String): Flow<Conversation?> {
         return chatRepository.getLocalConversation(conversationId)
     }
@@ -226,7 +251,12 @@ class ChatViewModel @Inject constructor(
 
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
-            chatRepository.sendMessage(conversationId, currentUserId, body = null, imageUrl = imageUri)
+            chatRepository.sendMessage(
+                conversationId,
+                currentUserId,
+                body = null,
+                imageUrl = imageUri
+            )
         }
     }
 
