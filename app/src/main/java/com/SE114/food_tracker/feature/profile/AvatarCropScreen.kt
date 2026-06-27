@@ -13,12 +13,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -112,6 +114,10 @@ fun AvatarCropScreen(
     var failed by remember(imageUri) { mutableStateOf(false) }
     var processing by remember { mutableStateOf(false) }
 
+    // Read system-bar insets HERE, in the activity composition — a Dialog's own window often
+    // reports zero navigation-bar inset, which is why the buttons sank under the nav bar.
+    val systemBarsInsets = WindowInsets.systemBars.asPaddingValues()
+
     LaunchedEffect(imageUri) {
         val loaded = withContext(Dispatchers.IO) {
             runCatching { decodeOrientedBitmap(context, imageUri) }
@@ -136,6 +142,7 @@ fun AvatarCropScreen(
                 current != null -> AvatarCropContent(
                     image = remember(current) { current.asImageBitmap() },
                     processing = processing,
+                    contentInsets = systemBarsInsets,
                     onCancel = onCancel,
                     onConfirm = { rect ->
                         scope.launch {
@@ -184,6 +191,7 @@ fun AvatarCropScreen(
 private fun AvatarCropContent(
     image: ImageBitmap,
     processing: Boolean,
+    contentInsets: PaddingValues,
     onCancel: () -> Unit,
     onConfirm: (CropRect) -> Unit
 ) {
@@ -231,8 +239,7 @@ private fun AvatarCropContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
+                .padding(contentInsets)
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -504,6 +511,7 @@ private fun AvatarCropContentPreview() {
         AvatarCropContent(
             image = previewImage(),
             processing = false,
+            contentInsets = PaddingValues(0.dp),
             onCancel = {},
             onConfirm = {}
         )
