@@ -111,7 +111,9 @@ fun ConversationListScreen(
             Triple(finalId, finalName, finalAvatar)
         }
     }
-
+    LaunchedEffect(Unit) {
+        friendViewModel.refresh() // Đảm bảo danh sách bạn bè luôn mới nhất khi vừa vào màn hình
+    }
     if (showCreateGroupDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -243,7 +245,13 @@ fun ConversationListScreen(
         onBackClick = onBackClick,
         onCreateGroupClick = { showCreateGroupDialog = true },
         onRefreshData = { onComplete ->
-            viewModel.fetchConversationsFromServer { onComplete() }
+            // 1. Gọi làm mới danh sách bạn bè
+            friendViewModel.refresh()
+
+            // 2. Gọi làm mới danh sách phòng chat, xong xuôi thì tắt spinner quay quay
+            viewModel.fetchConversationsFromServer {
+                onComplete()
+            }
         }
     )
 }
