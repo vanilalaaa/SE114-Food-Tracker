@@ -42,7 +42,6 @@ fun ConversationListScreen(
     onConversationClick: (id: String, name: String) -> Unit = { _, _ -> },
     onBackClick: (() -> Unit)? = null
 ) {
-    // ← CHANGED: use the new Flow that carries is_unread per row
     val conversationList by viewModel.getConversationsWithUnreadFlow()
         .collectAsState(initial = emptyList())
 
@@ -51,6 +50,7 @@ fun ConversationListScreen(
     var newGroupName by remember { mutableStateOf("") }
     val selectedMembers = remember { mutableStateListOf<String>() }
 
+    // Đổi cấu trúc sang Triple(ID, Tên, AvatarUrl) để bóc tách ảnh đại diện an toàn từ trên này
     val friendListCheck = remember(acceptedFriendsList) {
         acceptedFriendsList.map { friend ->
             val actualProfile = try {
@@ -81,6 +81,7 @@ fun ConversationListScreen(
                     null
                 }
             }?.toString()?.lowercase()?.trim() ?: "stable_friend_${friend.hashCode()}"
+
             val finalName = when {
                 actualProfile != null -> try {
                     actualProfile::class.members.find { it.name == "displayName" || it.name == "name" }
@@ -97,7 +98,17 @@ fun ConversationListScreen(
                 }
             }?.toString() ?: "Thành viên nhóm"
 
-            Pair(finalId, finalName)
+            // TRÍCH XUẤT AVATAR URL TẠI ĐÂY
+            val finalAvatar = when {
+                actualProfile != null -> try {
+                    actualProfile::class.members.find { it.name == "avatarUrl" || it.name == "avatar" }?.call(actualProfile)
+                } catch (e: Exception) { null }
+                else -> try {
+                    friend::class.members.find { it.name == "friendAvatar" || it.name == "avatarUrl" }?.call(friend)
+                } catch (e: Exception) { null }
+            }?.toString()
+
+            Triple(finalId, finalName, finalAvatar)
         }
     }
 
@@ -220,13 +231,11 @@ fun ConversationListScreen(
     ConversationListScreenContent(
         conversationList = conversationList,
         friendList = friendListCheck,
-        // ← CHANGED: markAsRead before navigating
         onConversationClick = { id, name ->
             viewModel.markAsRead(id)
             onConversationClick(id, name)
         },
         onFriendClick = { friendId, friendName ->
-            // Create/resolve the real 1-1 conversation, then open it with the valid id.
             viewModel.openConversationWithFriend(friendId, friendName) { conversationId, name ->
                 onConversationClick(conversationId, name)
             }
@@ -234,8 +243,6 @@ fun ConversationListScreen(
         onBackClick = onBackClick,
         onCreateGroupClick = { showCreateGroupDialog = true },
         onRefreshData = { onComplete ->
-            // Keep the spinner until the sync actually finishes (instead of dismissing instantly
-            // and then recomposing the list mid-scroll).
             viewModel.fetchConversationsFromServer { onComplete() }
         }
     )
@@ -244,11 +251,9 @@ fun ConversationListScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationListScreenContent(
-    conversationList: List<ConversationWithUnread>,           // ← CHANGED type
-    friendList: List<Pair<String, String>> = emptyList(),
+    conversationList: List<ConversationWithUnread>,
+    friendList: List<Triple<String, String, String?>> = emptyList(), // Nhận kiểu Triple chuyên dụng
     onConversationClick: (id: String, name: String) -> Unit,
-    // Friend suggestions need the 1-1 conversation created/resolved before opening, unlike
-    // existing conversations whose id is already valid.
     onFriendClick: (friendId: String, friendName: String) -> Unit = { _, _ -> },
     onBackClick: (() -> Unit)?,
     onCreateGroupClick: () -> Unit,
@@ -269,10 +274,12 @@ fun ConversationListScreenContent(
     val filteredNewFriends = remember(searchQuery, friendList, conversationList) {
         if (searchQuery.isBlank()) emptyList()
         else {
-            val existingIds = conversationList.map { it.id }
+            val existingPeerNames = conversationList.filter { !it.isGroup }.map { it.displayName?.lowercase()?.trim() }
+
             friendList.filter { friend ->
+                val friendNameClean = friend.second.lowercase().trim()
                 friend.second.contains(searchQuery, ignoreCase = true) &&
-                        !existingIds.contains(friend.first)
+                        friendNameClean !in existingPeerNames
             }
         }
     }
@@ -309,6 +316,7 @@ fun ConversationListScreenContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .navigationBarsPadding()
         ) {
             OutlinedTextField(
                 value = searchQuery,
@@ -409,17 +417,23 @@ fun ConversationListScreenContent(
                                 )
                             }
                             items(filteredNewFriends) { friend ->
-                                // Wrap friend suggestion as ConversationWithUnread (always read — they have no messages)
+                                // Lấy trực tiếp từ Triple đã bóc tách từ trên
+                                val finalAvatar = friend.third
+
+                                // Đã vá lỗi thiếu dấu phẩy "," và sai thụt lề cú pháp
                                 val mockConversation = remember(friend) {
                                     ConversationWithUnread(
                                         id = friend.first,
                                         name = friend.second,
                                         isGroup = false,
                                         walletId = null,
+                                        avatarUrl = finalAvatar,
                                         lastMessageAt = 0L,
                                         lastMessageSnippet = "Bắt đầu trò chuyện...",
                                         createdAt = System.currentTimeMillis(),
-                                        unreadCount = 0
+                                        unreadCount = 0,
+                                        peerName = friend.second,
+                                        peerAvatar = finalAvatar
                                     )
                                 }
                                 ConversationItem(
@@ -458,7 +472,7 @@ fun ConversationListScreenPreview() {
                     createdAt = System.currentTimeMillis(), isUnread = false, unreadCount = 0
                 )
             ),
-            friendList = listOf(Pair("3", "Thúy Vy"), Pair("4", "Hải Đăng")),
+            friendList = listOf(Triple("3", "Thúy Vy", null), Triple("4", "Hải Đăng", null)),
             onConversationClick = { _, _ -> },
             onBackClick = {},
             onCreateGroupClick = {}

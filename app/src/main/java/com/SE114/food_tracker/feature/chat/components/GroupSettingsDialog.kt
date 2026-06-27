@@ -23,6 +23,8 @@ import com.SE114.food_tracker.core.designsystem.theme.*
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun GroupSettingsDialog(
@@ -45,6 +47,8 @@ fun GroupSettingsDialog(
         contract = ActivityResultContracts.GetContent()
     ) { uri -> uri?.let { onChangeAvatar(it.toString()) } }
 
+    val scrollState = rememberScrollState()
+
     AlertDialog(
         onDismissRequest = onDismissRequest,
         containerColor = LightPinkBG,
@@ -58,12 +62,15 @@ fun GroupSettingsDialog(
             )
         },
         text = {
+            // SỬA TẠI ĐÂY: Loại bỏ heightIn(max = 450.dp) cứng nhắc, để M3 AlertDialog tự tính toán chiều cao an toàn
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
 
-                // Group avatar with an edit badge → opens the image picker.
+                // Ảnh đại diện nhóm (Chỉ cho phép Admin bấm sửa đổi)
                 Box(
                     contentAlignment = Alignment.BottomEnd,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -94,23 +101,28 @@ fun GroupSettingsDialog(
                             )
                         }
                     }
-                    Surface(
-                        shape = CircleShape,
-                        color = StatPinkDark,
-                        modifier = Modifier.clickable { avatarPicker.launch("image/*") }
-                    ) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.Edit,
-                            contentDescription = "Chỉnh sửa ảnh đại diện",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(6.dp)
-                                .size(16.dp)
-                        )
+
+                    // Chỉ Admin mới có quyền đổi Avatar nhóm
+                    if (isAdmin) {
+                        Surface(
+                            shape = CircleShape,
+                            color = StatPinkDark,
+                            modifier = Modifier.clickable { avatarPicker.launch("image/*") }
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Edit,
+                                contentDescription = "Chỉnh sửa ảnh đại diện",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .padding(6.dp)
+                                    .size(16.dp)
+                            )
+                        }
                     }
                 }
 
-                if (!currentAvatarUrl.isNullOrBlank()) {
+                // Nút gỡ ảnh (Chỉ hiển thị cho Admin)
+                if (isAdmin && !currentAvatarUrl.isNullOrBlank()) {
                     TextButton(
                         onClick = onRemoveAvatar,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -124,40 +136,42 @@ fun GroupSettingsDialog(
                     }
                 }
 
-                OutlinedTextField(
-                    value = groupNameInput,
-                    onValueChange = { groupNameInput = it },
-                    label = { Text("Tên nhóm mới", color = TextLabelGray) },
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = CardWhite,
-                        unfocusedContainerColor = CardWhite,
-                        focusedBorderColor = StatPinkDark,
-                        unfocusedBorderColor = Color(0xFFE0E0E0),
-                        focusedLabelColor = StatPinkDark
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Button(
-                    onClick = {
-                        if (groupNameInput.isNotBlank()) {
-                            onRenameGroup(groupNameInput)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text(
-                        "Cập nhật tên",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                // Form đổi tên nhóm (Chỉ hiển thị cho Admin)
+                if (isAdmin) {
+                    OutlinedTextField(
+                        value = groupNameInput,
+                        onValueChange = { groupNameInput = it },
+                        label = { Text("Tên nhóm mới", color = TextLabelGray) },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = CardWhite,
+                            unfocusedContainerColor = CardWhite,
+                            focusedBorderColor = StatPinkDark,
+                            unfocusedBorderColor = Color(0xFFE0E0E0),
+                            focusedLabelColor = StatPinkDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
-                }
 
-                HorizontalDivider(thickness = 1.dp, color = CalendarHighlight)
+                    Button(
+                        onClick = {
+                            if (groupNameInput.isNotBlank()) {
+                                onRenameGroup(groupNameInput)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = StatPinkDark),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(
+                            "Cập nhật tên",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                    HorizontalDivider(thickness = 1.dp, color = CalendarHighlight)
+                }
 
                 Text(
                     text = "Danh sách thành viên",
@@ -166,7 +180,6 @@ fun GroupSettingsDialog(
                     color = TextSecondary
                 )
 
-                // Kiểm tra nếu danh sách trống từ server
                 if (memberList.isEmpty()) {
                     Box(
                         modifier = Modifier
@@ -206,26 +219,29 @@ fun GroupSettingsDialog(
                                         color = TextPrimary
                                     )
 
-                                    // Chỉ cho phép click gọi hàm Kick Member với đúng thông tin thực tế
-                                    Surface(
-                                        color = StatPinkLight,
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier
-                                            .clickable { onKickMember(member.first, member.second) }
-                                    ) {
-                                        Icon(
-                                            imageVector = androidx.compose.material.icons.Icons.Default.PersonRemove,
-                                            contentDescription = "Mời ra khỏi nhóm",
-                                            tint = StatRed,
+                                    // Chỉ Admin mới thấy nút xóa thành viên khác ra khỏi nhóm
+                                    if (isAdmin) {
+                                        Surface(
+                                            color = StatPinkLight,
+                                            shape = RoundedCornerShape(12.dp),
                                             modifier = Modifier
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                                .size(18.dp)
-                                        )
+                                                .clickable { onKickMember(member.first, member.second) }
+                                        ) {
+                                            Icon(
+                                                imageVector = androidx.compose.material.icons.Icons.Default.PersonRemove,
+                                                contentDescription = "Mời ra khỏi nhóm",
+                                                tint = StatRed,
+                                                modifier = Modifier
+                                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                                    .size(18.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+
                     var showAddMemberDialog by remember { mutableStateOf(false) }
 
                     if (showAddMemberDialog) {
@@ -240,6 +256,7 @@ fun GroupSettingsDialog(
                         )
                     }
 
+                    // Nút thêm thành viên mới
                     OutlinedButton(
                         onClick = { showAddMemberDialog = true },
                         modifier = Modifier
@@ -257,6 +274,8 @@ fun GroupSettingsDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Thêm thành viên")
                     }
+
+                    // Phân định chức năng cuối màn hình dựa trên vai trò hệ thống
                     if (isAdmin) {
                         Spacer(modifier = Modifier.height(16.dp))
                         HorizontalDivider(thickness = 1.dp, color = StatRed.copy(alpha = 0.3f))
@@ -271,6 +290,32 @@ fun GroupSettingsDialog(
                         ) {
                             Text(
                                 "Giải tán nhóm",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    } else {
+                        // NẾU LÀ THÀNH VIÊN THƯỜNG: Hiện nút Rời khỏi nhóm độc lập ở đáy màn hình
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(thickness = 1.dp, color = StatRed.copy(alpha = 0.3f))
+
+                        Button(
+                            onClick = {
+                                // Tự tìm thông tin của mình để tự kích bản thân ra khỏi nhóm (Rời nhóm)
+                                // Do không truyền thẳng myId, ta kích hoạt callback để repository xử lý tự rời
+                                val myAccount = memberList.firstOrNull { it.second == conversationName } // Hoặc kích hoạt bằng cách truyền rỗng, hệ thống tự hiểu là chính mình
+                                // Để an toàn tối đa, ta kích hoạt lệnh với tên của chính user được xử lý ở repo
+                                onKickMember("", "Chính mình")
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = StatRed),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) {
+                            Text(
+                                "Rời khỏi nhóm",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp

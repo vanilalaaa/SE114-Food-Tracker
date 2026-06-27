@@ -428,6 +428,7 @@ fun ChatScreenContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .imePadding()
+                    .navigationBarsPadding()
             ) {
                 Row(
                     modifier = Modifier

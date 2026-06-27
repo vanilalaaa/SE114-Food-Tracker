@@ -1013,15 +1013,14 @@ class ChatRepository @Inject constructor(
 
     suspend fun getUserNamesMap(userIds: List<String>): Map<String, String> {
         return try {
-            // Lấy thông tin từ bảng 'profile'
+            val cleanIds = userIds.map { it.lowercase().trim() }
             val profiles = supabaseClient.from("profile")
-                .select { filter { isIn("id", userIds) } }
+                .select { filter { isIn("id", cleanIds) } }
                 .decodeList<SupabaseProfileDto>()
 
-            // Trả về bản đồ [userId -> displayName]
-            profiles.associate { it.id.lowercase() to it.displayName }
+            // Chuẩn hóa key lưu trong Map
+            profiles.associate { it.id.lowercase().trim() to it.displayName }
         } catch (e: Exception) {
-            Timber.e(e, "Lỗi lấy tên người dùng")
             emptyMap()
         }
     }
@@ -1029,7 +1028,8 @@ class ChatRepository @Inject constructor(
     suspend fun addMembersToGroup(conversationId: String, userIds: List<String>) {
         try {
             // 1. Lấy tên hiển thị của những người được thêm
-            val userNamesMap = getUserNamesMap(userIds)
+            val cleanIds = userIds.map { it.lowercase().trim() }
+            val userNamesMap = getUserNamesMap(cleanIds)
 
             // 2. Tạo danh sách tên để thông báo (nếu không tìm thấy tên thì dùng "Thành viên")
             val namesJoined = userIds.map { id ->
@@ -1056,6 +1056,16 @@ class ChatRepository @Inject constructor(
             val currentUserId = getAuthenticatedUserId()
             val targetId = userIdToKick.lowercase().trim()
 
+            // NẾU LÀ CHÍNH MÌNH RỜI NHÓM
+            if (targetId == currentUserId) {
+                // Gửi tin nhắn lên server trước để tài khoản khác thấy
+                sendSystemMessage(conversationId, "$memberName đã rời khỏi nhóm.")
+                kotlinx.coroutines.delay(300) // Chờ một chút để tin kịp đẩy lên
+                deleteConversationLocal(conversationId) // Xóa local máy mình
+                return // BẮT BUỘC RETURN: Không gửi tin nhắn hệ thống nữa để tránh tự tạo lại phòng chat rác
+            }
+
+            // NẾU LÀ MỜI NGƯỜI KHÁC RA
             // Thực hiện xóa quyền trên Server trước
             supabaseClient.from("conversation_participant").delete {
                 filter {
@@ -1063,15 +1073,6 @@ class ChatRepository @Inject constructor(
                     eq("user_id", targetId)
                 }
             }
-
-            // NẾU LÀ CHÍNH MÌNH RỜI NHÓM
-            if (targetId == currentUserId) {
-                // Xóa sạch bộ nhớ Local lập tức và thoát luôn
-                deleteConversationLocal(conversationId)
-                return // BẮT BUỘC RETURN: Không gửi tin nhắn hệ thống nữa để tránh tự tạo lại phòng chat rác
-            }
-
-            // NẾU LÀ MỜI NGƯỜI KHÁC RA
             sendSystemMessage(conversationId, "Đã mời $memberName rời khỏi nhóm.")
         } catch (e: Exception) {
             e.printStackTrace()
@@ -1096,15 +1097,8 @@ class ChatRepository @Inject constructor(
     }
     suspend fun deleteOneToOneChat(conversationId: String) {
         try {
-            val currentUserId = getAuthenticatedUserId()
-            // Xóa mối liên kết của mình với cuộc trò chuyện này trên server
-            supabaseClient.from("conversation_participant").delete {
-                filter {
-                    eq("conversation_id", conversationId)
-                    eq("user_id", currentUserId)
-                }
-            }
-            // Dọn sạch local để biến mất hoàn toàn khỏi danh sách chat
+            // CHỈ XÓA LOCAL: Giữ nguyên dòng dữ liệu trên Supabase
+            // để khi đối phương nhắn tin hoặc mình tìm kiếm lại, hàm RPC vẫn tìm ra đúng ID phòng chat cũ này
             deleteConversationLocal(conversationId)
         } catch (e: Exception) {
             e.printStackTrace()
