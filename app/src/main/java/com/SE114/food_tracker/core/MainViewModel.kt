@@ -6,6 +6,8 @@ import com.SE114.food_tracker.core.sync.LocalDataCleaner
 import com.SE114.food_tracker.data.repository.AuthOutcome
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.ChatRepository
+import com.SE114.food_tracker.data.repository.FeedRepository
+import com.SE114.food_tracker.data.repository.FriendRepository
 import com.SE114.food_tracker.data.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -24,6 +26,8 @@ class MainViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
     private val chatRepository: ChatRepository,
+    private val feedRepository: FeedRepository,
+    private val friendRepository: FriendRepository,
     private val localDataCleaner: LocalDataCleaner
 ) : ViewModel() {
 
@@ -72,6 +76,8 @@ class MainViewModel @Inject constructor(
         _blockedReason.value = REASON_BLOCKED
         localDataCleaner.clearUserOwnedData()
         chatRepository.resetChatState()
+        feedRepository.resetFeedRealtime()
+        friendRepository.resetFriendshipRealtime()
         authRepository.signOut()
     }
 

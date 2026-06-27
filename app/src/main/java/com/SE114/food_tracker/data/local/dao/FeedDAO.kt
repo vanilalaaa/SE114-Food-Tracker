@@ -302,6 +302,30 @@ interface FeedDAO {
         UPDATE feed_post
         SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
         WHERE sync_status = 'SYNCED'
+        AND is_deleted = 0
+        """
+    )
+    suspend fun softDeleteAllSyncedPosts(updatedAt: Long = System.currentTimeMillis())
+
+    @Query(
+        """
+        UPDATE feed_post
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND is_deleted = 0
+        AND post_id NOT IN (:remotePostIds)
+        """
+    )
+    suspend fun softDeleteSyncedPostsMissingFromRemote(
+        remotePostIds: List<String>,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query(
+        """
+        UPDATE feed_post
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
         AND post_id IN (:remotePostIds)
         """
     )

@@ -97,6 +97,14 @@ class FriendRepository @Inject constructor(
         }
     }
 
+    fun resetFriendshipRealtime() {
+        val channel = friendshipRealtimeChannel
+        friendshipRealtimeChannel = null
+        repositoryScope.launch {
+            channel?.let { runCatching { it.unsubscribe() } }
+        }
+    }
+
     suspend fun refreshCurrentProfile(): Result<ProfileDTO> = runCatching {
         val profile = fetchCurrentProfile()
         _currentProfile.value = profile

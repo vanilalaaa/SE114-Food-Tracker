@@ -275,7 +275,7 @@ fun FriendScreenContent(
                 SectionHeader(title = "Lời mời kết bạn", count = incomingRequests.size)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(incomingRequests, key = { it.friendshipId }) { request ->
+            items(incomingRequests, key = { "incoming-${it.friendshipId}" }) { request ->
                 IncomingRequestItem(
                     request = request,
                     isBusy = request.friendshipId in busyFriendshipIds,
@@ -291,7 +291,7 @@ fun FriendScreenContent(
                 SectionHeader(title = "Lời mời đã gửi", count = outgoingRequests.size)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(outgoingRequests, key = { it.friendshipId }) { request ->
+            items(outgoingRequests, key = { "outgoing-${it.friendshipId}" }) { request ->
                 OutgoingRequestItem(
                     request = request,
                     isBusy = request.friendshipId in busyFriendshipIds,
@@ -309,7 +309,7 @@ fun FriendScreenContent(
         if (acceptedFriends.isEmpty()) {
             item { EmptyFriendState() }
         } else {
-            items(acceptedFriends, key = { it.friendshipId }) { friend ->
+            items(acceptedFriends, key = { "accepted-${it.friendshipId}" }) { friend ->
                 FriendListItem(
                     friend = friend,
                     onOpenProfile = { onOpenFriendProfile(friend) },

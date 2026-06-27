@@ -188,6 +188,14 @@ class FeedRepository @Inject constructor(
         }
     }
 
+    fun resetFeedRealtime() {
+        val channel = feedRealtimeChannel
+        feedRealtimeChannel = null
+        repositoryScope.launch {
+            channel?.let { runCatching { it.unsubscribe() } }
+        }
+    }
+
     suspend fun refreshVisibleFromSupabase(): Boolean {
         val ownerId = currentAuthenticatedUserId()
         return pullVisibleFromSupabase(ownerId)
@@ -403,6 +411,7 @@ class FeedRepository @Inject constructor(
             val visibleRemotePosts = remotePosts
                 .filterNot { it.isDeleted }
                 .filterNot { it.id in locallyDeletedPostIds }
+            val visibleRemotePostIds = visibleRemotePosts.map { it.id }
 
             val postEntities = visibleRemotePosts.map { dto ->
                 dto.toEntity(
@@ -411,6 +420,11 @@ class FeedRepository @Inject constructor(
             }
             if (remoteDeletedPostIds.isNotEmpty()) {
                 feedDao.softDeleteSyncedPostsByRemoteIds(remoteDeletedPostIds)
+            }
+            if (visibleRemotePostIds.isEmpty()) {
+                feedDao.softDeleteAllSyncedPosts()
+            } else {
+                feedDao.softDeleteSyncedPostsMissingFromRemote(visibleRemotePostIds)
             }
             if (postEntities.isNotEmpty()) {
                 feedDao.insertPosts(postEntities)
