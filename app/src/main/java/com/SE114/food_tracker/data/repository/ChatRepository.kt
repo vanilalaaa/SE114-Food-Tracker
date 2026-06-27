@@ -232,12 +232,17 @@ class ChatRepository @Inject constructor(
         try {
             val currentUserId = getAuthenticatedUserId()
             if (currentUserId.isBlank()) return
-
-            val convIds = supabaseClient.from("conversation_participant")
+            // Tách danh sách gốc để vừa lấy convIds vừa lấy được quyền isAdmin của bạn ──
+            val myParticipants = supabaseClient.from("conversation_participant")
                 .select { filter { eq("user_id", currentUserId) } }
                 .decodeList<SupabaseParticipantDto>()
-                .map { it.conversationId }
-                .distinct()
+
+            val convIds = myParticipants.map { it.conversationId }.distinct()
+            // val convIds = supabaseClient.from("conversation_participant")
+               // .select { filter { eq("user_id", currentUserId) } }
+                //.decodeList<SupabaseParticipantDto>()
+                //.map { it.conversationId }
+                //.distinct()
             // Tìm và xóa các phòng chat local ma do bị kick hoặc giải tán
             val localConvs = chatDAO.getAllConversations().firstOrNull() ?: emptyList()
             val localIds = localConvs.map { it.id }
@@ -277,7 +282,18 @@ class ChatRepository @Inject constructor(
             // refresh jank. A no-op sync now writes nothing.
             val changed = mapped.filter { it != existing[it.id] }
             if (changed.isNotEmpty()) chatDAO.insertConversations(changed)
-
+            // ── BỔ SUNG AN TOÀN: Đưa chính mình vào table local để thỏa mãn điều kiện INNER JOIN ──
+            // Chiến lược IGNORE sẽ tự động bỏ qua nếu bản ghi đã tồn tại, đảm bảo không clobber dữ liệu đọc tin thực tế.
+            myParticipants.forEach { participant ->
+                chatDAO.insertParticipantIfAbsent(
+                    ConversationParticipant(
+                        conversationId = participant.conversationId,
+                        userId = currentUserId,
+                        isAdmin = participant.isAdmin,
+                        lastReadAt = 0L // Sẽ không bị ghi đè lên last_read_at thực tế nhờ OnConflictStrategy.IGNORE
+                    )
+                )
+            }
             // Persist the participant graph + peer profiles in two batched queries so the
             // list can render the 1-1 peer's name/avatar without a per-conversation round-trip.
             // The current user's own row is left to markAsRead so we never clobber last_read_at.
@@ -859,7 +875,14 @@ class ChatRepository @Inject constructor(
                 isGroup = true
             )
             chatDAO.insertConversation(localGroup)
-
+            chatDAO.insertParticipantIfAbsent(
+                ConversationParticipant(
+                    conversationId = groupUuid,
+                    userId = currentUserId,
+                    isAdmin = true,
+                    lastReadAt = System.currentTimeMillis()
+                )
+            )
             sendSystemMessage(groupUuid, "Nhóm '$groupName' đã được khởi tạo thành công.")
             return groupUuid
         } catch (e: Exception) {
