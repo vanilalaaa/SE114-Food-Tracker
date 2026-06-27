@@ -27,6 +27,8 @@ import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.model.ProfileSharedItem
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
+import com.SE114.food_tracker.feature.feed.FeedUiState
+import com.SE114.food_tracker.feature.feed.components.FeedPostDetailOverlay
 import com.SE114.food_tracker.feature.profile.components.ProfileDiaryTab
 import com.SE114.food_tracker.feature.profile.components.ProfileHeader
 import com.SE114.food_tracker.feature.profile.components.ProfilePostsTab
@@ -38,6 +40,7 @@ import com.SE114.food_tracker.feature.report.ReportReason
 fun ProfileScreen(
     profileId: String,
     onNavigateBack: () -> Unit,
+    onNavigateToProfile: (String) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -48,10 +51,26 @@ fun ProfileScreen(
         onRetry = viewModel::loadProfile,
         onRetryDiary = viewModel::loadSharedDiary,
         onTabSelected = viewModel::selectTab,
-        onPostClick = {},
+        onPostClick = viewModel::openPostDetail,
         onReportClick = viewModel::submitReport,
         onFriendshipActionClick = viewModel::performFriendshipAction,
         onReportMessageShown = viewModel::clearReportMessage
+    )
+
+    FeedPostDetailOverlay(
+        uiState = uiState.toFeedUiState(),
+        onClose = viewModel::closePostDetail,
+        onNavigateToProfile = onNavigateToProfile,
+        onSelectPostAt = viewModel::selectPostAt,
+        onToggleLike = viewModel::toggleLike,
+        onHidePost = viewModel::hidePost,
+        onDownloadPost = viewModel::downloadPostImage,
+        onDeletePost = viewModel::deletePost,
+        onAddComment = viewModel::addComment,
+        onEditComment = viewModel::editComment,
+        onDeleteComment = viewModel::deleteComment,
+        onSetCommentHidden = viewModel::setCommentHidden,
+        onClearError = viewModel::clearReportMessage
     )
 }
 
@@ -149,6 +168,15 @@ fun ProfileScreenContent(
         }
     }
 }
+
+private fun ProfileUiState.toFeedUiState(): FeedUiState =
+    FeedUiState(
+        currentUserId = currentUserId,
+        posts = posts,
+        selectedPostId = selectedPostId,
+        selectedPostIndex = selectedPostIndex,
+        selectedComments = selectedComments
+    )
 
 @Preview(showBackground = true)
 @Composable
