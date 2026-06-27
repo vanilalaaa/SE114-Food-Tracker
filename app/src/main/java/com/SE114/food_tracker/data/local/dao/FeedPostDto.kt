@@ -26,7 +26,8 @@ data class FeedCommentDto(
     val body: String,
     val parentCommentId: String?,
     val isHidden: Boolean,
-    val createdAt: Long
+    val createdAt: Long,
+    val updatedAt: Long
 )
 
 data class FeedSourceItemDto(

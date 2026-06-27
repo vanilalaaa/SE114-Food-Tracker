@@ -149,7 +149,10 @@ fun AppNavGraph(
             composable(AppDestinations.Profile.route) { backStackEntry ->
                 ProfileScreen(
                     profileId = backStackEntry.arguments?.getString("profileId").orEmpty(),
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToProfile = { profileId ->
+                        navController.navigate(AppDestinations.Profile.createRoute(profileId))
+                    }
                 )
             }
 

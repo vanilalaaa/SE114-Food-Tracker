@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.profile
 
+import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.model.ProfileSharedItem
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
@@ -10,6 +11,7 @@ enum class ProfileTab {
 }
 
 data class ProfileUiState(
+    val currentUserId: String = "",
     val isLoading: Boolean = false,
     val profile: ProfileDTO? = null,
     val isSelf: Boolean = false,
@@ -20,6 +22,9 @@ data class ProfileUiState(
     val diaryError: String? = null,
     val posts: List<FeedPostDto> = emptyList(),
     val isPostsLoading: Boolean = false,
+    val selectedPostId: String? = null,
+    val selectedPostIndex: Int = -1,
+    val selectedComments: List<FeedCommentDto> = emptyList(),
     val isReportSubmitting: Boolean = false,
     val reportMessage: String? = null,
     val friendshipId: String? = null,
@@ -41,4 +46,7 @@ data class ProfileUiState(
             "pending" -> if (isFriendshipOutgoing) "Hủy lời mời" else "Từ chối lời mời"
             else -> null
         }
+
+    val selectedPost: FeedPostDto?
+        get() = posts.getOrNull(selectedPostIndex)
 }

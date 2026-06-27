@@ -95,6 +95,9 @@ class ItemRepository @Inject constructor(
 
     suspend fun markFailed(itemId: String) = itemDAO.markFailed(itemId)
 
+    suspend fun updateItemImageUrl(itemId: String, imageUrl: String) =
+        itemDAO.updateItemImageUrl(itemId, imageUrl)
+
     fun getTotalExpenseForDay(start: Long, end: Long): Flow<Double?> =
         itemDAO.getTotalExpenseForDay(owner(), start, end)
 
@@ -103,6 +106,9 @@ class ItemRepository @Inject constructor(
 
     fun getPersonalExpenseByCategory(start: Long, end: Long): Flow<List<CategoryExpense>> =
         itemDAO.getPersonalExpenseByCategory(owner(), start, end)
+
+    fun observeDistinctEntryDates(): Flow<List<Long>> =
+        itemDAO.observeDistinctEntryDates(owner())
 }
 
 private fun Int.toDiaryTimeLabel(): String =

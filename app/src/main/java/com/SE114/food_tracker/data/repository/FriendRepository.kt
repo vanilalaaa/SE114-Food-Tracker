@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import timber.log.Timber
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
@@ -81,19 +82,36 @@ class FriendRepository @Inject constructor(
                     table = "friendship"
                 }
 
-                repositoryScope.launch {
+                launchRealtimeCollector("friendship insert") {
                     insertFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("friendship update") {
                     updateFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("friendship delete") {
                     deleteFlow.collect { _friendshipRealtimeEvents.tryEmit(Unit) }
                 }
 
                 channel.subscribe()
                 friendshipRealtimeChannel = channel
+            }.onFailure { throwable ->
+                Timber.e(throwable, "[FriendRealtime] subscribe failed")
             }
+        }
+    }
+
+    private fun launchRealtimeCollector(label: String, block: suspend () -> Unit) {
+        repositoryScope.launch {
+            runCatching { block() }
+                .onFailure { Timber.e(it, "[FriendRealtime] $label collector stopped") }
+        }
+    }
+
+    fun resetFriendshipRealtime() {
+        val channel = friendshipRealtimeChannel
+        friendshipRealtimeChannel = null
+        repositoryScope.launch {
+            channel?.let { runCatching { it.unsubscribe() } }
         }
     }
 
