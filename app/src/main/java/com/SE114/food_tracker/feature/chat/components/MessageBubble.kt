@@ -21,7 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage // 🔥 ĐÃ ĐỔI: Dùng Subcompose để bắt trạng thái Error/Loading gài avatar mặc định
+import coil.compose.SubcomposeAsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.MessageSyncStatus
 import java.util.UUID
@@ -81,7 +81,7 @@ fun MessageBubble(
                             text = message.body ?: "",
                             color = Color(0xFF546E7A),
                             fontSize = 11.sp,
-                            textAlign = TextAlign.Center
+                            // textAlign = TextAlign.Center
                         )
                     }
                 }

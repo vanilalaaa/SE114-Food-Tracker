@@ -1202,7 +1202,10 @@ class ChatRepository @Inject constructor(
                 }
                 val storageBucket = supabaseClient.storage.from("chat-images")
                 val fileName = "${UUID.randomUUID()}.jpg"
-                storageBucket.upload(path = fileName, data = fileBytes) { upsert = true }
+                storageBucket.upload(path = fileName, data = fileBytes) {
+                    upsert = true
+                    contentType = "image/jpeg" //
+                }
                 finalImageUrl = storageBucket.publicUrl(fileName)
             }
 
