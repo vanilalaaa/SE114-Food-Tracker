@@ -1014,13 +1014,18 @@ class ChatRepository @Inject constructor(
     suspend fun getUserNamesMap(userIds: List<String>): Map<String, String> {
         return try {
             val cleanIds = userIds.map { it.lowercase().trim() }
-            val profiles = supabaseClient.from("profile")
-                .select { filter { isIn("id", cleanIds) } }
-                .decodeList<SupabaseProfileDto>()
+            if (cleanIds.isEmpty()) return emptyMap()
 
-            // Chuẩn hóa key lưu trong Map
-            profiles.associate { it.id.lowercase().trim() to it.displayName }
+            val profiles = supabaseClient.from("profile")
+                .select(
+                    io.github.jan.supabase.postgrest.query.Columns.raw("id, display_name")
+                ) { filter { isIn("id", cleanIds) } }
+                .decodeList<PeerProfileDto>() // Thay đổi thành PeerProfileDto cho đồng bộ
+
+            // Chuẩn hóa Key thành lowercase và trim để khớp hoàn toàn khi đối chiếu
+            profiles.associate { it.id.lowercase().trim() to (it.displayName ?: "Thành viên") }
         } catch (e: Exception) {
+            Timber.tag("ChatRepository").e(e, "Lỗi giải mã thông tin tên thành viên mới")
             emptyMap()
         }
     }
