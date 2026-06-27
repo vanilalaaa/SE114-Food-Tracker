@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import io.github.jan.supabase.auth.status.SessionStatus
 import com.SE114.food_tracker.data.repository.AuthRepository
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
@@ -140,7 +142,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private var connectedConversationId: String? = null
-
+    private var presenceJob: kotlinx.coroutines.Job? = null
     fun connectToConversation(conversationId: String) {
         connectedConversationId = conversationId
         viewModelScope.launch {
@@ -152,6 +154,18 @@ class ChatViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+        presenceJob?.cancel()
+        presenceJob = viewModelScope.launch {
+            var hasBeenLoaded = false
+
+            chatDAO.getConversationById(conversationId).collect { conversation ->
+                if (conversation != null) {
+                    hasBeenLoaded = true // Xác nhận phòng chat đã nạp vào máy thành công
+                } else if (hasBeenLoaded) {
+                    _navigationEvent.emit("LEFT")
+                }
             }
         }
     }
@@ -205,15 +219,28 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
-        viewModelScope.launch {
-            // 1. Thực hiện kick thành viên trên server trước
-            chatRepository.kickMember(conversationId, userId, name)
+        val cleanId = userId.trim().lowercase()
 
-            // 2. Kiểm tra nếu người bị kick là chính mình thì mới bắn event chuyển màn hình
-            if (userId.lowercase() == currentUserId) {
+        // Kiểm tra xem đây có phải hành động tự rời nhóm của chính mình không
+        val isSelfKick = cleanId == currentUserId || cleanId.isBlank() || name == "Chính mình"
+
+        // Chuẩn hóa ID thật để gửi lên tầng Repository xử lý dữ liệu
+        val finalUserId = if (isSelfKick) currentUserId else userId
+        val finalName = if (isSelfKick) "Chính mình" else name
+
+        viewModelScope.launch {
+            if (isSelfKick) {
+                presenceJob?.cancel()
+                chatRepository.deleteConversationLocal(conversationId)
                 _navigationEvent.emit("LEFT")
+
+                withContext(NonCancellable) {
+                    chatRepository.kickMember(conversationId, finalUserId, finalName)
+                }
+            } else {
+                // Nếu là Admin kích người khác, chạy bình thường không cần đóng màn hình
+                chatRepository.kickMember(conversationId, finalUserId, finalName)
             }
         }
     }
