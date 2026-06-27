@@ -1,8 +1,21 @@
 package com.SE114.food_tracker.data.local.dao
 
 import androidx.room.*
+import androidx.room.ColumnInfo
 import com.SE114.food_tracker.data.local.entities.Item
 import kotlinx.coroutines.flow.Flow
+
+data class LocalProfileSharedItemDto(
+    @ColumnInfo(name = "itemId") val itemId: String,
+    @ColumnInfo(name = "name") val name: String,
+    @ColumnInfo(name = "categoryName") val categoryName: String?,
+    @ColumnInfo(name = "categoryIcon") val categoryIcon: String?,
+    @ColumnInfo(name = "price") val price: Double,
+    @ColumnInfo(name = "createdAt") val createdAt: Long,
+    @ColumnInfo(name = "timeType") val timeType: Int,
+    @ColumnInfo(name = "imageUrl") val imageUrl: String?,
+    @ColumnInfo(name = "entryDateMillis") val entryDateMillis: Long
+)
 
 @Dao
 interface ItemDAO {
@@ -23,6 +36,26 @@ interface ItemDAO {
 
     @Query("SELECT * FROM item WHERE owner_id = :ownerId AND is_deleted = 0 ORDER BY created_at DESC")
     fun getAllItems(ownerId: String): Flow<List<Item>>
+
+    @Query("""
+        SELECT
+            i.item_id AS itemId,
+            i.name AS name,
+            c.name AS categoryName,
+            c.icon_url AS categoryIcon,
+            i.price AS price,
+            i.created_at AS createdAt,
+            i.time_type AS timeType,
+            i.image_url AS imageUrl,
+            i.entry_date AS entryDateMillis
+        FROM item i
+        LEFT JOIN category c ON c.category_id = i.category_id
+        WHERE i.owner_id = :ownerId
+          AND i.is_shared = 1
+          AND i.is_deleted = 0
+        ORDER BY i.entry_date DESC, i.created_at DESC
+    """)
+    suspend fun getSharedItemsForProfile(ownerId: String): List<LocalProfileSharedItemDto>
 
     @Query("SELECT * FROM item WHERE item_id = :id")
     suspend fun getItemByIdOneShot(id: String): Item?
@@ -57,6 +90,13 @@ interface ItemDAO {
 
     @Query("UPDATE item SET sync_status = 'FAILED' WHERE item_id = :itemId")
     suspend fun markFailed(itemId: String)
+
+    @Query("UPDATE item SET image_url = :imageUrl, updated_at = :updatedAt WHERE item_id = :itemId")
+    suspend fun updateItemImageUrl(
+        itemId: String,
+        imageUrl: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
 
     /** Wipes every item on explicit logout (Task 3 hygiene). Server is the source of truth. */
     @Query("DELETE FROM item")

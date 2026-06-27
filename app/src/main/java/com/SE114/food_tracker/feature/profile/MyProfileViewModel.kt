@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.util.toUserFacingMessage
 import com.SE114.food_tracker.data.repository.AuthError
 import com.SE114.food_tracker.data.repository.AuthOutcome
 import com.SE114.food_tracker.data.repository.ImageRepository
@@ -114,7 +115,12 @@ class MyProfileViewModel @Inject constructor(
                     _state.update { it.copy(isUploadingAvatar = false, avatarUrl = url) }
                 },
                 onFailure = { throwable ->
-                    _state.update { it.copy(isUploadingAvatar = false, error = AuthError.Unknown(throwable.message)) }
+                    _state.update {
+                        it.copy(
+                            isUploadingAvatar = false,
+                            error = throwable.toProfileAuthError()
+                        )
+                    }
                 }
             )
         }
@@ -170,6 +176,13 @@ class MyProfileViewModel @Inject constructor(
     }
 
     private fun setStatus(status: UserIdCheckStatus) = _state.update { it.copy(userIdStatus = status) }
+
+    private fun Throwable.toProfileAuthError(): AuthError =
+        if (toUserFacingMessage() == "Không có kết nối mạng") {
+            AuthError.NoNetwork
+        } else {
+            AuthError.Unknown(null)
+        }
 
     companion object {
         private const val USER_ID_DEBOUNCE_MS = 500L

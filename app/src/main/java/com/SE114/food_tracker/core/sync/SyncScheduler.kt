@@ -32,11 +32,16 @@ object SyncScheduler {
     fun triggerImmediateSync(context: Context) {
         val immediateRequest = OneTimeWorkRequestBuilder<Sync>()
             .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.LINEAR,
+                BaseSyncWorker.BACKOFF_DELAY_SECONDS,
+                TimeUnit.SECONDS
+            )
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             "item_sync_immediate",
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.KEEP,
             immediateRequest
         )
     }
