@@ -33,8 +33,7 @@ import com.SE114.food_tracker.feature.chat.components.ConversationItem
 import com.SE114.food_tracker.feature.friend.FriendViewModel
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import java.util.UUID
-import androidx.compose.material.icons.filled.GroupAdd
-
+import com.SE114.food_tracker.feature.chat.components.lazyVerticalScrollbar
 @Composable
 fun ConversationListScreen(
     viewModel: ChatViewModel = hiltViewModel(),
@@ -145,10 +144,14 @@ fun ConversationListScreen(
                         fontWeight = FontWeight.SemiBold,
                         color = TextSecondary
                     )
+                    val friendLazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
                     LazyColumn(
+                        state = friendLazyListState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp),
+                            .height(200.dp)
+                            .lazyVerticalScrollbar(friendLazyListState, color = StatPinkDark)
+                            .padding(end = 14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (friendListCheck.isEmpty()) {

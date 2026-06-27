@@ -62,10 +62,12 @@ fun GroupSettingsDialog(
             )
         },
         text = {
-            // SỬA TẠI ĐÂY: Loại bỏ heightIn(max = 450.dp) cứng nhắc, để M3 AlertDialog tự tính toán chiều cao an toàn
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 360.dp)
+                    .columnVerticalScrollbar(scrollState, color = StatPinkDark)
+                    .padding(end = 14.dp)
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
