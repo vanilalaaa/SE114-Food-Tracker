@@ -35,12 +35,17 @@ import io.github.jan.supabase.auth.status.SessionStatus
 import com.SE114.food_tracker.data.repository.AuthRepository
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import java.io.File
+import android.net.Uri
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val chatDAO: ChatDAO,
-    private val authRepository: AuthRepository // Inject
+    private val authRepository: AuthRepository, // Inject
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val currentUserId: String
@@ -57,6 +62,7 @@ class ChatViewModel @Inject constructor(
 
     var isTransactionSuccess by mutableStateOf<Boolean?>(null)
         private set
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val conversationsWithUnread: StateFlow<List<ConversationWithUnread>> =
         authRepository.currentSessionFlow()
@@ -79,6 +85,7 @@ class ChatViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = emptyList()
             )
+
     init {
         fetchConversationsFromServer()
         chatRepository.subscribeToGlobalConversationsRealtime()
@@ -219,19 +226,28 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
+
+    // Trong ChatViewModel.kt
+
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
         val cleanId = userId.trim().lowercase()
 
-        // Kiểm tra xem đây có phải hành động tự rời nhóm của chính mình không
         val isSelfKick = cleanId == currentUserId || cleanId.isBlank() || name == "Chính mình"
-
-        // Chuẩn hóa ID thật để gửi lên tầng Repository xử lý dữ liệu
         val finalUserId = if (isSelfKick) currentUserId else userId
-        val finalName = if (isSelfKick) "Chính mình" else name
 
         viewModelScope.launch {
+
+            val finalName = if (isSelfKick) {
+                chatRepository.getUserNamesMap(listOf(currentUserId))[currentUserId]
+                    ?: "Một thành viên"
+            } else {
+                name
+            }
+
             if (isSelfKick) {
+
                 presenceJob?.cancel()
+
                 chatRepository.deleteConversationLocal(conversationId)
                 _navigationEvent.emit("LEFT")
 
@@ -239,17 +255,19 @@ class ChatViewModel @Inject constructor(
                     chatRepository.kickMember(conversationId, finalUserId, finalName)
                 }
             } else {
-                // Nếu là Admin kích người khác, chạy bình thường không cần đóng màn hình
+
                 chatRepository.kickMember(conversationId, finalUserId, finalName)
             }
         }
     }
+
     fun deleteDirectChat(conversationId: String) {
         viewModelScope.launch {
             chatRepository.deleteOneToOneChat(conversationId)
             _navigationEvent.emit("LEFT")
         }
     }
+
     private val _navigationEvent = MutableSharedFlow<String?>()
     val navigationEvent = _navigationEvent.asSharedFlow()
     fun disbandGroup(conversationId: String) {
@@ -311,13 +329,37 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun copyUriToInternalCache(context: Context, uriString: String): String? {
+        return try {
+            val uri = Uri.parse(uriString)
+            val inputStream = context.contentResolver.openInputStream(uri)
+            // Tạo một file tạm thời trong bộ nhớ Cache riêng của ứng dụng
+            val cacheFile = File(context.cacheDir, "upload_${System.currentTimeMillis()}.jpg")
+
+            inputStream?.use { input ->
+                cacheFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            // Trả về đường dẫn file dạng file://...
+            cacheFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
+            val safeCachePath = copyUriToInternalCache(context, imageUri)
+
+            val finalPath = if (safeCachePath != null) "file://$safeCachePath" else imageUri
+
             chatRepository.sendMessage(
                 conversationId,
                 currentUserId,
                 body = null,
-                imageUrl = imageUri
+                imageUrl = finalPath
             )
         }
     }
