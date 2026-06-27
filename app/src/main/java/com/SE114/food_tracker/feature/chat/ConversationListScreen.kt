@@ -386,7 +386,7 @@ fun ConversationListScreenContent(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 8.dp)
+                        contentPadding = PaddingValues(top = 8.dp)
                     ) {
                         if (filteredConversations.isNotEmpty()) {
                             if (searchQuery.isNotBlank()) {
