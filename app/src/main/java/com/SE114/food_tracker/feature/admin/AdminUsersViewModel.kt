@@ -90,7 +90,6 @@ class AdminUsersViewModel @Inject constructor(
 
     fun setAdmin(user: AdminUser, admin: Boolean) =
         runUserAction(user.id) {
-            // Chặn ngay tại Client nếu cố tình cấp quyền Admin cho User đang bị khóa vĩnh viễn
             if (admin && user.isBanned && user.bannedUntil == null) {
                 _state.update { it.copy(actionError = AuthError.BannedUserCannotBeAdmin) }
                 return@runUserAction
@@ -102,7 +101,6 @@ class AdminUsersViewModel @Inject constructor(
             }
         }
 
-    /** [durationSeconds] applies only when [banned] is true; null = permanent. */
     fun setBanned(user: AdminUser, banned: Boolean, durationSeconds: Long? = null) =
         runUserAction(user.id) {
             when (val outcome = adminRepository.setBanned(user.id, banned, durationSeconds)) {
@@ -145,14 +143,6 @@ class AdminUsersViewModel @Inject constructor(
             }
         }
 
-    // ── UI helpers ─────────────────────────────────────────────────────────────
-
-    /**
-     * True when the "Restore" button should be shown as disabled because the
-     * 30-day restore window for this soft-deleted account has already elapsed
-     * client-side. The server will also enforce this, but blocking in the UI
-     * avoids a round-trip that would always fail.
-     */
     fun isDeletionRestoreBlocked(user: AdminUser): Boolean {
         val expiresAt = user.deletionExpiresAt ?: return false
         return runCatching {
@@ -160,11 +150,7 @@ class AdminUsersViewModel @Inject constructor(
         }.getOrDefault(false)
     }
 
-    // ĐÃ XÓA: Hàm isPermanentBanRestoreBlocked cũ đã bị loại bỏ hoàn toàn tại đây.
-
     fun clearActionError() = _state.update { it.copy(actionError = null) }
-
-    // ── Internals ──────────────────────────────────────────────────────────────
 
     private fun runUserAction(userId: String, action: suspend () -> Unit) {
         if (userId in _state.value.busyIds) return

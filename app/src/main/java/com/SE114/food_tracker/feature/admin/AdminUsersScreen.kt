@@ -43,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,6 +60,9 @@ import com.SE114.food_tracker.data.repository.AdminUser
 import com.SE114.food_tracker.feature.admin.components.AdminTopBar
 import com.SE114.food_tracker.feature.admin.components.AdminUserRow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlin.math.max
 
 private enum class UserConfirmKind { BAN, DELETE, MAKE_ADMIN, REVOKE_ADMIN }
 private data class UserConfirm(val user: AdminUser, val kind: UserConfirmKind)
@@ -233,7 +235,6 @@ private fun AdminUsersContent(
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
                         items(state.users, key = { it.id }) { user ->
-                            // Thiết kế bao bọc Row để chèn thêm nút Info "i" màu đỏ linh hoạt
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
@@ -242,7 +243,6 @@ private fun AdminUsersContent(
                                     AdminUserRow(user = user, onClick = { onUserClick(user) })
                                 }
 
-                                // Nếu user có trạng thái đặc biệt thì hiển thị nút "i" màu đỏ cùng Bubble
                                 if (user.isBanned || user.isDeleted) {
                                     var showBubble by remember { mutableStateOf(false) }
                                     Box(modifier = Modifier.padding(end = 4.dp)) {
@@ -257,15 +257,35 @@ private fun AdminUsersContent(
                                             )
                                         }
 
-                                        // Menu thả xuống đóng vai trò làm Bubble thông tin không bị tràn chữ
                                         DropdownMenu(
                                             expanded = showBubble,
                                             onDismissRequest = { showBubble = false },
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                         ) {
                                             val bubbleText = when {
-                                                user.isDeleted -> "Thời gian xóa mềm tự hủy sắp hết hạn vào chu kỳ kế tiếp"
-                                                user.isBanned -> "Tài khoản bị khóa. Vui lòng kiểm tra kỹ thời gian kết thúc hoặc lệnh vĩnh viễn trong Sheet."
+                                                user.isDeleted -> {
+                                                    val daysLeft = user.deletionExpiresAt?.let {
+                                                        runCatching {
+                                                            val expiresInstant = Instant.parse(it)
+                                                            val duration = expiresInstant - Clock.System.now()
+                                                            max(0L, duration.inWholeDays)
+                                                        }.getOrNull()
+                                                    }
+                                                    if (daysLeft != null) "Còn $daysLeft ngày tài khoản sẽ tự hủy hoàn toàn"
+                                                    else "Thời gian xóa mềm tự hủy sắp hết hạn"
+                                                }
+                                                user.isBanned -> {
+                                                    if (user.bannedUntil == null) {
+                                                        "Tài khoản bị khóa: Vĩnh viễn"
+                                                    } else {
+                                                        val daysLeft = runCatching {
+                                                            val expiresInstant = Instant.parse(user.bannedUntil)
+                                                            val duration = expiresInstant - Clock.System.now()
+                                                            max(0L, duration.inWholeDays)
+                                                        }.getOrDefault(0L)
+                                                        "Tài khoản bị khóa: Còn $daysLeft ngày"
+                                                    }
+                                                }
                                                 else -> ""
                                             }
                                             Text(
@@ -436,7 +456,7 @@ private fun AdminUsersContentPreview() {
                         userId = "shon",
                         avatarUrl = null,
                         isAdmin = false,
-                        isBanned = true,  // Bật cái này để Preview nút "i" màu đỏ
+                        isBanned = true,
                         isDeleted = false
                     ),
                     AdminUser(
@@ -446,7 +466,7 @@ private fun AdminUsersContentPreview() {
                         avatarUrl = null,
                         isAdmin = false,
                         isBanned = false,
-                        isDeleted = true  // Hiển thị nút "i" màu đỏ cho tài khoản bị xóa mềm
+                        isDeleted = true
                     )
                 ),
                 isLoading = false,

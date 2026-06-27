@@ -18,7 +18,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.SE114.food_tracker.R
 import com.SE114.food_tracker.data.repository.AdminUser
-import com.SE114.food_tracker.feature.admin.bannedUntilLabel
 
 @Composable
 fun AdminUserRow(
@@ -50,7 +49,8 @@ fun AdminUserRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            BanInfoLine(user = user)
+            // Gọi hàm hiển thị thông tin đếm số lần ban (đã loại bỏ text thời gian đỏ)
+            BanCountLine(user = user)
         }
         Spacer(Modifier.width(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -67,20 +67,18 @@ fun AdminUserRow(
 }
 
 @Composable
-private fun BanInfoLine(user: AdminUser) {
-    val parts = buildList {
-        if (user.banCount > 0) add(stringResource(R.string.admin_ban_count, user.banCount))
-        if (user.isBanned) add(bannedUntilLabel(user.bannedUntil))
+private fun BanCountLine(user: AdminUser) {
+    // Chỉ hiển thị số lần bị khóa (nếu có) bằng màu chữ phụ thông thường,
+    // không hiển thị chuỗi thời gian đếm ngược màu đỏ nữa.
+    if (user.banCount > 0) {
+        Text(
+            text = stringResource(R.string.admin_ban_count, user.banCount),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
-    if (parts.isEmpty()) return
-    Text(
-        text = parts.joinToString(" · "),
-        style = MaterialTheme.typography.labelSmall,
-        color = if (user.isBanned) MaterialTheme.colorScheme.error
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
 }
 
 @Composable
