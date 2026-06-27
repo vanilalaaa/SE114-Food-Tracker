@@ -64,6 +64,7 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND p.sync_status = 'SYNCED'
         AND NOT EXISTS(
             SELECT 1
             FROM feed_hidden_post hp
@@ -145,6 +146,7 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND p.sync_status = 'SYNCED'
         AND NOT EXISTS(
             SELECT 1
             FROM feed_hidden_post hp

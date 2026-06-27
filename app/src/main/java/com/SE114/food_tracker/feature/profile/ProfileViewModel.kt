@@ -8,6 +8,7 @@ import android.provider.MediaStore
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.network.NetworkMonitor
 import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.core.util.toUserFacingMessage
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
@@ -26,6 +27,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,6 +40,7 @@ class ProfileViewModel @Inject constructor(
     private val feedRepository: FeedRepository,
     private val friendRepository: FriendRepository,
     private val reportRepository: ReportRepository,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -248,6 +251,7 @@ class ProfileViewModel @Inject constructor(
 
     fun toggleLike(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.toggleLike(postId) }
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { error ->
@@ -259,6 +263,7 @@ class ProfileViewModel @Inject constructor(
 
     fun hidePost(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.hidePost(postId) }
                 .onSuccess { closePostDetail() }
                 .onFailure { error ->
@@ -281,6 +286,7 @@ class ProfileViewModel @Inject constructor(
 
     fun deletePost(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.deletePost(postId) }
                 .onSuccess { closePostDetail() }
                 .onFailure { error ->
@@ -297,6 +303,7 @@ class ProfileViewModel @Inject constructor(
     fun addComment(postId: String, body: String, parentCommentId: String? = null) {
         if (body.isBlank()) return
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.addComment(postId, body, parentCommentId) }
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { error ->
@@ -309,6 +316,7 @@ class ProfileViewModel @Inject constructor(
     fun editComment(commentId: String, body: String) {
         if (body.isBlank()) return
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.editComment(commentId, body) }
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { error ->
@@ -320,6 +328,7 @@ class ProfileViewModel @Inject constructor(
 
     fun deleteComment(commentId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.deleteComment(commentId) }
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { error ->
@@ -331,6 +340,7 @@ class ProfileViewModel @Inject constructor(
 
     fun setCommentHidden(commentId: String, isHidden: Boolean) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.setCommentHidden(commentId, isHidden) }
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { error ->
@@ -430,6 +440,12 @@ class ProfileViewModel @Inject constructor(
 
     private fun showMessage(message: String) {
         _uiState.update { it.copy(reportMessage = message) }
+    }
+
+    private suspend fun requireOnlineAction(): Boolean {
+        if (networkMonitor.isOnline.first()) return true
+        showMessage("Cần có mạng để thao tác")
+        return false
     }
 
     private suspend fun loadFriendship(targetProfileId: String, currentProfileId: String?) {

@@ -91,6 +91,13 @@ interface ItemDAO {
     @Query("UPDATE item SET sync_status = 'FAILED' WHERE item_id = :itemId")
     suspend fun markFailed(itemId: String)
 
+    @Query("UPDATE item SET image_url = :imageUrl, updated_at = :updatedAt WHERE item_id = :itemId")
+    suspend fun updateItemImageUrl(
+        itemId: String,
+        imageUrl: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
     /** Wipes every item on explicit logout (Task 3 hygiene). Server is the source of truth. */
     @Query("DELETE FROM item")
     suspend fun clearAll()

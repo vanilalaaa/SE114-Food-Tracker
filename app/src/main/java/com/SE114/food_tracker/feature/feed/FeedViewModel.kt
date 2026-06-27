@@ -12,6 +12,7 @@ import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.exifinterface.media.ExifInterface
+import com.SE114.food_tracker.core.network.NetworkMonitor
 import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.core.util.toUserFacingMessage
 import com.SE114.food_tracker.core.util.toUserFacingErrorMessage
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -58,6 +60,7 @@ private const val MaxFeedPostDecodeSize = 2048
 class FeedViewModel @Inject constructor(
     private val feedRepository: FeedRepository,
     private val friendRepository: FriendRepository,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -374,8 +377,15 @@ class FeedViewModel @Inject constructor(
         }
     }
 
+    private suspend fun requireOnlineAction(): Boolean {
+        if (networkMonitor.isOnline.first()) return true
+        _error.value = "Cần có mạng để thao tác"
+        return false
+    }
+
     fun toggleLike(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.toggleLike(postId) }
                 .onSuccess {
                     SyncScheduler.triggerImmediateSync(context)
@@ -390,6 +400,7 @@ class FeedViewModel @Inject constructor(
 
     fun hidePost(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.hidePost(postId) }
                 .onSuccess {
                     closePostDetail()
@@ -422,6 +433,7 @@ class FeedViewModel @Inject constructor(
     ) {
         if (body.isBlank()) return
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.addComment(postId, body, parentCommentId) }
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { throwable ->
@@ -434,6 +446,7 @@ class FeedViewModel @Inject constructor(
     fun editComment(commentId: String, body: String) {
         if (body.isBlank()) return
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.editComment(commentId, body) }
                 .onSuccess {
                     SyncScheduler.triggerImmediateSync(context)
@@ -448,6 +461,7 @@ class FeedViewModel @Inject constructor(
 
     fun deleteComment(commentId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.deleteComment(commentId) }
                 .onSuccess {
                     SyncScheduler.triggerImmediateSync(context)
@@ -462,6 +476,7 @@ class FeedViewModel @Inject constructor(
 
     fun setCommentHidden(commentId: String, isHidden: Boolean) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.setCommentHidden(commentId, isHidden) }
                 .onSuccess {
                     SyncScheduler.triggerImmediateSync(context)
@@ -476,6 +491,7 @@ class FeedViewModel @Inject constructor(
 
     fun deletePost(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.deletePost(postId) }
                 .onSuccess { remoteSynced ->
                     closePostDetail()

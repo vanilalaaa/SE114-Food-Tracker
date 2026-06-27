@@ -3,9 +3,11 @@ package com.SE114.food_tracker.core.sync
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.SE114.food_tracker.data.local.entities.Item
 import com.SE114.food_tracker.data.remote.SupabaseItemService
 import com.SE114.food_tracker.data.remote.dto.BudgetDTO
 import com.SE114.food_tracker.data.remote.dto.CategoryDTO
@@ -13,6 +15,7 @@ import com.SE114.food_tracker.data.remote.mapper.DataMapper
 import com.SE114.food_tracker.data.repository.BudgetRepository
 import com.SE114.food_tracker.data.repository.CategoryRepository
 import com.SE114.food_tracker.data.repository.FeedRepository
+import com.SE114.food_tracker.data.repository.ImageRepository
 import com.SE114.food_tracker.data.repository.ItemRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -21,6 +24,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.firstOrNull
 import timber.log.Timber
+import java.io.File
 
 @HiltWorker
 class Sync @AssistedInject constructor(
@@ -31,7 +35,8 @@ class Sync @AssistedInject constructor(
     private val supabaseItemService: SupabaseItemService,
     private val supabaseClient: SupabaseClient,
     private val budgetRepository: BudgetRepository,
-    private val feedRepository: FeedRepository
+    private val feedRepository: FeedRepository,
+    private val imageRepository: ImageRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -131,22 +136,23 @@ class Sync @AssistedInject constructor(
             Timber.d("[Sync] items pending = ${pending.size}")
 
             for (item in pending) {
+                val itemToUpload = uploadLocalItemImageIfNeeded(item, ownerId)
                 // Log the full DTO so you can inspect exactly what JSON is sent.
-                val dto = with(DataMapper) { item.toDto(ownerId) }
+                val dto = with(DataMapper) { itemToUpload.toDto(ownerId) }
                 Timber.d(
-                    "[Sync] upserting item '${item.name}' " +
+                    "[Sync] upserting item '${itemToUpload.name}' " +
                             "item_id=${dto.id} category_id=${dto.categoryId} " +
                             "entry_date=${dto.entryDate} price=${dto.price}"
                 )
 
-                supabaseItemService.uploadItem(item, ownerId)
+                supabaseItemService.uploadItem(itemToUpload, ownerId)
                     .onSuccess {
-                        itemRepository.markSynced(item.itemId)
+                        itemRepository.markSynced(itemToUpload.itemId)
                         Timber.d("[Sync] ✓ item synced: ${item.name}")
                     }
                     .onFailure { err ->
                         Timber.e(err, "[Sync] ✗ item FAILED: ${item.name} — ${err.message}")
-                        itemRepository.markFailed(item.itemId)
+                        itemRepository.markFailed(itemToUpload.itemId)
                         anyError = true
                     }
             }
@@ -278,5 +284,39 @@ class Sync @AssistedInject constructor(
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val cap = cm.getNetworkCapabilities(cm.activeNetwork)
         return cap?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }
+
+    private suspend fun uploadLocalItemImageIfNeeded(item: Item, ownerId: String): Item {
+        val imageUrl = item.imageUrl.orEmpty()
+        if (
+            imageUrl.isBlank() ||
+            imageUrl.startsWith("http", ignoreCase = true) ||
+            (!imageUrl.startsWith("file://") && !imageUrl.startsWith("content://"))
+        ) {
+            return item
+        }
+
+        val bytes = readLocalImageBytes(imageUrl)
+        val publicUrl = imageRepository.uploadItemImage(ownerId, item.itemId, bytes).getOrThrow()
+        itemRepository.updateItemImageUrl(item.itemId, publicUrl)
+        return item.copy(
+            imageUrl = publicUrl,
+            updatedAt = System.currentTimeMillis()
+        )
+    }
+
+    private fun readLocalImageBytes(imageUrl: String): ByteArray {
+        val uri = Uri.parse(imageUrl)
+        return when (uri.scheme) {
+            "file" -> {
+                val path = uri.path ?: error("Cannot read local item image: $imageUrl")
+                File(path).readBytes()
+            }
+            "content" -> {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: error("Cannot read local item image: $imageUrl")
+            }
+            else -> error("Unsupported local item image uri: $imageUrl")
+        }
     }
 }

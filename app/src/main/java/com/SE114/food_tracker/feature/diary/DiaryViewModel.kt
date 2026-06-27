@@ -44,6 +44,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
+import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -271,6 +272,7 @@ class DiaryViewModel @Inject constructor(
                 var finalImageUrl: String? = null
 
                 imageBytes?.let { bytes ->
+                    finalImageUrl = savePendingItemImage(itemId, bytes)
                     val ownerId = itemRepository.getCurrentUserId()
                     if (ownerId != null) {
                         imageRepository.uploadItemImage(ownerId, itemId, bytes)
@@ -362,6 +364,7 @@ class DiaryViewModel @Inject constructor(
                 var finalImageUrl = currentItem.imageUrl
 
                 imageBytes?.let { bytes ->
+                    finalImageUrl = savePendingItemImage(itemId, bytes)
                     val ownerId = itemRepository.getCurrentUserId()
                     if (ownerId != null) {
                         imageRepository.uploadItemImage(ownerId, itemId, bytes)
@@ -413,6 +416,13 @@ class DiaryViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
+    }
+
+    private fun savePendingItemImage(itemId: String, bytes: ByteArray): String {
+        val directory = File(context.filesDir, "diary_items").apply { mkdirs() }
+        val target = File(directory, "$itemId.jpg")
+        target.writeBytes(bytes)
+        return Uri.fromFile(target).toString()
     }
 
     private suspend fun computeStreak(): Int = withContext(Dispatchers.IO) {

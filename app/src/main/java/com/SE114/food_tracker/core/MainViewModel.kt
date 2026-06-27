@@ -1,14 +1,17 @@
 package com.SE114.food_tracker.core
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.SE114.food_tracker.core.sync.LocalDataCleaner
+import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.repository.AuthOutcome
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.ChatRepository
 import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.FriendRepository
 import com.SE114.food_tracker.data.repository.ProfileRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.Job
@@ -28,7 +31,8 @@ class MainViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val feedRepository: FeedRepository,
     private val friendRepository: FriendRepository,
-    private val localDataCleaner: LocalDataCleaner
+    private val localDataCleaner: LocalDataCleaner,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val sessionStatus: StateFlow<SessionStatus?> = authRepository.currentSessionFlow()
@@ -50,13 +54,18 @@ class MainViewModel @Inject constructor(
                     // Auth is ready (login or restored session) — drain any chat messages queued
                     // offline or left PENDING by a previous session/crash.
                     chatRepository.enqueuePendingMessageSync()
+                    SyncScheduler.triggerImmediateSync(context)
                 }
         }
     }
 
     /** Re-checks the account on app resume; admin actions on another device take effect here. */
     fun recheckActive() {
-        if (authRepository.hasSession()) enforceActive()
+        if (authRepository.hasSession()) {
+            enforceActive()
+            chatRepository.enqueuePendingMessageSync()
+            SyncScheduler.triggerImmediateSync(context)
+        }
     }
 
     private fun enforceActive() {
