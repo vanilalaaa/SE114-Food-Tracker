@@ -126,6 +126,7 @@ fun FeedPostDetailOverlay(
         var commentText by rememberSaveable { mutableStateOf("") }
         var replyingToCommentId by rememberSaveable { mutableStateOf<String?>(null) }
         var replyingToDisplayName by rememberSaveable { mutableStateOf<String?>(null) }
+        var replyingToBody by rememberSaveable { mutableStateOf<String?>(null) }
         var editingCommentId by rememberSaveable { mutableStateOf<String?>(null) }
         var editingCommentPreview by rememberSaveable { mutableStateOf<String?>(null) }
         var pendingScrollCommentId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -156,6 +157,7 @@ fun FeedPostDetailOverlay(
                 .collect { page ->
                     replyingToCommentId = null
                     replyingToDisplayName = null
+                    replyingToBody = null
                     editingCommentId = null
                     editingCommentPreview = null
                     pendingScrollCommentId = null
@@ -221,6 +223,7 @@ fun FeedPostDetailOverlay(
                         postOwnerId = uiState.selectedPost?.ownerId.orEmpty(),
                         commentText = commentText,
                         replyingToDisplayName = replyingToDisplayName,
+                        replyingToBody = replyingToBody,
                         isEditingComment = editingCommentId != null,
                         editingCommentPreview = editingCommentPreview,
                         scrollToCommentId = pendingScrollCommentId,
@@ -233,6 +236,7 @@ fun FeedPostDetailOverlay(
                         onCancelReply = {
                             replyingToCommentId = null
                             replyingToDisplayName = null
+                            replyingToBody = null
                             editingCommentId = null
                             editingCommentPreview = null
                         },
@@ -244,6 +248,7 @@ fun FeedPostDetailOverlay(
                         onReply = { comment ->
                             replyingToCommentId = comment.commentId
                             replyingToDisplayName = comment.displayName
+                            replyingToBody = comment.body
                             editingCommentId = null
                             editingCommentPreview = null
                             if (commentText.isBlank()) {
@@ -254,6 +259,7 @@ fun FeedPostDetailOverlay(
                             editingCommentId = comment.commentId
                             replyingToCommentId = null
                             replyingToDisplayName = null
+                            replyingToBody = null
                             commentText = comment.body
                             editingCommentPreview = comment.body
                         },
@@ -276,6 +282,7 @@ fun FeedPostDetailOverlay(
                                 commentText = ""
                                 replyingToCommentId = null
                                 replyingToDisplayName = null
+                                replyingToBody = null
                                 editingCommentId = null
                                 editingCommentPreview = null
                             }
@@ -284,6 +291,7 @@ fun FeedPostDetailOverlay(
                             isCommentsSheetOpen = false
                             replyingToCommentId = null
                             replyingToDisplayName = null
+                            replyingToBody = null
                             editingCommentId = null
                             editingCommentPreview = null
                             pendingScrollCommentId = null
@@ -706,6 +714,7 @@ private fun FeedCommentsBottomSheet(
     postOwnerId: String,
     commentText: String,
     replyingToDisplayName: String?,
+    replyingToBody: String?,
     isEditingComment: Boolean,
     editingCommentPreview: String?,
     scrollToCommentId: String?,
@@ -767,6 +776,7 @@ private fun FeedCommentsBottomSheet(
             FeedCommentInput(
                 value = commentText,
                 replyingToDisplayName = replyingToDisplayName,
+                replyingToBody = replyingToBody,
                 isEditingComment = isEditingComment,
                 editingCommentPreview = editingCommentPreview,
                 onValueChange = onCommentTextChange,
@@ -1045,6 +1055,7 @@ private fun FeedCommentRow(
         Modifier.clickable { onReply(comment) }
     }
     val contentAlpha = if (comment.isHidden) 0.42f else 1f
+    val isEdited = comment.updatedAt > comment.createdAt + 1_000L
 
     Row(
         modifier = Modifier
@@ -1078,6 +1089,15 @@ private fun FeedCommentRow(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
+                if (isEdited) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Đã chỉnh sửa",
+                        color = Color.White.copy(alpha = 0.30f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
             Text(
                 text = comment.body,
@@ -1136,6 +1156,7 @@ private fun formatCommentAge(createdAt: Long): String {
 private fun FeedCommentInput(
     value: String,
     replyingToDisplayName: String?,
+    replyingToBody: String?,
     isEditingComment: Boolean,
     editingCommentPreview: String?,
     onValueChange: (String) -> Unit,
@@ -1186,13 +1207,23 @@ private fun FeedCommentInput(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Đang trả lời $replyingToDisplayName",
-                    color = Color.White.copy(alpha = 0.72f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Đang trả lời $replyingToDisplayName",
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = replyingToBody.orEmpty(),
+                        color = Color.White.copy(alpha = 0.50f),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Text(
                     text = "Hủy",
                     color = Color.White.copy(alpha = 0.88f),

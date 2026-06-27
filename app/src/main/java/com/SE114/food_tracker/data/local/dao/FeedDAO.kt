@@ -191,7 +191,8 @@ interface FeedDAO {
             c.body AS body,
             c.parent_comment_id AS parentCommentId,
             c.is_hidden AS isHidden,
-            c.created_at AS createdAt
+            c.created_at AS createdAt,
+            c.updated_at AS updatedAt
         FROM feed_comment c
         LEFT JOIN user_profile_cache u ON u.user_id = c.user_id
         WHERE c.post_id = :postId

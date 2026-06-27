@@ -655,7 +655,10 @@ class FeedRepository @Inject constructor(
             isDeleted = isDeleted,
             isHidden = isHidden,
             createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
-            hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it).toString() }
+            hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it).toString() },
+            editedAt = updatedAt
+                .takeIf { it > createdAt + COMMENT_EDITED_THRESHOLD_MS && !isDeleted }
+                ?.let { Instant.fromEpochMilliseconds(it).toString() }
         )
 
     private fun FeedComment.toWriteDTO(ownerId: String): FeedCommentWriteDTO =
@@ -667,7 +670,10 @@ class FeedRepository @Inject constructor(
             parentCommentId = parentCommentId,
             isDeleted = isDeleted,
             isHidden = isHidden,
-            hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it).toString() }
+            hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it).toString() },
+            editedAt = updatedAt
+                .takeIf { it > createdAt + COMMENT_EDITED_THRESHOLD_MS && !isDeleted }
+                ?.let { Instant.fromEpochMilliseconds(it).toString() }
         )
 
     private fun FeedPostRemoteDTO.toEntity(ownerName: String): FeedPost =
@@ -710,7 +716,8 @@ class FeedRepository @Inject constructor(
             isHidden = isHidden,
             hiddenAt = hiddenAt?.let { Instant.parse(it).toEpochMilliseconds() },
             createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
-            updatedAt = hiddenAt?.let { Instant.parse(it).toEpochMilliseconds() }
+            updatedAt = editedAt?.let { Instant.parse(it).toEpochMilliseconds() }
+                ?: hiddenAt?.let { Instant.parse(it).toEpochMilliseconds() }
                 ?: deletedAt?.let { Instant.parse(it).toEpochMilliseconds() }
                 ?: Instant.parse(createdAt).toEpochMilliseconds()
         )
@@ -751,6 +758,7 @@ class FeedRepository @Inject constructor(
         private const val EMOJI_IMAGE_PREFIX = "emoji:"
         private const val LOCAL_USER_ID = "local_user"
         private const val AUTH_SESSION_WAIT_MS = 2_000L
+        private const val COMMENT_EDITED_THRESHOLD_MS = 1_000L
     }
 }
 
