@@ -48,7 +48,8 @@ fun MessageBubble(
     modifier: Modifier = Modifier,
     senderName: String = "Thành viên"
 ) {
-    if (message.isSystem) {
+
+    if (message.isSystem || message.senderId == "system" || message.senderId == "SYSTEM") {
         Box(
             modifier = modifier
                 .fillMaxWidth()
