@@ -26,12 +26,19 @@ import java.util.*
 import javax.inject.Inject
 import kotlinx.coroutines.flow.firstOrNull
 import timber.log.Timber
-
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import io.github.jan.supabase.auth.status.SessionStatus
+import com.SE114.food_tracker.data.repository.AuthRepository
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
-    private val chatDAO: ChatDAO
+    private val chatDAO: ChatDAO,
+    private val authRepository: AuthRepository // Inject
 ) : ViewModel() {
 
     val currentUserId: String
@@ -48,11 +55,39 @@ class ChatViewModel @Inject constructor(
 
     var isTransactionSuccess by mutableStateOf<Boolean?>(null)
         private set
-
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val conversationsWithUnread: StateFlow<List<ConversationWithUnread>> =
+        authRepository.currentSessionFlow()
+            .map { status ->
+                if (status is SessionStatus.Authenticated) {
+                    chatRepository.getAuthenticatedUserId()
+                } else {
+                    ""
+                }
+            }
+            .flatMapLatest { userId ->
+                if (userId.isBlank()) {
+                    flowOf(emptyList()) // Nếu chưa có ID, trả về danh sách rỗng an toàn
+                } else {
+                    chatDAO.getAllConversationsWithUnread(userId) // Có ID thật, Room tự động stream dữ liệu chuẩn
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
     init {
         fetchConversationsFromServer()
         chatRepository.subscribeToGlobalConversationsRealtime()
-
+        viewModelScope.launch {
+            authRepository.currentSessionFlow().collect { status ->
+                if (status is SessionStatus.Authenticated) {
+                    fetchConversationsFromServer()
+                    chatRepository.subscribeToGlobalConversationsRealtime()
+                }
+            }
+        }
         viewModelScope.launch {
             chatRepository.memberUpdateSignal.collect { convId: String ->
                 loadGroupMembers(convId)

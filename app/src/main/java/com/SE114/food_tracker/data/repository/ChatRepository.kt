@@ -1055,7 +1055,13 @@ class ChatRepository @Inject constructor(
         try {
             val currentUserId = getAuthenticatedUserId()
             val targetId = userIdToKick.lowercase().trim()
-
+            // Thực hiện xóa quyền trên Server trước
+            supabaseClient.from("conversation_participant").delete {
+                filter {
+                    eq("conversation_id", conversationId)
+                    eq("user_id", targetId)
+                }
+            }
             // NẾU LÀ CHÍNH MÌNH RỜI NHÓM
             if (targetId == currentUserId) {
                 // Gửi tin nhắn lên server trước để tài khoản khác thấy
@@ -1066,13 +1072,6 @@ class ChatRepository @Inject constructor(
             }
 
             // NẾU LÀ MỜI NGƯỜI KHÁC RA
-            // Thực hiện xóa quyền trên Server trước
-            supabaseClient.from("conversation_participant").delete {
-                filter {
-                    eq("conversation_id", conversationId)
-                    eq("user_id", targetId)
-                }
-            }
             sendSystemMessage(conversationId, "Đã mời $memberName rời khỏi nhóm.")
         } catch (e: Exception) {
             e.printStackTrace()

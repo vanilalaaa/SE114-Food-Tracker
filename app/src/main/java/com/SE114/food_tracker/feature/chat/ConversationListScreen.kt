@@ -42,9 +42,9 @@ fun ConversationListScreen(
     onConversationClick: (id: String, name: String) -> Unit = { _, _ -> },
     onBackClick: (() -> Unit)? = null
 ) {
-    val conversationList by viewModel.getConversationsWithUnreadFlow()
-        .collectAsState(initial = emptyList())
-
+   // val conversationList by viewModel.getConversationsWithUnreadFlow()
+     //   .collectAsState(initial = emptyList())
+    val conversationList by viewModel.conversationsWithUnread.collectAsState()
     val acceptedFriendsList by friendViewModel.acceptedFriends.collectAsState()
     var showCreateGroupDialog by remember { mutableStateOf(false) }
     var newGroupName by remember { mutableStateOf("") }
