@@ -135,10 +135,10 @@ class FeedRepository @Inject constructor(
                     table = "post_like"
                 }
 
-                repositoryScope.launch {
+                launchRealtimeCollector("post insert") {
                     postInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("post update") {
                     postUpdateFlow.collect { action ->
                         action.decodeRecordOrNull<FeedPostRemoteDTO>()
                             ?.takeIf { it.isDeleted }
@@ -146,29 +146,29 @@ class FeedRepository @Inject constructor(
                         _postRealtimeEvents.tryEmit(Unit)
                     }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("post delete") {
                     postDeleteFlow.collect { action ->
                         action.decodeOldRecordOrNull<FeedPostRemoteDTO>()
                             ?.let { feedDao.softDeleteSyncedPostsByRemoteIds(listOf(it.id)) }
                         _postRealtimeEvents.tryEmit(Unit)
                     }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("comment insert") {
                     commentInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("comment update") {
                     commentUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("comment delete") {
                     commentDeleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("like insert") {
                     likeInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("like update") {
                     likeUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("like delete") {
                     likeDeleteFlow.collect { action ->
                         action.decodeOldRecordOrNull<FeedLikeRemoteDTO>()
                             ?.let {
@@ -187,6 +187,13 @@ class FeedRepository @Inject constructor(
             }.onFailure { throwable ->
                 Timber.e(throwable, "[FeedRealtime] subscribe failed")
             }
+        }
+    }
+
+    private fun launchRealtimeCollector(label: String, block: suspend () -> Unit) {
+        repositoryScope.launch {
+            runCatching { block() }
+                .onFailure { Timber.e(it, "[FeedRealtime] $label collector stopped") }
         }
     }
 

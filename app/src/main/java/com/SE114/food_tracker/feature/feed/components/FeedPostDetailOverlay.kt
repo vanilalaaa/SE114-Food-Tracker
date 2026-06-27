@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.feed.components
 
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,8 +52,6 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
@@ -134,12 +134,12 @@ fun FeedPostDetailOverlay(
         var isCommentsSheetOpen by rememberSaveable { mutableStateOf(false) }
         var pendingDeletePostId by rememberSaveable { mutableStateOf<String?>(null) }
         var actionPost by remember { mutableStateOf<FeedPostDto?>(null) }
-        val snackbarHostState = remember { SnackbarHostState() }
+        val context = LocalContext.current
 
         LaunchedEffect(uiState.error) {
             val error = uiState.error
             if (error != null) {
-                snackbarHostState.showSnackbar(error)
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
                 onClearError()
             }
         }
@@ -207,14 +207,6 @@ fun FeedPostDetailOverlay(
                         tint = Color.White
                     )
                 }
-
-                SnackbarHost(
-                    hostState = snackbarHostState,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
-                )
 
                 if (isCommentsSheetOpen) {
                     FeedCommentsBottomSheet(

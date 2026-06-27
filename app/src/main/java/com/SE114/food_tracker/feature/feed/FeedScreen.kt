@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.feed
 
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -19,8 +20,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -172,14 +171,14 @@ fun FeedScreenContent(
     onSetCommentHidden: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val gridState = rememberLazyGridState()
-    val snackbarHostState = remember { SnackbarHostState() }
     val pullToRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(uiState.error, uiState.selectedPostId) {
         val error = uiState.error
         if (error != null && uiState.selectedPostId == null) {
-            snackbarHostState.showSnackbar(error)
+            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
             onClearError()
         }
     }
@@ -251,13 +250,6 @@ fun FeedScreenContent(
                 contentDescription = "Tạo bài viết"
             )
         }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
-        )
 
         if (uiState.isCreateSheetOpen) {
             ModalBottomSheet(

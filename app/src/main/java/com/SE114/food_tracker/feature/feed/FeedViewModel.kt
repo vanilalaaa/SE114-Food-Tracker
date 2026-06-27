@@ -13,6 +13,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.exifinterface.media.ExifInterface
 import com.SE114.food_tracker.core.sync.SyncScheduler
+import com.SE114.food_tracker.core.util.toUserFacingMessage
+import com.SE114.food_tracker.core.util.toUserFacingErrorMessage
 import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
@@ -131,8 +133,9 @@ class FeedViewModel @Inject constructor(
         }
             .catch { throwable ->
                 Timber.e(throwable, "[FeedVM] Failed to build feed state")
-                _error.value = throwable.message
-                emit(FeedUiState(error = throwable.message))
+                val message = throwable.toUserFacingMessage("Không tải được bảng tin")
+                _error.value = message
+                emit(FeedUiState(error = message))
             }
             .stateIn(
                 scope = viewModelScope,
@@ -169,7 +172,7 @@ class FeedViewModel @Inject constructor(
                 }
             }.onFailure { throwable ->
                 Timber.e(throwable, "[FeedVM] Refresh failed")
-                _error.value = throwable.message ?: "Không làm mới được bảng tin"
+                _error.value = throwable.toUserFacingMessage("Không làm mới được bảng tin")
             }
 
             _isLoading.value = false
@@ -293,7 +296,7 @@ class FeedViewModel @Inject constructor(
                 }
             } catch (throwable: Throwable) {
                 Timber.e(throwable, "[FeedVM] Create post failed")
-                _error.value = throwable.message ?: "Tạo bài viết thất bại"
+                _error.value = throwable.toUserFacingMessage("Tạo bài viết thất bại")
             } finally {
                 _isCreatingPost.value = false
             }
@@ -380,7 +383,7 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Toggle like failed")
-                    _error.value = throwable.message ?: "Không cập nhật được lượt thích"
+                    _error.value = throwable.toUserFacingMessage("Không cập nhật được lượt thích")
                 }
         }
     }
@@ -394,7 +397,7 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Hide post failed")
-                    _error.value = throwable.message ?: "Không ẩn được bài viết"
+                    _error.value = throwable.toUserFacingMessage("Không ẩn được bài viết")
                 }
         }
     }
@@ -407,7 +410,7 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Download post image failed")
-                    _error.value = throwable.message ?: "Không tải được ảnh"
+                    _error.value = throwable.toUserFacingMessage("Không tải được ảnh")
                 }
         }
     }
@@ -423,7 +426,7 @@ class FeedViewModel @Inject constructor(
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Add comment failed")
-                    _error.value = throwable.message ?: "Không gửi được bình luận"
+                    _error.value = throwable.toUserFacingMessage("Không gửi được bình luận")
                 }
         }
     }
@@ -438,7 +441,7 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Edit comment failed")
-                    _error.value = throwable.message ?: "Không sửa được bình luận"
+                    _error.value = throwable.toUserFacingMessage("Không sửa được bình luận")
                 }
         }
     }
@@ -452,7 +455,7 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Delete comment failed")
-                    _error.value = throwable.message ?: "Không xóa được bình luận"
+                    _error.value = throwable.toUserFacingMessage("Không xóa được bình luận")
                 }
         }
     }
@@ -466,7 +469,7 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Toggle comment visibility failed")
-                    _error.value = throwable.message ?: "KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c bÃ¬nh luáº­n"
+                    _error.value = throwable.toUserFacingMessage("Không cập nhật được bình luận")
                 }
         }
     }
@@ -487,7 +490,7 @@ class FeedViewModel @Inject constructor(
                         closePostDetail()
                         SyncScheduler.triggerImmediateSync(context)
                     }
-                    _error.value = throwable.message ?: "Không xóa được bài viết"
+                    _error.value = throwable.toUserFacingMessage("Không xóa được bài viết")
                 }
         }
     }
@@ -497,7 +500,7 @@ class FeedViewModel @Inject constructor(
     }
 
     fun showError(message: String) {
-        _error.value = message
+        _error.value = message.toUserFacingErrorMessage()
     }
 
     private fun clearDraft() {

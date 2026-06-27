@@ -3,6 +3,7 @@ package com.SE114.food_tracker.feature.profile
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.util.toUserFacingMessage
 import com.SE114.food_tracker.data.repository.FeedRepository
 import com.SE114.food_tracker.data.repository.FriendRepository
 import com.SE114.food_tracker.data.repository.ProfileViewerRepository
@@ -57,6 +58,22 @@ class ProfileViewModel @Inject constructor(
             }
 
             val authId = profileRepository.currentAuthUserId()
+            val cachedProfile = profileRepository.cachedProfile(profileId)
+            if (cachedProfile != null) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        profile = cachedProfile,
+                        isSelf = cachedProfile.id == authId,
+                        error = null
+                    )
+                }
+                loadFriendship(cachedProfile.id, authId)
+                loadSharedDiary()
+                observeAuthorPosts()
+            } else {
+                observeAuthorPosts()
+            }
 
             profileRepository.fetchProfile(profileId)
                 .onSuccess { profile ->
@@ -74,10 +91,14 @@ class ProfileViewModel @Inject constructor(
                 }
                 .onFailure { error ->
                     _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = error.message ?: "Không tải được profile."
-                        )
+                        if (it.profile != null) {
+                            it.copy(isLoading = false, error = null)
+                        } else {
+                            it.copy(
+                                isLoading = false,
+                                error = error.toUserFacingMessage("Không tải được profile.")
+                            )
+                        }
                     }
                 }
         }
@@ -88,6 +109,16 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isDiaryLoading = true, diaryError = null) }
+            val cachedItems = profileRepository.cachedSharedItems(profileId)
+            if (cachedItems.isNotEmpty()) {
+                _uiState.update {
+                    it.copy(
+                        isDiaryLoading = false,
+                        sharedItems = cachedItems,
+                        diaryError = null
+                    )
+                }
+            }
 
             profileRepository.fetchSharedItems(profileId)
                 .onSuccess { items ->
@@ -101,10 +132,14 @@ class ProfileViewModel @Inject constructor(
                 }
                 .onFailure { error ->
                     _uiState.update {
-                        it.copy(
-                            isDiaryLoading = false,
-                            diaryError = error.message ?: "Không tải được nhật ký."
-                        )
+                        if (it.sharedItems.isNotEmpty()) {
+                            it.copy(isDiaryLoading = false, diaryError = null)
+                        } else {
+                            it.copy(
+                                isDiaryLoading = false,
+                                diaryError = error.toUserFacingMessage("Không tải được nhật ký.")
+                            )
+                        }
                     }
                 }
         }
@@ -214,7 +249,7 @@ class ProfileViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isFriendshipActionSubmitting = false,
-                        reportMessage = error.message ?: "Không cập nhật được lời mời kết bạn."
+                        reportMessage = error.toUserFacingMessage("Không cập nhật được lời mời kết bạn.")
                     )
                 }
             }
@@ -249,7 +284,7 @@ class ProfileViewModel @Inject constructor(
             rawMessage.contains("permission denied", ignoreCase = true) ||
                 rawMessage.contains("row-level security", ignoreCase = true) ->
                 "Chưa có quyền gửi báo cáo. Kiểm tra RLS Supabase."
-            rawMessage.isNotBlank() -> rawMessage
+            rawMessage.isNotBlank() -> toUserFacingMessage("Không gửi được báo cáo. Vui lòng thử lại.")
             else -> "Không gửi được báo cáo. Vui lòng thử lại."
         }
     }
