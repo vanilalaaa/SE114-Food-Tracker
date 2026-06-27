@@ -4,23 +4,29 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,6 +55,7 @@ import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.components.AppButtonVariant
 import com.SE114.food_tracker.core.designsystem.components.AppScaffold
 import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
+import com.SE114.food_tracker.core.designsystem.theme.AlertRed
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.data.repository.AdminUser
 import com.SE114.food_tracker.feature.admin.components.AdminTopBar
@@ -95,6 +103,7 @@ fun AdminUsersScreen(
     selectedUser?.let { user ->
         UserActionSheet(
             user = user,
+            deleteRestoreBlocked = viewModel.isDeletionRestoreBlocked(user),
             onDismiss = { selectedUser = null },
             onAdminToggle = {
                 selectedUser = null
@@ -128,30 +137,30 @@ fun AdminUsersScreen(
                 onDismiss = { pendingConfirm = null }
             )
             UserConfirmKind.DELETE -> ConfirmDialog(
-                title = stringResource(R.string.admin_delete_confirm_title),
-                body = stringResource(R.string.admin_delete_confirm_body, handle),
+                title        = stringResource(R.string.admin_delete_confirm_title),
+                body         = stringResource(R.string.admin_delete_confirm_body, handle),
                 confirmLabel = stringResource(R.string.admin_confirm_delete),
-                cancelLabel = stringResource(R.string.admin_cancel),
-                destructive = true,
-                onConfirm = { pendingConfirm = null; viewModel.setDeleted(confirm.user, true) },
-                onDismiss = { pendingConfirm = null }
+                cancelLabel  = stringResource(R.string.admin_cancel),
+                destructive  = true,
+                onConfirm    = { pendingConfirm = null; viewModel.setDeleted(confirm.user, true) },
+                onDismiss    = { pendingConfirm = null }
             )
             UserConfirmKind.MAKE_ADMIN -> ConfirmDialog(
-                title = stringResource(R.string.admin_make_admin_confirm_title),
-                body = stringResource(R.string.admin_make_admin_confirm_body, handle),
+                title        = stringResource(R.string.admin_make_admin_confirm_title),
+                body         = stringResource(R.string.admin_make_admin_confirm_body, handle),
                 confirmLabel = stringResource(R.string.admin_confirm_make_admin),
-                cancelLabel = stringResource(R.string.admin_cancel),
-                onConfirm = { pendingConfirm = null; viewModel.setAdmin(confirm.user, true) },
-                onDismiss = { pendingConfirm = null }
+                cancelLabel  = stringResource(R.string.admin_cancel),
+                onConfirm    = { pendingConfirm = null; viewModel.setAdmin(confirm.user, true) },
+                onDismiss    = { pendingConfirm = null }
             )
             UserConfirmKind.REVOKE_ADMIN -> ConfirmDialog(
-                title = stringResource(R.string.admin_revoke_admin_confirm_title),
-                body = stringResource(R.string.admin_revoke_admin_confirm_body, handle),
+                title        = stringResource(R.string.admin_revoke_admin_confirm_title),
+                body         = stringResource(R.string.admin_revoke_admin_confirm_body, handle),
                 confirmLabel = stringResource(R.string.admin_confirm_revoke_admin),
-                cancelLabel = stringResource(R.string.admin_cancel),
-                destructive = true,
-                onConfirm = { pendingConfirm = null; viewModel.setAdmin(confirm.user, false) },
-                onDismiss = { pendingConfirm = null }
+                cancelLabel  = stringResource(R.string.admin_cancel),
+                destructive  = true,
+                onConfirm    = { pendingConfirm = null; viewModel.setAdmin(confirm.user, false) },
+                onDismiss    = { pendingConfirm = null }
             )
         }
     }
@@ -176,13 +185,13 @@ private fun AdminUsersContent(
             AdminTopBar(title = stringResource(R.string.admin_users_title), onBack = onBack)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
-                value = state.search,
+                value         = state.search,
                 onValueChange = onSearchChange,
-                placeholder = { Text(stringResource(R.string.admin_users_search_hint)) },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true,
+                placeholder   = { Text(stringResource(R.string.admin_users_search_hint)) },
+                leadingIcon   = { Icon(Icons.Filled.Search, contentDescription = null) },
+                singleLine    = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                modifier = Modifier.fillMaxWidth()
+                modifier      = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
 
@@ -196,36 +205,78 @@ private fun AdminUsersContent(
             }
 
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                when {
-                    state.isLoading && state.users.isEmpty() ->
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-
-                    state.error != null && state.users.isEmpty() -> Column(
+                if (state.isLoading && state.users.isEmpty()) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (state.error != null && state.users.isEmpty()) {
+                    Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(state.error.adminMessage(), color = MaterialTheme.colorScheme.error)
                         AppButton(
-                            text = stringResource(R.string.admin_retry),
+                            text    = stringResource(R.string.admin_retry),
                             onClick = onRetry,
                             variant = AppButtonVariant.Secondary
                         )
                     }
-
-                    state.users.isEmpty() -> Text(
-                        text = stringResource(R.string.admin_users_empty),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                } else if (state.users.isEmpty()) {
+                    Text(
+                        text     = stringResource(R.string.admin_users_empty),
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.Center)
                     )
-
-                    else -> LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)
+                } else {
+                    LazyColumn(
+                        state          = listState,
+                        modifier       = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
                         items(state.users, key = { it.id }) { user ->
-                            AdminUserRow(user = user, onClick = { onUserClick(user) })
+                            // Thiết kế bao bọc Row để chèn thêm nút Info "i" màu đỏ linh hoạt
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    AdminUserRow(user = user, onClick = { onUserClick(user) })
+                                }
+
+                                // Nếu user có trạng thái đặc biệt thì hiển thị nút "i" màu đỏ cùng Bubble
+                                if (user.isBanned || user.isDeleted) {
+                                    var showBubble by remember { mutableStateOf(false) }
+                                    Box(modifier = Modifier.padding(end = 4.dp)) {
+                                        IconButton(
+                                            onClick = { showBubble = true },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Info,
+                                                contentDescription = "Xem chi tiết thời gian",
+                                                tint = AlertRed
+                                            )
+                                        }
+
+                                        // Menu thả xuống đóng vai trò làm Bubble thông tin không bị tràn chữ
+                                        DropdownMenu(
+                                            expanded = showBubble,
+                                            onDismissRequest = { showBubble = false },
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                        ) {
+                                            val bubbleText = when {
+                                                user.isDeleted -> "Thời gian xóa mềm tự hủy sắp hết hạn vào chu kỳ kế tiếp"
+                                                user.isBanned -> "Tài khoản bị khóa. Vui lòng kiểm tra kỹ thời gian kết thúc hoặc lệnh vĩnh viễn trong Sheet."
+                                                else -> ""
+                                            }
+                                            Text(
+                                                text = bubbleText,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                modifier = Modifier.padding(4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                         if (state.isLoadingMore) {
                             item {
@@ -248,6 +299,7 @@ private fun AdminUsersContent(
 @Composable
 private fun UserActionSheet(
     user: AdminUser,
+    deleteRestoreBlocked: Boolean,
     onDismiss: () -> Unit,
     onAdminToggle: () -> Unit,
     onBanToggle: () -> Unit,
@@ -262,40 +314,66 @@ private fun UserActionSheet(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = user.displayName?.takeIf { it.isNotBlank() }
+                text  = user.displayName?.takeIf { it.isNotBlank() }
                     ?: stringResource(R.string.admin_user_no_name),
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "@" + (user.userId ?: ""),
+                text  = "@" + (user.userId ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
-            AppButton(
-                text = stringResource(
-                    if (user.isAdmin) R.string.admin_action_revoke_admin else R.string.admin_action_make_admin
-                ),
-                onClick = onAdminToggle,
-                variant = if (user.isAdmin) AppButtonVariant.Secondary else AppButtonVariant.Primary,
-                modifier = Modifier.fillMaxWidth()
-            )
-            AppButton(
-                text = stringResource(
-                    if (user.isBanned) R.string.admin_action_unban else R.string.admin_action_ban
-                ),
-                onClick = onBanToggle,
-                variant = if (user.isBanned) AppButtonVariant.Secondary else AppButtonVariant.Destructive,
-                modifier = Modifier.fillMaxWidth()
-            )
-            AppButton(
-                text = stringResource(
-                    if (user.isDeleted) R.string.admin_action_restore else R.string.admin_action_delete
-                ),
-                onClick = onDeleteToggle,
-                variant = if (user.isDeleted) AppButtonVariant.Secondary else AppButtonVariant.Destructive,
-                modifier = Modifier.fillMaxWidth()
-            )
+
+            if (!user.isAdmin) {
+                AppButton(
+                    text    = stringResource(R.string.admin_action_make_admin),
+                    onClick = onAdminToggle,
+                    variant = AppButtonVariant.Primary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (user.isBanned) {
+                AppButton(
+                    text     = stringResource(R.string.admin_action_unban),
+                    onClick  = onBanToggle,
+                    enabled  = true,
+                    variant  = AppButtonVariant.Secondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                AppButton(
+                    text    = stringResource(R.string.admin_action_ban),
+                    onClick = onBanToggle,
+                    variant = AppButtonVariant.Destructive,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (user.isDeleted) {
+                AppButton(
+                    text     = stringResource(R.string.admin_action_restore),
+                    onClick  = onDeleteToggle,
+                    enabled  = !deleteRestoreBlocked,
+                    variant  = AppButtonVariant.Secondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (deleteRestoreBlocked) {
+                    Text(
+                        text  = stringResource(R.string.admin_err_deletion_expired),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            } else {
+                AppButton(
+                    text    = stringResource(R.string.admin_action_delete),
+                    onClick = onDeleteToggle,
+                    variant = AppButtonVariant.Destructive,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
@@ -308,23 +386,23 @@ private fun BanDurationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = {},
-        dismissButton = {
+        confirmButton    = {},
+        dismissButton    = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.admin_cancel)) }
         },
         title = { Text(stringResource(R.string.admin_ban_duration_title)) },
-        text = {
+        text  = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = stringResource(R.string.admin_ban_confirm_body, userHandle),
+                    text  = stringResource(R.string.admin_ban_confirm_body, userHandle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 BanDuration.entries.forEach { duration ->
                     Text(
-                        text = stringResource(duration.labelRes),
-                        style = MaterialTheme.typography.bodyLarge,
+                        text     = stringResource(duration.labelRes),
+                        style    = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onPick(duration) }
@@ -343,16 +421,42 @@ private fun AdminUsersContentPreview() {
         AdminUsersContent(
             state = AdminUsersUiState(
                 users = listOf(
-                    AdminUser("1", "An Nguyễn", "an.nguyen", null, isAdmin = true, isBanned = false, isDeleted = false),
-                    AdminUser("2", "Bảo Trần", "bao.tran", null, isAdmin = false, isBanned = true, isDeleted = false),
-                    AdminUser("3", "Chi Lê", "chi.le", null, isAdmin = false, isBanned = false, isDeleted = true)
-                )
+                    AdminUser(
+                        id = "1",
+                        displayName = "An Nguyễn",
+                        userId = "an.nguyen",
+                        avatarUrl = null,
+                        isAdmin = true,
+                        isBanned = false,
+                        isDeleted = false
+                    ),
+                    AdminUser(
+                        id = "2",
+                        displayName = "shonwannie",
+                        userId = "shon",
+                        avatarUrl = null,
+                        isAdmin = false,
+                        isBanned = true,  // Bật cái này để Preview nút "i" màu đỏ
+                        isDeleted = false
+                    ),
+                    AdminUser(
+                        id = "3",
+                        displayName = "Chi Lê",
+                        userId = "chi.le",
+                        avatarUrl = null,
+                        isAdmin = false,
+                        isBanned = false,
+                        isDeleted = true  // Hiển thị nút "i" màu đỏ cho tài khoản bị xóa mềm
+                    )
+                ),
+                isLoading = false,
+                canLoadMore = false
             ),
-            onBack = {},
+            onBack         = {},
             onSearchChange = {},
-            onRetry = {},
-            onLoadMore = {},
-            onUserClick = {}
+            onRetry        = {},
+            onLoadMore     = {},
+            onUserClick    = {}
         )
     }
 }
