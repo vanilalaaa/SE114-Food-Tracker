@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.SE114.food_tracker.core.designsystem.components.AppTopBar
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.GroupSettingsDialog
+import com.SE114.food_tracker.feature.chat.components.ChatImageViewer
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import kotlinx.coroutines.launch
@@ -175,8 +176,13 @@ fun ChatScreenContent(
     var textInput by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showDeleteDirectDialog by remember { mutableStateOf(false) } // State Dialog xóa 1-1
+    var viewerImageUrl by remember { mutableStateOf<String?>(null) } // Ảnh đang xem toàn màn hình
 
     var memberToKick by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    viewerImageUrl?.let { url ->
+        ChatImageViewer(imageUrl = url, onDismiss = { viewerImageUrl = null })
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -395,7 +401,8 @@ fun ChatScreenContent(
                                     message = message,
                                     isMine = isMine,
                                     senderName = message.senderName,
-                                    onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
+                                    onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } },
+                                    onImageClick = { viewerImageUrl = it }
                                 )
                             }
                         }
