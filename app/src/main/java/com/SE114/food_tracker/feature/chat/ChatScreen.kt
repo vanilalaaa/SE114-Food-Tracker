@@ -374,11 +374,11 @@ fun ChatScreenContent(
                         val isMine = message.senderId == myId ||
                                 message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
                                 message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED
-
+                        val isSystemMessage = message.isSystem || message.senderId == "system" || message.senderId == "SYSTEM"
                         Column(
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (!isMine && isGroup && !message.isSystem && message.senderId != "system") {
+                            if (!isMine && isGroup && !isSystemMessage) {
                                 Text(
                                     text = message.senderName,
                                     fontSize = 11.sp,
@@ -390,12 +390,13 @@ fun ChatScreenContent(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
+                                horizontalArrangement = when {
+                                    isSystemMessage -> Arrangement.Center
+                                    isMine -> Arrangement.End
+                                    else -> Arrangement.Start
+                                },
                                 verticalAlignment = Alignment.Bottom
                             ) {
-                                if (!isMine && isGroup && (message.isSystem || message.senderId == "system")) {
-                                    Spacer(modifier = Modifier.width(44.dp))
-                                }
 
                                 MessageBubble(
                                     message = message,
