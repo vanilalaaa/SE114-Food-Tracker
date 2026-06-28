@@ -1,7 +1,11 @@
 package com.SE114.food_tracker.data.repository
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import com.SE114.food_tracker.core.network.NetworkMonitor
 import com.SE114.food_tracker.core.sync.SyncScheduler
 import com.SE114.food_tracker.data.local.dao.ChatDAO
@@ -35,6 +39,8 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -51,8 +57,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.sync.Mutex
@@ -102,6 +113,22 @@ class ChatRepository @Inject constructor(
         @SerialName("conversation_id") val conversationId: String,
         @SerialName("user_id") val userId: String,
         @SerialName("is_admin") val isAdmin: Boolean
+    )
+
+    /** Fetch-only view of the current user's participation that also carries the server-side read
+     *  marker, so re-login / account-switch can restore last_read_at instead of resetting to 0. */
+    @Serializable
+    data class MyParticipationDto(
+        @SerialName("conversation_id") val conversationId: String,
+        @SerialName("user_id") val userId: String,
+        @SerialName("is_admin") val isAdmin: Boolean = false,
+        @SerialName("last_read_at") val lastReadAt: Long = 0L
+    )
+
+    @Serializable
+    data class UnreadCountDto(
+        @SerialName("conversation_id") val conversationId: String,
+        @SerialName("unread_count") val unreadCount: Int = 0
     )
 
     @Serializable
@@ -202,6 +229,12 @@ class ChatRepository @Inject constructor(
     )
     val walletUpdateSignal = _walletUpdateSignal.asSharedFlow()
 
+    // Server-computed unread count per conversation (messages from others newer than my read
+    // marker). Lets the list show an exact number for conversations whose messages aren't synced
+    // into Room yet; the ViewModel merges it with the locally-counted unread.
+    private val _serverUnreadCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val serverUnreadCounts: StateFlow<Map<String, Int>> = _serverUnreadCounts.asStateFlow()
+
     // Broadcast event name — must be identical on sender and all receivers.
     private val BROADCAST_EVENT_NEW_MESSAGE = "new_message"
 
@@ -235,7 +268,7 @@ class ChatRepository @Inject constructor(
             // Tách danh sách gốc để vừa lấy convIds vừa lấy được quyền isAdmin của bạn ──
             val myParticipants = supabaseClient.from("conversation_participant")
                 .select { filter { eq("user_id", currentUserId) } }
-                .decodeList<SupabaseParticipantDto>()
+                .decodeList<MyParticipationDto>()
 
             val convIds = myParticipants.map { it.conversationId }.distinct()
             // val convIds = supabaseClient.from("conversation_participant")
@@ -246,7 +279,8 @@ class ChatRepository @Inject constructor(
             // Tìm và xóa các phòng chat local ma do bị kick hoặc giải tán
             val localConvs = chatDAO.getAllConversations().firstOrNull() ?: emptyList()
             val localIds = localConvs.map { it.id }
-            val orphanedIds = localIds.filter { it !in convIds.toSet() }
+            val convIdSet = convIds.toSet()
+            val orphanedIds = localIds.filter { it !in convIdSet }
             orphanedIds.forEach { id ->
                 deleteConversationLocal(id)
             }
@@ -284,15 +318,21 @@ class ChatRepository @Inject constructor(
             if (changed.isNotEmpty()) chatDAO.insertConversations(changed)
             // ── BỔ SUNG AN TOÀN: Đưa chính mình vào table local để thỏa mãn điều kiện INNER JOIN ──
             // Chiến lược IGNORE sẽ tự động bỏ qua nếu bản ghi đã tồn tại, đảm bảo không clobber dữ liệu đọc tin thực tế.
+            // Restore the read marker from the server (the source of truth). On a fresh login /
+            // account-switch the local participant row is gone, so insertIfAbsent seeds it with the
+            // server value instead of 0 (which made every conversation look unread). When a row
+            // already exists, markConversationRead advances it forward-only — so a marker read on
+            // another device is mirrored, but a locally-newer (read-offline) marker is never undone.
             myParticipants.forEach { participant ->
                 chatDAO.insertParticipantIfAbsent(
                     ConversationParticipant(
                         conversationId = participant.conversationId,
                         userId = currentUserId,
                         isAdmin = participant.isAdmin,
-                        lastReadAt = 0L // Sẽ không bị ghi đè lên last_read_at thực tế nhờ OnConflictStrategy.IGNORE
+                        lastReadAt = participant.lastReadAt
                     )
                 )
+                chatDAO.markConversationRead(participant.conversationId, currentUserId, participant.lastReadAt)
             }
             // Persist the participant graph + peer profiles in two batched queries so the
             // list can render the 1-1 peer's name/avatar without a per-conversation round-trip.
@@ -330,9 +370,21 @@ class ChatRepository @Inject constructor(
                     }
                 )
             }
+
+            refreshServerUnreadCounts()
         } catch (e: Exception) {
             Timber.tag("Chat").e(e, "fetchAndSaveConversationsToLocal failed")
         }
+    }
+
+    /** Pull the server's per-conversation unread count for the current user. Best-effort: a
+     *  failure leaves the previous counts in place (the local message-based count still works). */
+    private suspend fun refreshServerUnreadCounts() {
+        runCatching {
+            supabaseClient.postgrest.rpc("unread_message_counts").decodeList<UnreadCountDto>()
+        }.onSuccess { rows ->
+            _serverUnreadCounts.value = rows.associate { it.conversationId to it.unreadCount }
+        }.onFailure { Timber.tag("Chat").e(it, "unread_message_counts failed") }
     }
 
     // ── CHỨC NĂNG REALTIME CHANNEL ──
@@ -1186,14 +1238,21 @@ class ChatRepository @Inject constructor(
                     "file://"
                 ))
             ) {
-                val fileBytes = try {
-                    val uri = android.net.Uri.parse(message.imageUrl)
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                } catch (readErr: Exception) {
-                    Timber.tag("Chat").e(readErr, "queued image no longer readable")
-                    null
+                // Read + decode + downscale + JPEG-compress are heavy; the online send path is
+                // launched on Dispatchers.Main, so do them off it (a 12MP photo would otherwise
+                // block the UI for hundreds of ms). Downscale fixes the slow load: gallery photos
+                // are multi-MB but a chat bubble only shows a ~150dp thumbnail.
+                val uploadBytes = withContext(Dispatchers.IO) {
+                    val raw = try {
+                        context.contentResolver.openInputStream(android.net.Uri.parse(message.imageUrl))
+                            ?.use { it.readBytes() }
+                    } catch (readErr: Exception) {
+                        Timber.tag("Chat").e(readErr, "queued image no longer readable")
+                        null
+                    }
+                    raw?.let { downscaleForUpload(it) }
                 }
-                if (fileBytes == null) {
+                if (uploadBytes == null) {
                     // Local image is gone/unreadable (e.g. a GetContent content:// grant lost after
                     // process death). That's permanent, not a connectivity issue — fail it so the
                     // worker doesn't retry forever and block the rest of the PENDING queue.
@@ -1202,7 +1261,7 @@ class ChatRepository @Inject constructor(
                 }
                 val storageBucket = supabaseClient.storage.from("chat-images")
                 val fileName = "${UUID.randomUUID()}.jpg"
-                storageBucket.upload(path = fileName, data = fileBytes) { upsert = true }
+                storageBucket.upload(path = fileName, data = uploadBytes) { upsert = true }
                 finalImageUrl = storageBucket.publicUrl(fileName)
             }
 
@@ -1270,6 +1329,58 @@ class ChatRepository @Inject constructor(
         return false
     }
 
+    /** Decode, fit within [maxDim] px, and JPEG-compress an image so chat uploads stay small.
+     *  Falls back to the original bytes if anything goes wrong (unsupported/corrupt format). */
+    private fun downscaleForUpload(bytes: ByteArray, maxDim: Int = 1280, quality: Int = 80): ByteArray {
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return bytes
+
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= maxDim || bounds.outHeight / (sample * 2) >= maxDim) {
+                sample *= 2
+            }
+            val decoded = BitmapFactory.decodeByteArray(
+                bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }
+            ) ?: return bytes
+
+            // Re-encoding to JPEG drops the EXIF orientation tag, and BitmapFactory never applies
+            // it — so bake the rotation into the pixels, otherwise rotated camera photos (which the
+            // old raw upload kept upright via EXIF) would now display sideways.
+            val rotation = runCatching {
+                when (ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL
+                )) {
+                    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+            }.getOrDefault(0f)
+
+            val scale = maxDim.toFloat() / maxOf(decoded.width, decoded.height)
+            val matrix = Matrix().apply {
+                if (rotation != 0f) postRotate(rotation)
+                if (scale < 1f) postScale(scale, scale)
+            }
+            val transformed = if (rotation != 0f || scale < 1f) {
+                Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+            } else {
+                decoded
+            }
+
+            val out = ByteArrayOutputStream()
+            transformed.compress(Bitmap.CompressFormat.JPEG, quality, out)
+            if (transformed != decoded) transformed.recycle()
+            decoded.recycle()
+            out.toByteArray()
+        } catch (e: Exception) {
+            Timber.tag("Chat").w(e, "image downscale failed; uploading original")
+            bytes
+        }
+    }
+
     /**
      * Drains the PENDING message queue oldest-first (called by [MessageSyncWorker]). Returns
      * false — so the worker retries when connectivity returns — if a send hits a connectivity
@@ -1317,6 +1428,8 @@ class ChatRepository @Inject constructor(
             )
         )
         chatDAO.markConversationRead(conversationId, currentUserId, now)
+        // Drop this conversation's server-side unread snapshot so the list badge clears at once.
+        _serverUnreadCounts.update { it - conversationId }
 
         // Server marker advances via a gated RPC (security definer) so clients never need
         // direct UPDATE access to conversation_participant.

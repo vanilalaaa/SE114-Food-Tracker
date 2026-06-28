@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -78,7 +79,26 @@ class ChatViewModel @Inject constructor(
                 if (userId.isBlank()) {
                     flowOf(emptyList()) // Nếu chưa có ID, trả về danh sách rỗng an toàn
                 } else {
-                    chatDAO.getAllConversationsWithUnread(userId) // Có ID thật, Room tự động stream dữ liệu chuẩn
+                    // Merge the Room list with the server's unread snapshot: the bare dot used to
+                    // appear when a conversation was unread (denormalized last_message_at) but had
+                    // no locally-synced messages to count. Take the larger of the two so every
+                    // unread conversation shows an exact number; gate on isUnread so a read chat
+                    // (or my own last message) shows nothing. The snapshot only refreshes on fetch,
+                    // so the count is a lower bound when unsynced history and new realtime messages
+                    // overlap — it self-heals on the next fetch / pull-to-refresh.
+                    combine(
+                        chatDAO.getAllConversationsWithUnread(userId),
+                        chatRepository.serverUnreadCounts
+                    ) { list, serverCounts ->
+                        list.map { conv ->
+                            val merged = if (conv.isUnread) {
+                                maxOf(conv.unreadCount, serverCounts[conv.id] ?: 0)
+                            } else {
+                                0
+                            }
+                            conv.copy(unreadCount = merged, isUnread = merged > 0)
+                        }
+                    }
                 }
             }
             .stateIn(
