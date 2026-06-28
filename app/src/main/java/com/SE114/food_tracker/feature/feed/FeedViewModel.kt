@@ -12,7 +12,10 @@ import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.exifinterface.media.ExifInterface
+import com.SE114.food_tracker.core.network.NetworkMonitor
 import com.SE114.food_tracker.core.sync.SyncScheduler
+import com.SE114.food_tracker.core.util.toUserFacingMessage
+import com.SE114.food_tracker.core.util.toUserFacingErrorMessage
 import com.SE114.food_tracker.data.local.dao.FeedCommentDto
 import com.SE114.food_tracker.data.local.dao.FeedPostDto
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -56,6 +60,7 @@ private const val MaxFeedPostDecodeSize = 2048
 class FeedViewModel @Inject constructor(
     private val feedRepository: FeedRepository,
     private val friendRepository: FriendRepository,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -131,8 +136,9 @@ class FeedViewModel @Inject constructor(
         }
             .catch { throwable ->
                 Timber.e(throwable, "[FeedVM] Failed to build feed state")
-                _error.value = throwable.message
-                emit(FeedUiState(error = throwable.message))
+                val message = throwable.toUserFacingMessage("Không tải được bảng tin")
+                _error.value = message
+                emit(FeedUiState(error = message))
             }
             .stateIn(
                 scope = viewModelScope,
@@ -142,6 +148,7 @@ class FeedViewModel @Inject constructor(
 
     init {
         subscribeToRealtimePosts()
+        subscribeToRealtimeFriendships()
         startAutoRefresh()
     }
 
@@ -168,7 +175,7 @@ class FeedViewModel @Inject constructor(
                 }
             }.onFailure { throwable ->
                 Timber.e(throwable, "[FeedVM] Refresh failed")
-                _error.value = throwable.message ?: "Không làm mới được bảng tin"
+                _error.value = throwable.toUserFacingMessage("Không làm mới được bảng tin")
             }
 
             _isLoading.value = false
@@ -292,7 +299,7 @@ class FeedViewModel @Inject constructor(
                 }
             } catch (throwable: Throwable) {
                 Timber.e(throwable, "[FeedVM] Create post failed")
-                _error.value = throwable.message ?: "Tạo bài viết thất bại"
+                _error.value = throwable.toUserFacingMessage("Tạo bài viết thất bại")
             } finally {
                 _isCreatingPost.value = false
             }
@@ -324,10 +331,19 @@ class FeedViewModel @Inject constructor(
         }
     }
 
+    private fun subscribeToRealtimeFriendships() {
+        friendRepository.subscribeToFriendshipRealtime()
+        viewModelScope.launch {
+            friendRepository.friendshipRealtimeEvents.collect {
+                scheduleRealtimeRefresh()
+            }
+        }
+    }
+
     private fun scheduleRealtimeRefresh() {
         realtimeRefreshJob?.cancel()
         realtimeRefreshJob = viewModelScope.launch {
-            delay(500)
+            delay(REALTIME_REFRESH_DEBOUNCE_MS)
             refreshVisibleFeedSilently("[FeedVM] Realtime feed refresh failed")
         }
     }
@@ -361,8 +377,15 @@ class FeedViewModel @Inject constructor(
         }
     }
 
+    private suspend fun requireOnlineAction(): Boolean {
+        if (networkMonitor.isOnline.first()) return true
+        _error.value = "Cần có mạng để thao tác"
+        return false
+    }
+
     fun toggleLike(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.toggleLike(postId) }
                 .onSuccess {
                     SyncScheduler.triggerImmediateSync(context)
@@ -370,13 +393,14 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Toggle like failed")
-                    _error.value = throwable.message ?: "Không cập nhật được lượt thích"
+                    _error.value = throwable.toUserFacingMessage("Không cập nhật được lượt thích")
                 }
         }
     }
 
     fun hidePost(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.hidePost(postId) }
                 .onSuccess {
                     closePostDetail()
@@ -384,7 +408,7 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Hide post failed")
-                    _error.value = throwable.message ?: "Không ẩn được bài viết"
+                    _error.value = throwable.toUserFacingMessage("Không ẩn được bài viết")
                 }
         }
     }
@@ -397,7 +421,7 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Download post image failed")
-                    _error.value = throwable.message ?: "Không tải được ảnh"
+                    _error.value = throwable.toUserFacingMessage("Không tải được ảnh")
                 }
         }
     }
@@ -409,11 +433,12 @@ class FeedViewModel @Inject constructor(
     ) {
         if (body.isBlank()) return
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.addComment(postId, body, parentCommentId) }
                 .onSuccess { SyncScheduler.triggerImmediateSync(context) }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Add comment failed")
-                    _error.value = throwable.message ?: "Không gửi được bình luận"
+                    _error.value = throwable.toUserFacingMessage("Không gửi được bình luận")
                 }
         }
     }
@@ -421,6 +446,7 @@ class FeedViewModel @Inject constructor(
     fun editComment(commentId: String, body: String) {
         if (body.isBlank()) return
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.editComment(commentId, body) }
                 .onSuccess {
                     SyncScheduler.triggerImmediateSync(context)
@@ -428,13 +454,14 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Edit comment failed")
-                    _error.value = throwable.message ?: "Không sửa được bình luận"
+                    _error.value = throwable.toUserFacingMessage("Không sửa được bình luận")
                 }
         }
     }
 
     fun deleteComment(commentId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.deleteComment(commentId) }
                 .onSuccess {
                     SyncScheduler.triggerImmediateSync(context)
@@ -442,13 +469,14 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Delete comment failed")
-                    _error.value = throwable.message ?: "Không xóa được bình luận"
+                    _error.value = throwable.toUserFacingMessage("Không xóa được bình luận")
                 }
         }
     }
 
     fun setCommentHidden(commentId: String, isHidden: Boolean) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.setCommentHidden(commentId, isHidden) }
                 .onSuccess {
                     SyncScheduler.triggerImmediateSync(context)
@@ -456,13 +484,14 @@ class FeedViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     Timber.e(throwable, "[FeedVM] Toggle comment visibility failed")
-                    _error.value = throwable.message ?: "KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c bÃ¬nh luáº­n"
+                    _error.value = throwable.toUserFacingMessage("Không cập nhật được bình luận")
                 }
         }
     }
 
     fun deletePost(postId: String) {
         viewModelScope.launch {
+            if (!requireOnlineAction()) return@launch
             runCatching { feedRepository.deletePost(postId) }
                 .onSuccess { remoteSynced ->
                     closePostDetail()
@@ -477,7 +506,7 @@ class FeedViewModel @Inject constructor(
                         closePostDetail()
                         SyncScheduler.triggerImmediateSync(context)
                     }
-                    _error.value = throwable.message ?: "Không xóa được bài viết"
+                    _error.value = throwable.toUserFacingMessage("Không xóa được bài viết")
                 }
         }
     }
@@ -487,7 +516,7 @@ class FeedViewModel @Inject constructor(
     }
 
     fun showError(message: String) {
-        _error.value = message
+        _error.value = message.toUserFacingErrorMessage()
     }
 
     private fun clearDraft() {
@@ -688,6 +717,7 @@ class FeedViewModel @Inject constructor(
     }
 
     private companion object {
+        const val REALTIME_REFRESH_DEBOUNCE_MS = 120L
         const val AUTO_REFRESH_INTERVAL_MS = 5_000L
     }
 }

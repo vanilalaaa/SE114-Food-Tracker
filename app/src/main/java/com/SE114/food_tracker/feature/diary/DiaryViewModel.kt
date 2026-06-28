@@ -44,6 +44,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
+import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -180,7 +181,10 @@ class DiaryViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferences.diaryCalendarScale.collect { _calendarScale.value = it.coerceIn(0.5f, 1.5f) }
         }
-        viewModelScope.launch { computeStreak() }
+        viewModelScope.launch {
+            itemRepository.observeDistinctEntryDates()
+                .collect { epochs -> _streak.value = calculateStreakFromEpochs(epochs) }
+        }
         viewModelScope.launch {
             runCatching { chatRepository.getUserWalletsWithRoles() }
                 .onSuccess { _availableWallets.value = it }
@@ -271,6 +275,7 @@ class DiaryViewModel @Inject constructor(
                 var finalImageUrl: String? = null
 
                 imageBytes?.let { bytes ->
+                    finalImageUrl = savePendingItemImage(itemId, bytes)
                     val ownerId = itemRepository.getCurrentUserId()
                     if (ownerId != null) {
                         imageRepository.uploadItemImage(ownerId, itemId, bytes)
@@ -304,7 +309,6 @@ class DiaryViewModel @Inject constructor(
                 // Thực hiện ghi vào DB và dọn dẹp
                 itemRepository.insert(item)
                 clearPendingImage()
-                computeStreak()
                 SyncScheduler.triggerImmediateSync(context)
 
                 if (walletId != null) {
@@ -362,6 +366,7 @@ class DiaryViewModel @Inject constructor(
                 var finalImageUrl = currentItem.imageUrl
 
                 imageBytes?.let { bytes ->
+                    finalImageUrl = savePendingItemImage(itemId, bytes)
                     val ownerId = itemRepository.getCurrentUserId()
                     if (ownerId != null) {
                         imageRepository.uploadItemImage(ownerId, itemId, bytes)
@@ -386,7 +391,6 @@ class DiaryViewModel @Inject constructor(
                     )
                 )
                 clearPendingImage()
-                computeStreak()
                 SyncScheduler.triggerImmediateSync(context)
 
             } catch (t: Throwable) {
@@ -404,7 +408,6 @@ class DiaryViewModel @Inject constructor(
             _error.value     = null
             try {
                 itemRepository.softDeleteDiaryItem(itemId)
-                computeStreak()
                 SyncScheduler.triggerImmediateSync(context)
             } catch (t: Throwable) {
                 _error.value = t.message
@@ -415,45 +418,39 @@ class DiaryViewModel @Inject constructor(
         }
     }
 
-    private suspend fun computeStreak(): Int = withContext(Dispatchers.IO) {
-        try {
-            val systemTimeZone = TimeZone.currentSystemDefault()
-            val today = Clock.System.todayIn(systemTimeZone)
+    private fun savePendingItemImage(itemId: String, bytes: ByteArray): String {
+        val directory = File(context.filesDir, "diary_items").apply { mkdirs() }
+        val target = File(directory, "$itemId.jpg")
+        target.writeBytes(bytes)
+        return Uri.fromFile(target).toString()
+    }
+    private fun calculateStreakFromEpochs(epochs: List<Long>): Int {
+        if (epochs.isEmpty()) return 0
 
-            // 1. Lấy chuỗi ID người dùng hiện tại
-            val ownerId = itemRepository.getCurrentUserId().orEmpty()
+        val systemTimeZone = TimeZone.currentSystemDefault()
+        val today = Clock.System.todayIn(systemTimeZone)
 
-            // 2. TỐI ƯU HIỆU NĂNG: Chỉ lấy danh sách các Epoch thuần túy (Kiểu Long) thay vì cả bảng Item
-            val distinctEpochs = itemRepository.getDistinctEntryDates(ownerId)
+        val activeDates = epochs.map { epoch ->
+            Instant.fromEpochMilliseconds(epoch)
+                .toLocalDateTime(systemTimeZone)
+                .date
+        }.toSet()
 
-            // 3.
-            val activeDates = distinctEpochs.map { epoch ->
-                Instant.fromEpochMilliseconds(epoch)
-                    .toLocalDateTime(systemTimeZone)
-                    .date
-            }.toSet()
+        var streak = 0
+        var cursor = today
 
-            // 4. Thuật toán đếm lùi chuỗi ngày liên tục (Streak) trên RAM
-            var streak = 0
-            var cursor = today
-
-            // UX bảo vệ chuỗi: Nếu hôm nay chưa ăn/nhập gì, lùi lại bắt đầu xét từ hôm qua
-            if (!activeDates.contains(cursor)) {
-                cursor = cursor.plus(DatePeriod(days = -1))
-            }
-
-            // Vòng lặp đếm lùi siêu tốc cho đến khi đứt chuỗi
-            while (activeDates.contains(cursor)) {
-                streak++
-                cursor = cursor.plus(DatePeriod(days = -1))
-            }
-
-            _streak.value = streak
-            return@withContext streak
-        } catch (e: Exception) {
-            Timber.e(e, "[DiaryVM] Lỗi tính toán streak")
-            return@withContext _streak.value
+        // Grace: if nothing logged today, start counting from yesterday
+        if (!activeDates.contains(cursor)) {
+            cursor = cursor.plus(DatePeriod(days = -1))
         }
+
+        while (activeDates.contains(cursor)) {
+            streak++
+            cursor = cursor.plus(DatePeriod(days = -1))
+        }
+
+        Timber.d("[DiaryVM] Streak recalculated = $streak (from ${epochs.size} dates)")
+        return streak
     }
 
     private suspend fun compressToJpeg(rawBytes: ByteArray, uri: Uri, maxBytes: Int): ByteArray =

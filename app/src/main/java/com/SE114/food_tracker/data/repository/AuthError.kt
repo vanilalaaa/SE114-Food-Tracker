@@ -15,8 +15,10 @@ sealed interface AuthError {
     data object UserIdChangeCooldown : AuthError
     data object OtpInvalid : AuthError
     data object NoNetwork : AuthError
-
-    /** An admin RPC rejected the caller (`not_authorized`); should not happen for a real admin. */
     data object NotAuthorized : AuthError
+    data object SelfAction : AuthError
+    data object TargetIsAdmin : AuthError
+    data object DeletionExpired : AuthError
+    data object BannedUserCannotBeAdmin : AuthError
     data class Unknown(val raw: String?) : AuthError
 }

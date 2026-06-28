@@ -2,6 +2,7 @@ package com.SE114.food_tracker.feature.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.SE114.food_tracker.core.util.toUserFacingMessage
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.FeedRepository
@@ -96,7 +97,7 @@ class FriendViewModel @Inject constructor(
     private fun scheduleRealtimeFriendshipRefresh() {
         realtimeFriendshipRefreshJob?.cancel()
         realtimeFriendshipRefreshJob = viewModelScope.launch {
-            delay(500)
+            delay(REALTIME_REFRESH_DEBOUNCE_MS)
             refreshFriendDataFromRealtime()
         }
     }
@@ -114,7 +115,7 @@ class FriendViewModel @Inject constructor(
                     .onFailure { reportActionError(it) }
             }
             .onFailure { e ->
-                _profileLoadError.value = e.message ?: "Không lấy được ID"
+                _profileLoadError.value = e.toUserFacingMessage("Không lấy được ID")
             }
     }
 
@@ -218,7 +219,7 @@ class FriendViewModel @Inject constructor(
                             .onSuccess { refreshSearchRelationshipSafely() }
                     }
                     .onFailure { e ->
-                        _profileLoadError.value = e.message ?: "Không lấy được ID"
+                        _profileLoadError.value = e.toUserFacingMessage("Không lấy được ID")
                     }
             } finally {
                 if (showRefreshing) _isRefreshing.value = false
@@ -248,7 +249,7 @@ class FriendViewModel @Inject constructor(
     }
 
     private fun reportActionError(t: Throwable) {
-        _actionMessage.value = t.message ?: "Đã xảy ra lỗi, vui lòng thử lại."
+        _actionMessage.value = t.toUserFacingMessage()
     }
 
     private suspend fun performSearch(query: String) {
@@ -297,6 +298,7 @@ class FriendViewModel @Inject constructor(
     private companion object {
         const val MIN_SEARCH_ID_LENGTH = 3
         const val SEARCH_DEBOUNCE_MS = 450L
+        const val REALTIME_REFRESH_DEBOUNCE_MS = 120L
         const val AUTO_REFRESH_INTERVAL_MS = 5_000L
     }
 }

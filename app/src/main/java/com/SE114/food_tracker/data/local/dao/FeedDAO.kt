@@ -64,6 +64,7 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND p.sync_status = 'SYNCED'
         AND NOT EXISTS(
             SELECT 1
             FROM feed_hidden_post hp
@@ -145,6 +146,7 @@ interface FeedDAO {
         LEFT JOIN category c ON c.category_id = i.category_id
         LEFT JOIN user_profile_cache u ON u.user_id = p.owner_id
         WHERE p.is_deleted = 0
+        AND p.sync_status = 'SYNCED'
         AND NOT EXISTS(
             SELECT 1
             FROM feed_hidden_post hp
@@ -191,7 +193,8 @@ interface FeedDAO {
             c.body AS body,
             c.parent_comment_id AS parentCommentId,
             c.is_hidden AS isHidden,
-            c.created_at AS createdAt
+            c.created_at AS createdAt,
+            c.updated_at AS updatedAt
         FROM feed_comment c
         LEFT JOIN user_profile_cache u ON u.user_id = c.user_id
         WHERE c.post_id = :postId
@@ -296,6 +299,30 @@ interface FeedDAO {
 
     @Query("DELETE FROM feed_post WHERE sync_status = 'SYNCED' AND post_id NOT IN (:remotePostIds)")
     suspend fun deleteSyncedPostsMissingFromRemote(remotePostIds: List<String>)
+
+    @Query(
+        """
+        UPDATE feed_post
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND is_deleted = 0
+        """
+    )
+    suspend fun softDeleteAllSyncedPosts(updatedAt: Long = System.currentTimeMillis())
+
+    @Query(
+        """
+        UPDATE feed_post
+        SET is_deleted = 1, sync_status = 'SYNCED', updated_at = :updatedAt
+        WHERE sync_status = 'SYNCED'
+        AND is_deleted = 0
+        AND post_id NOT IN (:remotePostIds)
+        """
+    )
+    suspend fun softDeleteSyncedPostsMissingFromRemote(
+        remotePostIds: List<String>,
+        updatedAt: Long = System.currentTimeMillis()
+    )
 
     @Query(
         """

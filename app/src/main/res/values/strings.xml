@@ -290,4 +290,16 @@
     <string name="bottom_bar_feed">B&#224;i vi&#7871;t</string>
     <string name="bottom_bar_chat">Chat</string>
     <string name="bottom_bar_settings">C&#224;i &#273;&#7863;t</string>
+
+    <string name="admin_err_self_action">Không thể thực hiện thao tác này trên chính tài khoản của mình</string>
+    <string name="admin_err_target_is_admin">Không thể thao tác trên tài khoản của một Quản trị viên khác</string>
+    <string name="admin_err_deletion_expired">Thời hạn ân hạn 30 ngày đã qua. Tài khoản này đã bị khóa tính năng khôi phục và chuẩn bị xóa vĩnh viễn khỏi Database.</string>
+    <string name="admin_err_banned_user_cannot_be_admin">Không thể cấp quyền Quản trị cho tài khoản đang bị khóa vĩnh viễn</string>
+
+    <string name="admin_status_detail_title_delete">Chi tiết thời gian xóa mềm</string>
+    <string name="admin_status_detail_body_delete">Tài khoản này đang trong trạng thái chờ xóa.\n\nHệ thống sẽ tự động dọn dẹp và xóa sổ vĩnh viễn khỏi cơ sở dữ liệu vào lúc:\n\n%1$s</string>
+    <string name="admin_status_detail_title_ban">Chi tiết thời gian khóa</string>
+    <string name="admin_status_detail_body_ban">Tài khoản này đang bị khóa tạm thời.\n\nHệ thống sẽ tự động mở khóa trả lại quyền truy cập vào lúc:\n\n%1$s</string>
+    <string name="admin_status_detail_close">Đóng</string>
+    <string name="admin_status_click_to_view">(Bấm để xem hạn)</string>
 </resources>
