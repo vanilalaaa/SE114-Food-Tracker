@@ -14,21 +14,40 @@ import com.SE114.food_tracker.data.repository.ChatRepository
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 import kotlinx.coroutines.flow.firstOrNull
 import timber.log.Timber
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import io.github.jan.supabase.auth.status.SessionStatus
+import com.SE114.food_tracker.data.repository.AuthRepository
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import java.io.File
+import android.net.Uri
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
-    private val chatDAO: ChatDAO
+    private val chatDAO: ChatDAO,
+    private val authRepository: AuthRepository, // Inject
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val currentUserId: String
@@ -46,10 +65,62 @@ class ChatViewModel @Inject constructor(
     var isTransactionSuccess by mutableStateOf<Boolean?>(null)
         private set
 
-    init {
-        fetchConversationsFromServer()
-        chatRepository.subscribeToGlobalConversationsRealtime()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val conversationsWithUnread: StateFlow<List<ConversationWithUnread>> =
+        authRepository.currentSessionFlow()
+            .map { status ->
+                if (status is SessionStatus.Authenticated) {
+                    chatRepository.getAuthenticatedUserId()
+                } else {
+                    ""
+                }
+            }
+            .flatMapLatest { userId ->
+                if (userId.isBlank()) {
+                    flowOf(emptyList()) // Nếu chưa có ID, trả về danh sách rỗng an toàn
+                } else {
+                    // Merge the Room list with the server's unread snapshot: the bare dot used to
+                    // appear when a conversation was unread (denormalized last_message_at) but had
+                    // no locally-synced messages to count. Take the larger of the two so every
+                    // unread conversation shows an exact number; gate on isUnread so a read chat
+                    // (or my own last message) shows nothing. The snapshot only refreshes on fetch,
+                    // so the count is a lower bound when unsynced history and new realtime messages
+                    // overlap — it self-heals on the next fetch / pull-to-refresh.
+                    combine(
+                        chatDAO.getAllConversationsWithUnread(userId),
+                        chatRepository.serverUnreadCounts
+                    ) { list, serverCounts ->
+                        list.map { conv ->
+                            val merged = if (conv.isUnread) {
+                                maxOf(conv.unreadCount, serverCounts[conv.id] ?: 0)
+                            } else {
+                                0
+                            }
+                            conv.copy(unreadCount = merged, isUnread = merged > 0)
+                        }
+                    }
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
 
+    init {
+        // Fetch + subscribe once per authenticated user. Previously this fired on the direct call
+        // AND on every session emission, re-running the network sync repeatedly on open.
+        viewModelScope.launch {
+            authRepository.currentSessionFlow()
+                .map { if (it is SessionStatus.Authenticated) chatRepository.getAuthenticatedUserId() else "" }
+                .distinctUntilChanged()
+                .collect { userId ->
+                    if (userId.isNotBlank()) {
+                        fetchConversationsFromServer()
+                        chatRepository.subscribeToGlobalConversationsRealtime()
+                    }
+                }
+        }
         viewModelScope.launch {
             chatRepository.memberUpdateSignal.collect { convId: String ->
                 loadGroupMembers(convId)
@@ -72,6 +143,7 @@ class ChatViewModel @Inject constructor(
 
     private val _groupMembers = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val groupMembers: StateFlow<List<Pair<String, String>>> = _groupMembers.asStateFlow()
+
     private val _isCurrentAdmin = MutableStateFlow(false)
     val isCurrentAdmin: StateFlow<Boolean> = _isCurrentAdmin.asStateFlow()
 
@@ -101,7 +173,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private var connectedConversationId: String? = null
-
+    private var presenceJob: kotlinx.coroutines.Job? = null
     fun connectToConversation(conversationId: String) {
         connectedConversationId = conversationId
         viewModelScope.launch {
@@ -113,6 +185,18 @@ class ChatViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+        presenceJob?.cancel()
+        presenceJob = viewModelScope.launch {
+            var hasBeenLoaded = false
+
+            chatDAO.getConversationById(conversationId).collect { conversation ->
+                if (conversation != null) {
+                    hasBeenLoaded = true // Xác nhận phòng chat đã nạp vào máy thành công
+                } else if (hasBeenLoaded) {
+                    _navigationEvent.emit("LEFT")
+                }
             }
         }
     }
@@ -135,7 +219,11 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { chatRepository.updateGroupName(conversationId, newName) }
     }
 
-    fun updateGroupAvatar(conversationId: String, imageUri: String, onResult: (Boolean) -> Unit = {}) {
+    fun updateGroupAvatar(
+        conversationId: String,
+        imageUri: String,
+        onResult: (Boolean) -> Unit = {}
+    ) {
         viewModelScope.launch {
             onResult(chatRepository.updateGroupAvatar(conversationId, imageUri))
         }
@@ -147,8 +235,70 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun addMembers(conversationId: String, userIds: List<String>) {
+        viewModelScope.launch {
+            // Lấy danh sách mới nhất từ server trước khi lọc
+            val currentRemoteMembers = chatRepository.fetchGroupMembersFromServer(conversationId)
+            val currentMemberIds = currentRemoteMembers.map { it.first.lowercase().trim() }
+
+            val newMembers = userIds.filter { it.lowercase().trim() !in currentMemberIds }
+
+            if (newMembers.isNotEmpty()) {
+                chatRepository.addMembersToGroup(conversationId, newMembers)
+                // Cập nhật lại State sau khi thêm
+                loadGroupMembers(conversationId)
+            }
+        }
+    }
+
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
-        viewModelScope.launch { chatRepository.kickMember(conversationId, userId, name) }
+        val cleanId = userId.trim().lowercase()
+
+        val isSelfKick = cleanId == currentUserId || cleanId.isBlank() || name == "Chính mình"
+        val finalUserId = if (isSelfKick) currentUserId else userId
+
+        viewModelScope.launch {
+
+            val finalName = if (isSelfKick) {
+                chatRepository.getUserNamesMap(listOf(currentUserId))[currentUserId]
+                    ?: "Một thành viên"
+            } else {
+                name
+            }
+
+            if (isSelfKick) {
+
+                presenceJob?.cancel()
+
+                chatRepository.deleteConversationLocal(conversationId)
+                _navigationEvent.emit("LEFT")
+
+                withContext(NonCancellable) {
+                    chatRepository.kickMember(conversationId, finalUserId, finalName)
+                }
+            } else {
+
+                chatRepository.kickMember(conversationId, finalUserId, finalName)
+            }
+        }
+    }
+
+    fun deleteDirectChat(conversationId: String) {
+        viewModelScope.launch {
+            chatRepository.deleteOneToOneChat(conversationId)
+            _navigationEvent.emit("LEFT")
+        }
+    }
+
+    private val _navigationEvent = MutableSharedFlow<String?>()
+    val navigationEvent = _navigationEvent.asSharedFlow()
+    fun disbandGroup(conversationId: String) {
+        viewModelScope.launch {
+            if (isCurrentAdmin.value) {
+                chatRepository.disbandGroup(conversationId)
+                _navigationEvent.emit("DISBANDED")
+            }
+        }
     }
 
     fun getConversationState(conversationId: String): Flow<Conversation?> {
@@ -201,9 +351,36 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private fun copyUriToInternalCache(context: android.content.Context, uriString: String): String? {
+        return try {
+            val uri = android.net.Uri.parse(uriString)
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val cacheFile = java.io.File(context.cacheDir, "upload_${System.currentTimeMillis()}.jpg")
+
+            inputStream?.use { input ->
+                cacheFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            cacheFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
-            chatRepository.sendMessage(conversationId, currentUserId, body = null, imageUrl = imageUri)
+
+            val safeCachePath = copyUriToInternalCache(context, imageUri)
+            val finalPath = if (safeCachePath != null) "file://$safeCachePath" else imageUri
+
+            chatRepository.sendMessage(
+                conversationId,
+                currentUserId,
+                body = null,
+                imageUrl = finalPath
+            )
         }
     }
 

@@ -102,31 +102,21 @@ fun ConversationItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Unread indicator — a count badge when we have the number, else a plain dot; gone once read.
-        when {
-            conversation.unreadCount > 0 -> {
-                Box(
-                    modifier = Modifier
-                        .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
-                        .clip(CircleShape)
-                        .background(StatPinkDark)
-                        .padding(horizontal = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (conversation.unreadCount > 99) "99+" else conversation.unreadCount.toString(),
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            conversation.isUnread -> {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(StatPinkDark)
+        // Unread indicator — always the exact "new messages" count (no bare dot); gone once read.
+        if (conversation.unreadCount > 0) {
+            Box(
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+                    .clip(CircleShape)
+                    .background(StatPinkDark)
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (conversation.unreadCount > 99) "99+" else conversation.unreadCount.toString(),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
