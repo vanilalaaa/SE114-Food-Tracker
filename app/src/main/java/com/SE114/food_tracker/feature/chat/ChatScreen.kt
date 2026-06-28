@@ -208,7 +208,11 @@ fun ChatScreenContent(
                     onClick = {
                         showDeleteDirectDialog = false
                         onDeleteDirectChat()
-                        Toast.makeText(context, "Đã xóa cuộc trò chuyện thành công!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            "Đã xóa cuộc trò chuyện thành công!",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = StatRed)
                 ) {
@@ -374,7 +378,8 @@ fun ChatScreenContent(
                         val isMine = message.senderId == myId ||
                                 message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
                                 message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED
-                        val isSystemMessage = message.isSystem || message.senderId == "system" || message.senderId == "SYSTEM"
+                        val isSystemMessage =
+                            message.isSystem || message.senderId == "system" || message.senderId == "SYSTEM"
                         Column(
                             modifier = Modifier.fillMaxWidth()
                         ) {
