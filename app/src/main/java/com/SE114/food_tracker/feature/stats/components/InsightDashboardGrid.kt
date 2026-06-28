@@ -106,10 +106,13 @@ fun InsightDashboardGrid(
                     )
                 }
                 Text(
-                    text = variationText,
-                    fontSize = 16.sp,
+                    // Tìm khoảng trống trước dấu "(" và thay bằng xuống dòng \n, đồng thời xóa bỏ dấu ngoặc đơn nếu muốn sạch sẽ hơn
+                    text = variationText.replace(" (", "\n").replace(")", ""),
+                    fontSize = 14.sp,
                     color = Color(0xFFD39292),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 20.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End // Căn chữ lề phải
                 )
             }
         }
