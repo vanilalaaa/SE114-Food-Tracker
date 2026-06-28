@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,7 +22,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage // 🔥 ĐÃ ĐỔI: Dùng Subcompose để bắt trạng thái Error/Loading gài avatar mặc định
+import coil.compose.SubcomposeAsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.entities.MessageSyncStatus
 import java.util.UUID
@@ -46,9 +47,11 @@ fun MessageBubble(
     isMine: Boolean,
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier,
-    senderName: String = "Thành viên"
+    senderName: String = "Thành viên",
+    onImageClick: (String) -> Unit = {}
 ) {
-    if (message.isSystem) {
+
+    if (message.isSystem || message.senderId == "system" || message.senderId == "SYSTEM") {
         Box(
             modifier = modifier
                 .fillMaxWidth()
@@ -80,7 +83,7 @@ fun MessageBubble(
                             text = message.body ?: "",
                             color = Color(0xFF546E7A),
                             fontSize = 11.sp,
-                            textAlign = TextAlign.Center
+                            // textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -131,7 +134,6 @@ fun MessageBubble(
                 }
             }
 
-            // 🔥 ĐÃ FIX LUỒNG AVATAR MẶC ĐỊNH: Nếu có link ảnh thì load, nếu link rỗng hoặc load lỗi (mạng yếu/link sai) tự động hiện Avatar chữ cái pastel ngay lập tức!
             if (message.senderAvatarUrl.isNotBlank()) {
                 SubcomposeAsyncImage(
                     model = message.senderAvatarUrl,
@@ -164,12 +166,37 @@ fun MessageBubble(
                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     if (message.imageUrl != null) {
                         Column {
-                            AsyncImage(
+                            SubcomposeAsyncImage(
                                 model = message.imageUrl,
                                 contentDescription = "Hình ảnh gửi kèm",
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                                 modifier = Modifier
                                     .size(150.dp)
                                     .clip(RoundedCornerShape(8.dp))
+                                    .clickable { onImageClick(message.imageUrl) },
+                                loading = {
+                                    Box(Modifier.size(150.dp), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(22.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                    }
+                                },
+                                error = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(150.dp)
+                                            .background(Color(0xFFECECEC)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "⚠️\nKhông tải được ảnh",
+                                            fontSize = 11.sp,
+                                            textAlign = TextAlign.Center,
+                                            color = TextLabelGray
+                                        )
+                                    }
+                                }
                             )
                             if (!message.body.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(4.dp))
