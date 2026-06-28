@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,14 +33,16 @@ import kotlinx.datetime.todayIn
 
 @Composable
 fun DayPickerDialog(
-    selectedYear: Int,
+    selectedDay: Int,
     selectedMonth: Int,
+    selectedYear: Int,
     onDateClick: (Int) -> Unit,
     onMonthYearChanged: (month: Int, year: Int) -> Unit,
-    hasDataDates: List<Int> = emptyList(),
-    scale: Float = 1f
+    hasDataDates: List<Int> = emptyList()
 ) {
     val days = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+
+    // Giữ lại để nhận diện ngày hôm nay thực tế trên hệ thống (Real Today)
     val today = remember { Clock.System.todayIn(TimeZone.currentSystemDefault()) }
 
     var showMonthPicker by remember { mutableStateOf(false) }
@@ -58,7 +59,6 @@ fun DayPickerDialog(
         List(emptySlotsBefore) { null } + (1..lastDayOfMonth).toList()
     }
 
-    // Helper: compute prev/next month+year without going out of bounds
     fun prevMonth(): Pair<Int, Int> =
         if (selectedMonth == 1) 12 to selectedYear - 1
         else selectedMonth - 1 to selectedYear
@@ -83,7 +83,7 @@ fun DayPickerDialog(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 16.dp)
-            .height(450.dp),          // +40dp to accommodate the new header row
+            .wrapContentHeight(),
         shape = RoundedCornerShape(28.dp),
         color = Color.White,
         shadowElevation = 8.dp
@@ -109,7 +109,6 @@ fun DayPickerDialog(
                     )
                 }
 
-                // Clickable "tháng 6 2026 ▼" label
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -159,78 +158,60 @@ fun DayPickerDialog(
 
             Spacer(Modifier.height(16.dp))
 
+            // ── Calendar Grid ────────────────────────────────────────────────
             LazyVerticalGrid(
                 columns = GridCells.Fixed(7),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(calendarGridItems) { date ->
                     if (date != null) {
-                        val isToday = (date == today.dayOfMonth
+                        // Trạng thái ngày đang được chọn (Theo anchor của ViewModel)
+                        val isSelected = (date == selectedDay)
+
+                        // Nhận biết xem ô này có phải là ngày hôm nay thực tế không
+                        val isRealToday = (date == today.dayOfMonth
                                 && selectedMonth == today.monthNumber
                                 && selectedYear == today.year)
+
                         val hasData = hasDataDates.contains(date)
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
+                        Box(
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
+                                .size(40.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(if (hasData) CalendarHighlight else Color.Transparent)
                                 .clickable { onDateClick(date) }
-                                .padding(vertical = 4.dp)
                         ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                if (isToday) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .background(MintGreen, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = date.toString(),
-                                            color = Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                } else {
+                            if (isSelected) {
+                                // Ô tròn MintGreen di chuyển linh hoạt theo ngày được chọn
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(MintGreen, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text(
                                         text = date.toString(),
-                                        color = TextPrimary,
+                                        color = Color.White,
                                         fontSize = 14.sp,
-                                        fontWeight = FontWeight.Normal
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                 }
-                            }
-
-                            Spacer(Modifier.height(4.dp))
-
-                            Box(
-                                modifier = Modifier
-                                    .size((24 * scale).dp)
-                                    .background(
-                                        if (hasData) Color.White else Color.Transparent,
-                                        CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (hasData) {
-                                    Icon(
-                                        Icons.Default.Restaurant,
-                                        null,
-                                        modifier = Modifier.size((12 * scale).dp),
-                                        tint = OrangeMain
-                                    )
-                                }
+                            } else {
+                                Text(
+                                    text = date.toString(),
+                                    // Nếu là ngày hôm nay thực tế nhưng chưa kích chọn thì text có màu MintGreen để làm dấu
+                                    color = if (isRealToday) MintGreen else TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isRealToday) FontWeight.Bold else FontWeight.Normal
+                                )
                             }
                         }
                     } else {
-                        Spacer(modifier = Modifier.size(36.dp))
+                        Spacer(modifier = Modifier.size(40.dp))
                     }
                 }
             }
@@ -240,11 +221,12 @@ fun DayPickerDialog(
 
 @Preview(showBackground = true)
 @Composable
-fun DayPickerDialog() {
+fun DayPickerDialogPreview() {
     FoodTrackerTheme {
         DayPickerDialog(
-            selectedYear       = 2026,
+            selectedDay        = 28,
             selectedMonth      = 6,
+            selectedYear       = 2026,
             onDateClick        = {},
             onMonthYearChanged = { _, _ -> }
         )
