@@ -251,8 +251,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // Trong ChatViewModel.kt
-
     fun kickGroupMember(conversationId: String, userId: String, name: String) {
         val cleanId = userId.trim().lowercase()
 
@@ -353,19 +351,17 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun copyUriToInternalCache(context: Context, uriString: String): String? {
+    private fun copyUriToInternalCache(context: android.content.Context, uriString: String): String? {
         return try {
-            val uri = Uri.parse(uriString)
+            val uri = android.net.Uri.parse(uriString)
             val inputStream = context.contentResolver.openInputStream(uri)
-            // Tạo một file tạm thời trong bộ nhớ Cache riêng của ứng dụng
-            val cacheFile = File(context.cacheDir, "upload_${System.currentTimeMillis()}.jpg")
+            val cacheFile = java.io.File(context.cacheDir, "upload_${System.currentTimeMillis()}.jpg")
 
             inputStream?.use { input ->
                 cacheFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
             }
-            // Trả về đường dẫn file dạng file://...
             cacheFile.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
@@ -375,8 +371,8 @@ class ChatViewModel @Inject constructor(
 
     fun sendImageMessage(conversationId: String, imageUri: String) {
         viewModelScope.launch {
-            val safeCachePath = copyUriToInternalCache(context, imageUri)
 
+            val safeCachePath = copyUriToInternalCache(context, imageUri)
             val finalPath = if (safeCachePath != null) "file://$safeCachePath" else imageUri
 
             chatRepository.sendMessage(
