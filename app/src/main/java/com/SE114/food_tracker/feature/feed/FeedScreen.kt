@@ -2,17 +2,24 @@ package com.SE114.food_tracker.feature.feed
 
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -31,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.SE114.food_tracker.core.designsystem.components.AppTopBar
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
@@ -75,6 +84,7 @@ fun FeedScreen(
                 pendingCropUri = uri
             }
         }
+        pendingCameraUri = null
     }
 
     FeedScreenContent(
@@ -161,14 +171,14 @@ fun FeedScreenContent(
     onSetCommentHidden: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val gridState = rememberLazyGridState()
-    val snackbarHostState = remember { SnackbarHostState() }
     val pullToRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(uiState.error, uiState.selectedPostId) {
         val error = uiState.error
         if (error != null && uiState.selectedPostId == null) {
-            snackbarHostState.showSnackbar(error)
+            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
             onClearError()
         }
     }
@@ -179,11 +189,35 @@ fun FeedScreenContent(
         onLoadNextPage = onLoadNextPage
     )
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MainBackground)
-    ) {
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            AppTopBar(
+                title = "Newsfeed",
+                subtitle = "${uiState.posts.size} bài viết",
+                actions = {
+                    IconButton(
+                        onClick = onNavigateToFriend,
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Groups,
+                            contentDescription = "Bạn bè",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                }
+            )
+        },
+        containerColor = MainBackground
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MainBackground)
+                .padding(innerPadding)
+        ) {
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = onRefresh,
@@ -202,7 +236,6 @@ fun FeedScreenContent(
             FeedGridContent(
                 uiState = uiState,
                 gridState = gridState,
-                onNavigateToFriend = onNavigateToFriend,
                 onPostClick = onPostClick
             )
         }
@@ -210,20 +243,13 @@ fun FeedScreenContent(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(20.dp)
+                .padding(end = 20.dp, bottom = BottomBarContentPadding + 20.dp)
         ) {
             AddActionButton(
                 onClick = onOpenComposer,
                 contentDescription = "Tạo bài viết"
             )
         }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
-        )
 
         if (uiState.isCreateSheetOpen) {
             ModalBottomSheet(
@@ -261,6 +287,7 @@ fun FeedScreenContent(
             onSetCommentHidden = onSetCommentHidden,
             onClearError = onClearError
         )
+        }
     }
 }
 

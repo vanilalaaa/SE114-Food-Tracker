@@ -145,7 +145,7 @@ fun DayDetailBottomSheetContent(
         Spacer(Modifier.height(28.dp))
         Text("Danh sách", style = AppTypography.titleSmall)
         Text(
-            "Swipe left to reveal delete. Tap to edit.",
+            "Vuốt sang trái để xóa. Nhấn để sửa.",
             style = AppTypography.labelMedium,
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
@@ -188,7 +188,8 @@ fun DayDetailBottomSheetContent(
                         categoryIcon = catIcon,
                         imageUrl     = item.imageUrl,
                         price        = item.price,
-                        time         = item.timeLabel.ifBlank { item.timeType.toTimeLabel() },
+                        createdAt    = item.createdAt,
+                        timeLabel    = item.timeLabel,
                         onClick      = { onEditItemClick(item) }
                     )
                 }
@@ -292,8 +293,9 @@ private fun SwipeToRevealDeleteRow(
 
 private fun Int.toTimeLabel(): String = when (this) {
     0    -> "Sáng"
-    1    -> "Trưa/Chiều"
-    2    -> "Tối"
+    1    -> "Trưa"
+    2    -> "Chiều"
+    3    -> "Tối"
     else -> "Khác"
 }
 

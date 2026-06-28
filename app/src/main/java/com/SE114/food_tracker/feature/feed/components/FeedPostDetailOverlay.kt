@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.feed.components
 
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,8 +52,6 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
@@ -126,6 +126,7 @@ fun FeedPostDetailOverlay(
         var commentText by rememberSaveable { mutableStateOf("") }
         var replyingToCommentId by rememberSaveable { mutableStateOf<String?>(null) }
         var replyingToDisplayName by rememberSaveable { mutableStateOf<String?>(null) }
+        var replyingToBody by rememberSaveable { mutableStateOf<String?>(null) }
         var editingCommentId by rememberSaveable { mutableStateOf<String?>(null) }
         var editingCommentPreview by rememberSaveable { mutableStateOf<String?>(null) }
         var pendingScrollCommentId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -133,12 +134,12 @@ fun FeedPostDetailOverlay(
         var isCommentsSheetOpen by rememberSaveable { mutableStateOf(false) }
         var pendingDeletePostId by rememberSaveable { mutableStateOf<String?>(null) }
         var actionPost by remember { mutableStateOf<FeedPostDto?>(null) }
-        val snackbarHostState = remember { SnackbarHostState() }
+        val context = LocalContext.current
 
         LaunchedEffect(uiState.error) {
             val error = uiState.error
             if (error != null) {
-                snackbarHostState.showSnackbar(error)
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
                 onClearError()
             }
         }
@@ -156,6 +157,7 @@ fun FeedPostDetailOverlay(
                 .collect { page ->
                     replyingToCommentId = null
                     replyingToDisplayName = null
+                    replyingToBody = null
                     editingCommentId = null
                     editingCommentPreview = null
                     pendingScrollCommentId = null
@@ -206,14 +208,6 @@ fun FeedPostDetailOverlay(
                     )
                 }
 
-                SnackbarHost(
-                    hostState = snackbarHostState,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
-                )
-
                 if (isCommentsSheetOpen) {
                     FeedCommentsBottomSheet(
                         comments = uiState.selectedComments,
@@ -221,6 +215,7 @@ fun FeedPostDetailOverlay(
                         postOwnerId = uiState.selectedPost?.ownerId.orEmpty(),
                         commentText = commentText,
                         replyingToDisplayName = replyingToDisplayName,
+                        replyingToBody = replyingToBody,
                         isEditingComment = editingCommentId != null,
                         editingCommentPreview = editingCommentPreview,
                         scrollToCommentId = pendingScrollCommentId,
@@ -233,6 +228,7 @@ fun FeedPostDetailOverlay(
                         onCancelReply = {
                             replyingToCommentId = null
                             replyingToDisplayName = null
+                            replyingToBody = null
                             editingCommentId = null
                             editingCommentPreview = null
                         },
@@ -244,6 +240,7 @@ fun FeedPostDetailOverlay(
                         onReply = { comment ->
                             replyingToCommentId = comment.commentId
                             replyingToDisplayName = comment.displayName
+                            replyingToBody = comment.body
                             editingCommentId = null
                             editingCommentPreview = null
                             if (commentText.isBlank()) {
@@ -254,6 +251,7 @@ fun FeedPostDetailOverlay(
                             editingCommentId = comment.commentId
                             replyingToCommentId = null
                             replyingToDisplayName = null
+                            replyingToBody = null
                             commentText = comment.body
                             editingCommentPreview = comment.body
                         },
@@ -276,6 +274,7 @@ fun FeedPostDetailOverlay(
                                 commentText = ""
                                 replyingToCommentId = null
                                 replyingToDisplayName = null
+                                replyingToBody = null
                                 editingCommentId = null
                                 editingCommentPreview = null
                             }
@@ -284,6 +283,7 @@ fun FeedPostDetailOverlay(
                             isCommentsSheetOpen = false
                             replyingToCommentId = null
                             replyingToDisplayName = null
+                            replyingToBody = null
                             editingCommentId = null
                             editingCommentPreview = null
                             pendingScrollCommentId = null
@@ -353,6 +353,7 @@ private fun FeedPostDetailPage(
     val navigationBarBottom = with(density) {
         WindowInsets.navigationBars.getBottom(density).toDp()
     }
+    val actionBarBottomPadding = navigationBarBottom.coerceAtLeast(32.dp) + 56.dp
 
     Box(
         modifier = Modifier
@@ -368,7 +369,7 @@ private fun FeedPostDetailPage(
                     start = 22.dp,
                     top = 22.dp,
                     end = 22.dp,
-                    bottom = navigationBarBottom + 16.dp
+                    bottom = actionBarBottomPadding
                 ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -705,6 +706,7 @@ private fun FeedCommentsBottomSheet(
     postOwnerId: String,
     commentText: String,
     replyingToDisplayName: String?,
+    replyingToBody: String?,
     isEditingComment: Boolean,
     editingCommentPreview: String?,
     scrollToCommentId: String?,
@@ -742,7 +744,7 @@ private fun FeedCommentsBottomSheet(
                 .fillMaxHeight(0.88f)
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, bottom = 12.dp)
+                .padding(start = 18.dp, end = 18.dp, bottom = 24.dp)
         ) {
             FeedCommentsList(
                 comments = comments,
@@ -766,6 +768,7 @@ private fun FeedCommentsBottomSheet(
             FeedCommentInput(
                 value = commentText,
                 replyingToDisplayName = replyingToDisplayName,
+                replyingToBody = replyingToBody,
                 isEditingComment = isEditingComment,
                 editingCommentPreview = editingCommentPreview,
                 onValueChange = onCommentTextChange,
@@ -1044,6 +1047,7 @@ private fun FeedCommentRow(
         Modifier.clickable { onReply(comment) }
     }
     val contentAlpha = if (comment.isHidden) 0.42f else 1f
+    val isEdited = comment.updatedAt > comment.createdAt + 1_000L
 
     Row(
         modifier = Modifier
@@ -1077,6 +1081,15 @@ private fun FeedCommentRow(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
+                if (isEdited) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Đã chỉnh sửa",
+                        color = Color.White.copy(alpha = 0.30f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
             Text(
                 text = comment.body,
@@ -1135,6 +1148,7 @@ private fun formatCommentAge(createdAt: Long): String {
 private fun FeedCommentInput(
     value: String,
     replyingToDisplayName: String?,
+    replyingToBody: String?,
     isEditingComment: Boolean,
     editingCommentPreview: String?,
     onValueChange: (String) -> Unit,
@@ -1185,13 +1199,23 @@ private fun FeedCommentInput(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Đang trả lời $replyingToDisplayName",
-                    color = Color.White.copy(alpha = 0.72f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Đang trả lời $replyingToDisplayName",
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = replyingToBody.orEmpty(),
+                        color = Color.White.copy(alpha = 0.50f),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Text(
                     text = "Hủy",
                     color = Color.White.copy(alpha = 0.88f),

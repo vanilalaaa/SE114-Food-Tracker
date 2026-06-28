@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import com.SE114.food_tracker.data.repository.ChatRepository
+import com.SE114.food_tracker.core.datastore.UserPreferences
 import com.SE114.food_tracker.core.network.NetworkMonitor
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -43,9 +44,11 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
+import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.String
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -55,11 +58,14 @@ class DiaryViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val supabaseItemService: SupabaseItemService,
     private val networkMonitor: NetworkMonitor,
+    private val userPreferences: UserPreferences,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _selectedDate       = MutableStateFlow(Clock.System.todayIn(TimeZone.currentSystemDefault()))
     private val _selectedCategoryId = MutableStateFlow<String?>(null)
+    private val _boxScale           = MutableStateFlow(1f)
+    private val _calendarScale      = MutableStateFlow(1f)
     private val _isLoading          = MutableStateFlow(false)
     private val _error              = MutableStateFlow<String?>(null)
     private val _streak             = MutableStateFlow(0)
@@ -129,6 +135,10 @@ class DiaryViewModel @Inject constructor(
             )
         }.combine(datesWithData) { content, datesWithData ->
             content.copy(datesWithData = datesWithData)
+        }.combine(combine(_boxScale, _calendarScale) { boxScale, calendarScale ->
+            boxScale to calendarScale
+        }) { content, scales ->
+            content.copy(boxScale = scales.first, calendarScale = scales.second)
         }.let { content ->
             combine(content, _isLoading, _error, _streak, _pendingImageUri) {
                     diaryContent, isLoading, error, streak, pendingImageUri ->
@@ -146,6 +156,8 @@ class DiaryViewModel @Inject constructor(
                     totalSpend         = filteredItems.sumOf { it.price },
                     itemCount          = filteredItems.size,
                     streak             = streak,
+                    boxScale           = diaryContent.boxScale,
+                    calendarScale      = diaryContent.calendarScale,
                     isLoading          = isLoading,
                     error              = error,
                     pendingImageUri    = pendingImageUri
@@ -163,7 +175,16 @@ class DiaryViewModel @Inject constructor(
             )
 
     init {
-        viewModelScope.launch { computeStreak() }
+        viewModelScope.launch {
+            userPreferences.diaryBoxScale.collect { _boxScale.value = it.coerceIn(0.5f, 1.5f) }
+        }
+        viewModelScope.launch {
+            userPreferences.diaryCalendarScale.collect { _calendarScale.value = it.coerceIn(0.5f, 1.5f) }
+        }
+        viewModelScope.launch {
+            itemRepository.observeDistinctEntryDates()
+                .collect { epochs -> _streak.value = calculateStreakFromEpochs(epochs) }
+        }
         viewModelScope.launch {
             runCatching { chatRepository.getUserWalletsWithRoles() }
                 .onSuccess { _availableWallets.value = it }
@@ -178,6 +199,18 @@ class DiaryViewModel @Inject constructor(
 
     fun selectCategoryFilter(catId: String?) {
         _selectedCategoryId.value = catId
+    }
+
+    fun updateBoxScale(scale: Float) {
+        val safeScale = scale.coerceIn(0.5f, 1.5f)
+        _boxScale.value = safeScale
+        viewModelScope.launch { userPreferences.setDiaryBoxScale(safeScale) }
+    }
+
+    fun updateCalendarScale(scale: Float) {
+        val safeScale = scale.coerceIn(0.5f, 1.5f)
+        _calendarScale.value = safeScale
+        viewModelScope.launch { userPreferences.setDiaryCalendarScale(safeScale) }
     }
 
     fun onImageSelected(uri: Uri) {
@@ -214,6 +247,7 @@ class DiaryViewModel @Inject constructor(
         note: String,
         timeType: Int,
         isShared: Boolean = false,
+        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
         walletId: String? = null
     ) {
         viewModelScope.launch {
@@ -241,6 +275,7 @@ class DiaryViewModel @Inject constructor(
                 var finalImageUrl: String? = null
 
                 imageBytes?.let { bytes ->
+                    finalImageUrl = savePendingItemImage(itemId, bytes)
                     val ownerId = itemRepository.getCurrentUserId()
                     if (ownerId != null) {
                         imageRepository.uploadItemImage(ownerId, itemId, bytes)
@@ -265,17 +300,15 @@ class DiaryViewModel @Inject constructor(
                     note       = note.ifBlank { null },
                     imageUrl   = finalImageUrl,
                     isShared   = isShared,
-                    walletId   = walletId,
                     syncStatus = SyncStatus.PENDING.name,
                     entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
-                    createdAt  = now,
+                    createdAt  = pickedTimeMillis, // ← SỬA: Thay thế 'now' thành mốc thời gian người dùng chọn
                     updatedAt  = now
                 )
 
-                // Lưu vào Room trước để giao diện (UI) cập nhật lập tức
+                // Thực hiện ghi vào DB và dọn dẹp
                 itemRepository.insert(item)
                 clearPendingImage()
-                computeStreak()
                 SyncScheduler.triggerImmediateSync(context)
 
                 if (walletId != null) {
@@ -312,6 +345,7 @@ class DiaryViewModel @Inject constructor(
         note: String,
         timeType: Int,
         isShared: Boolean,
+        pickedTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
         walletId: String? = null
     ) {
         viewModelScope.launch {
@@ -332,6 +366,7 @@ class DiaryViewModel @Inject constructor(
                 var finalImageUrl = currentItem.imageUrl
 
                 imageBytes?.let { bytes ->
+                    finalImageUrl = savePendingItemImage(itemId, bytes)
                     val ownerId = itemRepository.getCurrentUserId()
                     if (ownerId != null) {
                         imageRepository.uploadItemImage(ownerId, itemId, bytes)
@@ -350,13 +385,12 @@ class DiaryViewModel @Inject constructor(
                         note       = note.ifBlank { null },
                         imageUrl   = finalImageUrl,
                         isShared   = isShared,
-                        walletId   = walletId,
                         syncStatus = SyncStatus.PENDING.name,
+                        createdAt  = pickedTimeMillis,
                         updatedAt  = Clock.System.now().toEpochMilliseconds()
                     )
                 )
                 clearPendingImage()
-                computeStreak()
                 SyncScheduler.triggerImmediateSync(context)
 
             } catch (t: Throwable) {
@@ -374,7 +408,6 @@ class DiaryViewModel @Inject constructor(
             _error.value     = null
             try {
                 itemRepository.softDeleteDiaryItem(itemId)
-                computeStreak()
                 SyncScheduler.triggerImmediateSync(context)
             } catch (t: Throwable) {
                 _error.value = t.message
@@ -385,45 +418,39 @@ class DiaryViewModel @Inject constructor(
         }
     }
 
-    private suspend fun computeStreak(): Int = withContext(Dispatchers.IO) {
-        try {
-            val systemTimeZone = TimeZone.currentSystemDefault()
-            val today = Clock.System.todayIn(systemTimeZone)
+    private fun savePendingItemImage(itemId: String, bytes: ByteArray): String {
+        val directory = File(context.filesDir, "diary_items").apply { mkdirs() }
+        val target = File(directory, "$itemId.jpg")
+        target.writeBytes(bytes)
+        return Uri.fromFile(target).toString()
+    }
+    private fun calculateStreakFromEpochs(epochs: List<Long>): Int {
+        if (epochs.isEmpty()) return 0
 
-            // 1. Lấy chuỗi ID người dùng hiện tại
-            val ownerId = itemRepository.getCurrentUserId().orEmpty()
+        val systemTimeZone = TimeZone.currentSystemDefault()
+        val today = Clock.System.todayIn(systemTimeZone)
 
-            // 2. TỐI ƯU HIỆU NĂNG: Chỉ lấy danh sách các Epoch thuần túy (Kiểu Long) thay vì cả bảng Item
-            val distinctEpochs = itemRepository.getDistinctEntryDates(ownerId)
+        val activeDates = epochs.map { epoch ->
+            Instant.fromEpochMilliseconds(epoch)
+                .toLocalDateTime(systemTimeZone)
+                .date
+        }.toSet()
 
-            // 3.
-            val activeDates = distinctEpochs.map { epoch ->
-                Instant.fromEpochMilliseconds(epoch)
-                    .toLocalDateTime(systemTimeZone)
-                    .date
-            }.toSet()
+        var streak = 0
+        var cursor = today
 
-            // 4. Thuật toán đếm lùi chuỗi ngày liên tục (Streak) trên RAM
-            var streak = 0
-            var cursor = today
-
-            // UX bảo vệ chuỗi: Nếu hôm nay chưa ăn/nhập gì, lùi lại bắt đầu xét từ hôm qua
-            if (!activeDates.contains(cursor)) {
-                cursor = cursor.plus(DatePeriod(days = -1))
-            }
-
-            // Vòng lặp đếm lùi siêu tốc cho đến khi đứt chuỗi
-            while (activeDates.contains(cursor)) {
-                streak++
-                cursor = cursor.plus(DatePeriod(days = -1))
-            }
-
-            _streak.value = streak
-            return@withContext streak
-        } catch (e: Exception) {
-            Timber.e(e, "[DiaryVM] Lỗi tính toán streak")
-            return@withContext _streak.value
+        // Grace: if nothing logged today, start counting from yesterday
+        if (!activeDates.contains(cursor)) {
+            cursor = cursor.plus(DatePeriod(days = -1))
         }
+
+        while (activeDates.contains(cursor)) {
+            streak++
+            cursor = cursor.plus(DatePeriod(days = -1))
+        }
+
+        Timber.d("[DiaryVM] Streak recalculated = $streak (from ${epochs.size} dates)")
+        return streak
     }
 
     private suspend fun compressToJpeg(rawBytes: ByteArray, uri: Uri, maxBytes: Int): ByteArray =
@@ -484,6 +511,8 @@ class DiaryViewModel @Inject constructor(
         val items: List<DiaryItem>,
         val monthlyItems: List<DiaryItem>,
         val categories: List<DiaryCategory>,
-        val datesWithData: Set<Int>
+        val datesWithData: Set<Int>,
+        val boxScale: Float = 1f,
+        val calendarScale: Float = 1f
     )
 }

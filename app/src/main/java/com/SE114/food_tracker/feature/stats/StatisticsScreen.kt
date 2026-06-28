@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -24,6 +26,7 @@ import com.SE114.food_tracker.feature.stats.components.*
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.core.util.CurrencyDisplay
 import com.SE114.food_tracker.core.util.LocalCurrencyDisplay
+import com.SE114.food_tracker.core.util.MoneyInputTransformation
 
 @Composable
 fun StatisticsScreen(
@@ -140,7 +143,8 @@ fun StatisticsScreen(
                                 TimeFrame.MONTH -> uiState.budget.monthly
                                 TimeFrame.YEAR  -> uiState.budget.yearly
                             }
-                            budgetInput = current?.toInt()?.toString() ?: ""
+                            // Gán chuỗi số thuần túy (không chứa dấu phẩy) vào State
+                            budgetInput = current?.toLong()?.toString() ?: ""
                             showBudgetDialog = true
                         }
                 ) {
@@ -268,7 +272,7 @@ fun StatisticsScreen(
                 InsightCard(insights = finalInsights)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(BottomBarContentPadding))
         }
     }
 
@@ -290,8 +294,15 @@ fun StatisticsScreen(
                     Text("Hạn mức mong muốn (đ):")
                     OutlinedTextField(
                         value         = budgetInput,
-                        onValueChange = { budgetInput = it },
+                        onValueChange = { newValue ->
+                            if (newValue.all { it.isDigit() }) {
+                                budgetInput = newValue
+                            }
+                        },
                         label         = { Text("Số tiền") },
+                        visualTransformation = MoneyInputTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine    = true,
                         modifier      = Modifier.fillMaxWidth()
                     )
                 }

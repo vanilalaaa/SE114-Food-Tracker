@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,6 +59,8 @@ import com.SE114.food_tracker.core.designsystem.theme.TextPrimary
 import com.SE114.food_tracker.data.local.dao.FeedSourceItemDto
 import com.SE114.food_tracker.feature.feed.FeedUiState
 import com.SE114.food_tracker.feature.feed.FeedVisibility
+import com.SE114.food_tracker.feature.feed.MaxPostCaptionLength
+import com.SE114.food_tracker.feature.feed.MaxPostTitleLength
 
 @Composable
 fun FeedComposerSheet(
@@ -106,11 +109,17 @@ fun FeedComposerSheet(
         ) {
             OutlinedTextField(
                 value = uiState.draftCaption,
-                onValueChange = onCaptionChange,
+                onValueChange = { onCaptionChange(it.take(MaxPostCaptionLength)) },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Chú thích", color = TextLabelGray) },
                 minLines = 2,
                 maxLines = 4,
+                supportingText = {
+                    Text(
+                        text = "${uiState.draftCaption.length}/$MaxPostCaptionLength",
+                        color = TextLabelGray
+                    )
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 keyboardActions = KeyboardActions.Default,
                 shape = RoundedCornerShape(22.dp),
@@ -166,6 +175,7 @@ fun FeedComposerSheet(
         FeedComposerActionBar(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
                 .padding(bottom = 12.dp),
             showCreate = hasRequiredContent,
             isCreatingPost = uiState.isCreatingPost,
@@ -260,25 +270,26 @@ private fun FeedPickedSourcePreview(
                 if (isFreeImage) {
                     OutlinedTextField(
                         value = freeImageTitle,
-                        onValueChange = onFreeImageTitleChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = pickedImageUri == null, onClick = onPickImage),
-                        enabled = pickedImageUri != null,
+                        onValueChange = { onFreeImageTitleChange(it.take(MaxPostTitleLength)) },
+                        modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Tên loại ảnh", color = TextLabelGray) },
                         singleLine = true,
+                        supportingText = {
+                            Text(
+                                text = "${freeImageTitle.length}/$MaxPostTitleLength",
+                                color = TextLabelGray
+                            )
+                        },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.None),
                         keyboardActions = KeyboardActions(),
                         shape = RoundedCornerShape(14.dp),
                         colors = composerTextFieldColors()
                     )
                     Text(
-                        text = if (pickedImageUri == null) "Chưa chọn nguồn" else "Ảnh tự do",
+                        text = if (pickedImageUri == null) "Chưa chọn ảnh" else "Ảnh tự do",
                         color = TextLabelGray,
                         fontSize = 12.sp,
-                        modifier = Modifier
-                            .padding(start = 4.dp, top = 4.dp)
-                            .clickable(enabled = pickedImageUri == null, onClick = onPickImage)
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                     )
                 } else {
                     Text(

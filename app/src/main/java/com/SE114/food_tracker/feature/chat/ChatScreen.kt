@@ -28,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.SE114.food_tracker.core.designsystem.components.AppTopBar
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.GroupSettingsDialog
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
@@ -58,9 +59,6 @@ fun ChatScreen(
     val currentUserId = viewModel.currentUserId
 
     val isGroup = conversationState?.isGroup ?: false
-    val hasWallet = conversationState?.walletId != null &&
-            conversationState?.walletId != "wallet_default" &&
-            conversationState?.walletId?.isNotBlank() == true
 
     LaunchedEffect(conversationId) {
         viewModel.connectToConversation(conversationId)
@@ -85,28 +83,11 @@ fun ChatScreen(
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,
-        hasWallet = hasWallet,
         isAdmin = isAdmin,
         memberList = memberList.map { Pair(it.first, it.second) }, // Map Triple sang Pair cho khớp signature cũ nhe Vy
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
-        onCreateWalletClick = {
-            viewModel.createGroupWallet(conversationId) { success ->
-                if (success) {
-                    Toast.makeText(
-                        context,
-                        "Khởi tạo Quỹ Nhóm thành công! 💰",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    Toast.makeText(
-                        context,
-                        "Lỗi tạo ví, vui lòng thử lại!",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        },
+        onCreateWalletClick = {},
 
         onSendMessage = { text ->
             viewModel.sendTextMessage(
@@ -145,7 +126,6 @@ fun ChatScreenContent(
     messageList: List<MessageUiModel>,
     myId: String,
     isGroup: Boolean,
-    hasWallet: Boolean,
     isAdmin: Boolean,
     memberList: List<Pair<String, String>>,
     onBackClick: () -> Unit,
@@ -246,39 +226,31 @@ fun ChatScreenContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = conversationName,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(text = "Đang trực tuyến", fontSize = 11.sp, color = Color(0xFF4CAF50))
-                    }
-                },
+            AppTopBar(
+                title = conversationName,
+                subtitle = "Đang trực tuyến",
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    if (isGroup) {
-                        if (hasWallet) {
-                            IconButton(onClick = onWalletClick) {
-                                Text("💰", fontSize = 22.sp)
-                            }
-                        } else if (isAdmin) {
-                            TextButton(onClick = onCreateWalletClick) {
-                                Text(
-                                    "Tạo Quỹ",
-                                    color = StatPinkDark,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
-                    }
+//                    if (isGroup) {
+//                        if (hasWallet) {
+//                            IconButton(onClick = onWalletClick) {
+//                                Text("💰", fontSize = 22.sp)
+//                            }
+//                        } else if (isAdmin) {
+//                            TextButton(onClick = onCreateWalletClick) {
+//                                Text(
+//                                    "Tạo Quỹ",
+//                                    color = StatPinkDark,
+//                                    fontWeight = FontWeight.Bold,
+//                                    fontSize = 14.sp
+//                                )
+//                            }
+//                        }
+//                    }
 
                     if (isGroup) {
                         IconButton(onClick = { showSettingsDialog = true }) {
@@ -289,8 +261,7 @@ fun ChatScreenContent(
                             )
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MainBackground)
+                }
             )
         },
         containerColor = MainBackground,
@@ -459,7 +430,6 @@ fun ChatScreenPreview() {
             conversationName = "Team SE114 - Food Tracker 🥑",
             myId = "vy_id",
             isGroup = true,
-            hasWallet = true,
             isAdmin = true,
             memberList = listOf(Pair("azun_id", "Azun"), Pair("vy_id", "Vy")),
             messageList = listOf(

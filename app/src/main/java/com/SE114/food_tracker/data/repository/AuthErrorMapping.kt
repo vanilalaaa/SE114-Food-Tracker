@@ -62,8 +62,14 @@ internal fun Throwable.toProfileError(): AuthError {
 }
 
 /**
- * Maps admin-RPC failures: the `not_authorized` exception raised by the admin gate
- * becomes [AuthError.NotAuthorized]; everything else delegates to [toAuthError].
+ * Maps admin-RPC failures to domain errors.
+ *
+ * Updated codes for migration 0008:
+ * - `not_authorized`              → [AuthError.NotAuthorized]
+ * - `self_action`                 → [AuthError.SelfAction]
+ * - `target_is_admin`             → [AuthError.TargetIsAdmin]
+ * - `deletion_expired`            → [AuthError.DeletionExpired]
+ * - `banned_user_cannot_be_admin` → [AuthError.BannedUserCannotBeAdmin] (CẬP NHẬT MỚI)
  */
 internal fun Throwable.toAdminError(): AuthError {
     val body = buildString {
@@ -73,15 +79,32 @@ internal fun Throwable.toAdminError(): AuthError {
             append(' '); append(description)
         }
     }
-    if ("not_authorized" in body) {
-        Timber.tag("Admin").e(this, "admin action rejected: not_authorized")
-        return AuthError.NotAuthorized
+
+    when {
+        "not_authorized" in body -> {
+            Timber.tag("Admin").e(this, "admin action rejected: not_authorized")
+            return AuthError.NotAuthorized
+        }
+        "self_action" in body -> {
+            Timber.tag("Admin").e(this, "admin action rejected: self_action")
+            return AuthError.SelfAction
+        }
+        "target_is_admin" in body -> {
+            Timber.tag("Admin").e(this, "admin action rejected: target_is_admin")
+            return AuthError.TargetIsAdmin
+        }
+        "deletion_expired" in body -> {
+            Timber.tag("Admin").e(this, "admin action rejected: deletion_expired")
+            return AuthError.DeletionExpired
+        }
+        "banned_user_cannot_be_admin" in body -> { // CẬP NHẬT MỚI
+            Timber.tag("Admin").e(this, "admin action rejected: banned_user_cannot_be_admin")
+            return AuthError.BannedUserCannotBeAdmin
+        }
     }
+
     Timber.tag("Admin").e(this, "admin RPC failed")
     val mapped = toAuthError()
-    // Keep NoNetwork etc.; for any other REST/server failure surface the full server text
-    // (e.g. "Could not find the function ... in the schema cache", "column ... does not exist")
-    // so the on-screen message names the real cause instead of a vague generic.
     return if (mapped is AuthError.Unknown && this is RestException) {
         AuthError.Unknown(body.trim().ifBlank { null })
     } else {
@@ -93,16 +116,16 @@ private fun Throwable.messageFallback(): AuthError {
     val msg = message?.lowercase().orEmpty()
     return when {
         "unable to resolve host" in msg || "failed to connect" in msg ||
-            "network" in msg || "timeout" in msg || "timed out" in msg -> AuthError.NoNetwork
+                "network" in msg || "timeout" in msg || "timed out" in msg -> AuthError.NoNetwork
         "invalid login credentials" in msg || "invalid credentials" in msg -> AuthError.InvalidCredentials
         "email not confirmed" in msg -> AuthError.EmailNotConfirmed
         "already registered" in msg || "already been registered" in msg ||
-            "user already exists" in msg -> AuthError.EmailAlreadyRegistered
+                "user already exists" in msg -> AuthError.EmailAlreadyRegistered
         "weak password" in msg || "password should be" in msg -> AuthError.WeakPassword
         "invalid email" in msg || "unable to validate email" in msg -> AuthError.InvalidEmail
         "rate limit" in msg || "too many requests" in msg -> AuthError.RateLimited
         "otp" in msg || "token has expired" in msg || "invalid token" in msg ||
-            "expired or is invalid" in msg -> AuthError.OtpInvalid
+                "expired or is invalid" in msg -> AuthError.OtpInvalid
         else -> AuthError.Unknown(message)
     }
 }

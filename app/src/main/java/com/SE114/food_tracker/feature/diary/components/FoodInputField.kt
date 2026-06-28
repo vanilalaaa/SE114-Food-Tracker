@@ -13,6 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.core.designsystem.theme.*
+import androidx.compose.ui.text.input.VisualTransformation
 
 @Composable
 fun FoodInputField(
@@ -23,6 +24,8 @@ fun FoodInputField(
     isSingleLine: Boolean = true,
     trailingText: String? = null,
     labelIcon: Any? = null,
+    maxChars: Int? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -49,9 +52,15 @@ fun FoodInputField(
 
         Spacer(Modifier.height(8.dp))
 
+        // ── Ô nhập dữ liệu (TextField) ────────────────────────────────────────
         TextField(
             value = value,
-            onValueChange = onValueChange,
+            onValueChange = { newValue ->
+                // Chỉ nhận giá trị mới nếu chưa vượt quá giới hạn ký tự (hoặc không cài giới hạn)
+                if (maxChars == null || newValue.length <= maxChars) {
+                    onValueChange(newValue)
+                }
+            },
             placeholder = { Text(placeholder, fontSize = 14.sp, color = Color.LightGray) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = isSingleLine,
@@ -62,6 +71,20 @@ fun FoodInputField(
                     Text(text = trailingText, color = Color.LightGray, fontSize = 14.sp)
                 }
             },
+            supportingText = {
+                // Hiển thị bộ đếm ký tự nhỏ xinh dưới góc phải khi có cài đặt maxChars
+                if (maxChars != null) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Text(
+                            text = "${value.length}/$maxChars",
+                            fontSize = 11.sp,
+                            color = if (value.length >= maxChars) Color(0xFFE57373) else Color.Gray
+                        )
+                    }
+                }
+            },
+            visualTransformation = visualTransformation,
+
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White,
@@ -78,9 +101,32 @@ fun FoodInputField(
 fun FoodInputFieldPreview() {
     FoodTrackerTheme {
         Column(modifier = Modifier.padding(16.dp)) {
-            FoodInputField(label = "TÊN MÓN", value = "", onValueChange = {}, placeholder = "VD: Phở Bò")
-            FoodInputField(label = "GIÁ", value = "30", onValueChange = {}, trailingText = "K đ")
-            FoodInputField(label = "Ghi chú", labelIcon = "📝", value = "", onValueChange = {}, isSingleLine = false)
+            // Tên món: Tối đa 50 ký tự
+            FoodInputField(
+                label = "TÊN MÓN",
+                value = "Bún chả Obam",
+                onValueChange = {},
+                placeholder = "VD: Phở Bò",
+                maxChars = 50
+            )
+
+            // Không giới hạn ký tự
+            FoodInputField(
+                label = "GIÁ",
+                value = "35",
+                onValueChange = {},
+                trailingText = "K đ"
+            )
+
+            // Ghi chú: Tối đa 200 ký tự công thức/lưu ý mua đồ
+            FoodInputField(
+                label = "Ghi chú",
+                labelIcon = "📝",
+                value = "Ít bún, nhiều chả băm, không lấy đu đủ",
+                onValueChange = {},
+                isSingleLine = false,
+                maxChars = 200
+            )
         }
     }
 }

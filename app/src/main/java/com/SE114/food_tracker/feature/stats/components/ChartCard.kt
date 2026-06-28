@@ -79,14 +79,13 @@ fun ChartCard(
     data: List<Pair<String, Double>>,
     modifier: Modifier = Modifier
 ) {
-    val targetSessions = listOf("Sáng", "Trưa/Chiều", "Tối")
+    val targetSessions = listOf("Sáng", "Trưa", "Chiều", "Tối")
     val isSessionChart = title.contains("giờ", ignoreCase = true) || title.contains("buổi", ignoreCase = true)
 
     val finalizedData = if (isSessionChart) {
         targetSessions.map { targetLabel ->
             val matchingValue = data.find {
-                it.first.contains(targetLabel, ignoreCase = true) ||
-                        (targetLabel == "Trưa/Chiều" && (it.first.contains("Trưa") || it.first.contains("Chiều")))
+                it.first.equals(targetLabel, ignoreCase = true)
             }?.second ?: 0.0
             targetLabel to matchingValue
         }

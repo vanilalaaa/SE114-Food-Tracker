@@ -2,6 +2,7 @@ package com.SE114.food_tracker.data.repository
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.storage.storage
+import timber.log.Timber
 import javax.inject.Inject
 
 class ImageRepository @Inject constructor(
@@ -50,6 +51,8 @@ class ImageRepository @Inject constructor(
             val publicUrl = supabaseClient.storage.from("avatars").publicUrl(path)
             Result.success("$publicUrl?v=${System.currentTimeMillis()}")
         } catch (e: Exception) {
+            // Was silently swallowed before — log so storage/RLS failures are diagnosable.
+            Timber.tag("Profile").e(e, "uploadAvatar failed (bucket=avatars, user=%s)", userId)
             Result.failure(e)
         }
     }

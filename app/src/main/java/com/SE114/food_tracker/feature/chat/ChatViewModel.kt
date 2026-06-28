@@ -56,13 +56,6 @@ class ChatViewModel @Inject constructor(
                 refreshChatData(convId)
             }
         }
-
-        viewModelScope.launch {
-            chatRepository.walletUpdateSignal.collect { convId: String ->
-                loadWalletData(convId)
-                refreshChatData(convId)
-            }
-        }
     }
 
     fun fetchConversationsFromServer(onComplete: () -> Unit = {}) {
@@ -260,67 +253,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // ── WALLET ────────────────────────────────────────────────────────────────
-
-    private val _walletBalanceFlow = MutableStateFlow(0.0)
-    val walletBalanceFlow: StateFlow<Double> = _walletBalanceFlow.asStateFlow()
-
-    fun loadWalletData(conversationId: String) {
-        viewModelScope.launch {
-            val balance = chatRepository.getWalletBalance(conversationId)
-            _walletBalanceFlow.value = balance
-            walletBalance = balance
-            _walletTransactions.value = chatRepository.fetchWalletTransactionsFromServer(conversationId)
-        }
-    }
-
-    fun executeWalletTransaction(
-        conversationId: String,
-        amount: Double,
-        isDeposit: Boolean,
-        note: String
-    ) {
-        viewModelScope.launch {
-            try {
-                val transactionType = if (isDeposit) "deposit" else "withdrawal"
-                val conversation = chatDAO.getConversationById(conversationId).firstOrNull()
-                val actualWalletId = conversation?.walletId
-                if (actualWalletId.isNullOrBlank() || actualWalletId == "wallet_default") return@launch
-
-                val success = chatRepository.executeWalletTransaction(
-                    conversationId = conversationId,
-                    amount = amount,
-                    txType = transactionType,
-                    note = note,
-                    itemId = null
-                )
-                if (success) loadWalletData(conversationId)
-                isTransactionSuccess = success
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
     fun resetTransactionStatus() {
         isTransactionSuccess = null
     }
 
     suspend fun isCurrentUserAdmin(conversationId: String): Boolean =
         runCatching { chatRepository.isCurrentUserAdminOf(conversationId) }.getOrDefault(false)
-
-    fun createGroupWallet(conversationId: String, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            val success = runCatching {
-                chatRepository.createGroupWalletForExistingChat(
-                    conversationId = conversationId,
-                    memberUserIds = emptyList()
-                )
-            }.getOrDefault(false)
-            if (success) fetchConversationsFromServer()
-            onResult(success)
-        }
-    }
 
     private fun formatToTime(timestamp: Long): String =
         SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(timestamp))

@@ -13,6 +13,7 @@ import com.SE114.food_tracker.data.local.entities.FeedLike
 import com.SE114.food_tracker.data.local.entities.FeedPost
 import com.SE114.food_tracker.data.local.entities.UserProfileCacheEntity
 import com.SE114.food_tracker.data.remote.dto.FeedCommentRemoteDTO
+import com.SE114.food_tracker.data.remote.dto.FeedCommentWriteDTO
 import com.SE114.food_tracker.data.remote.dto.FeedLikeRemoteDTO
 import com.SE114.food_tracker.data.remote.dto.FeedPostRemoteDTO
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
@@ -20,6 +21,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
+import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.rpc
@@ -133,10 +135,10 @@ class FeedRepository @Inject constructor(
                     table = "post_like"
                 }
 
-                repositoryScope.launch {
+                launchRealtimeCollector("post insert") {
                     postInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("post update") {
                     postUpdateFlow.collect { action ->
                         action.decodeRecordOrNull<FeedPostRemoteDTO>()
                             ?.takeIf { it.isDeleted }
@@ -144,29 +146,29 @@ class FeedRepository @Inject constructor(
                         _postRealtimeEvents.tryEmit(Unit)
                     }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("post delete") {
                     postDeleteFlow.collect { action ->
                         action.decodeOldRecordOrNull<FeedPostRemoteDTO>()
                             ?.let { feedDao.softDeleteSyncedPostsByRemoteIds(listOf(it.id)) }
                         _postRealtimeEvents.tryEmit(Unit)
                     }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("comment insert") {
                     commentInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("comment update") {
                     commentUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("comment delete") {
                     commentDeleteFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("like insert") {
                     likeInsertFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("like update") {
                     likeUpdateFlow.collect { _postRealtimeEvents.tryEmit(Unit) }
                 }
-                repositoryScope.launch {
+                launchRealtimeCollector("like delete") {
                     likeDeleteFlow.collect { action ->
                         action.decodeOldRecordOrNull<FeedLikeRemoteDTO>()
                             ?.let {
@@ -185,6 +187,21 @@ class FeedRepository @Inject constructor(
             }.onFailure { throwable ->
                 Timber.e(throwable, "[FeedRealtime] subscribe failed")
             }
+        }
+    }
+
+    private fun launchRealtimeCollector(label: String, block: suspend () -> Unit) {
+        repositoryScope.launch {
+            runCatching { block() }
+                .onFailure { Timber.e(it, "[FeedRealtime] $label collector stopped") }
+        }
+    }
+
+    fun resetFeedRealtime() {
+        val channel = feedRealtimeChannel
+        feedRealtimeChannel = null
+        repositoryScope.launch {
+            channel?.let { runCatching { it.unsubscribe() } }
         }
     }
 
@@ -238,17 +255,25 @@ class FeedRepository @Inject constructor(
         parentCommentId: String? = null
     ) {
         val now = System.currentTimeMillis()
-        feedDao.insertComment(
-            FeedComment(
-                postId = postId,
-                userId = currentUserId(),
-                displayName = currentDisplayName(),
-                body = body.trim(),
-                parentCommentId = parentCommentId,
-                createdAt = now,
-                updatedAt = now
-            )
+        val ownerId = currentAuthenticatedUserId()
+        val comment = FeedComment(
+            postId = postId,
+            userId = ownerId,
+            displayName = currentDisplayName(),
+            body = body.trim(),
+            parentCommentId = parentCommentId,
+            createdAt = now,
+            updatedAt = now
         )
+        feedDao.insertComment(comment)
+
+        runCatching { pushComment(comment, ownerId) }
+            .onSuccess { feedDao.markCommentSynced(comment.commentId) }
+            .onFailure { throwable ->
+                Timber.e(throwable, "[FeedSync] immediate comment create failed id=${comment.commentId}")
+                feedDao.markCommentFailed(comment.commentId)
+                throw throwable
+            }
     }
 
     suspend fun editComment(commentId: String, body: String) {
@@ -396,13 +421,14 @@ class FeedRepository @Inject constructor(
             val remotePosts = supabaseClient.postgrest.from("post")
                 .select()
                 .decodeList<FeedPostRemoteDTO>()
-            val locallyDeletedPostIds = feedDao.getDeletedPostIds().toSet()
+            val locallyPendingDeletedPostIds = feedDao.getPendingDeletedPostIds().toSet()
             val remoteDeletedPostIds = remotePosts
                 .filter { it.isDeleted }
                 .map { it.id }
             val visibleRemotePosts = remotePosts
                 .filterNot { it.isDeleted }
-                .filterNot { it.id in locallyDeletedPostIds }
+                .filterNot { it.id in locallyPendingDeletedPostIds }
+            val visibleRemotePostIds = visibleRemotePosts.map { it.id }
 
             val postEntities = visibleRemotePosts.map { dto ->
                 dto.toEntity(
@@ -411,6 +437,11 @@ class FeedRepository @Inject constructor(
             }
             if (remoteDeletedPostIds.isNotEmpty()) {
                 feedDao.softDeleteSyncedPostsByRemoteIds(remoteDeletedPostIds)
+            }
+            if (visibleRemotePostIds.isEmpty()) {
+                feedDao.softDeleteAllSyncedPosts()
+            } else {
+                feedDao.softDeleteSyncedPostsMissingFromRemote(visibleRemotePostIds)
             }
             if (postEntities.isNotEmpty()) {
                 feedDao.insertPosts(postEntities)
@@ -538,7 +569,10 @@ class FeedRepository @Inject constructor(
         if (comment.isDeleted) {
             softDeleteRemoteCommentThread(comment.commentId)
         } else {
-            supabaseClient.postgrest.from("post_comment").upsert(comment.toRemoteDTO(ownerId))
+            val response = supabaseClient.from("post_comment")
+                .upsert(comment.toWriteDTO(ownerId)) { select() }
+            val syncedComment = response.decodeSingle<FeedCommentRemoteDTO>()
+            feedDao.insertComment(syncedComment.toEntity(displayName = comment.displayName))
         }
     }
 
@@ -628,7 +662,25 @@ class FeedRepository @Inject constructor(
             isDeleted = isDeleted,
             isHidden = isHidden,
             createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
-            hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it).toString() }
+            hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it).toString() },
+            editedAt = updatedAt
+                .takeIf { it > createdAt + COMMENT_EDITED_THRESHOLD_MS && !isDeleted }
+                ?.let { Instant.fromEpochMilliseconds(it).toString() }
+        )
+
+    private fun FeedComment.toWriteDTO(ownerId: String): FeedCommentWriteDTO =
+        FeedCommentWriteDTO(
+            id = commentId,
+            postId = postId,
+            authorId = ownerId,
+            body = body,
+            parentCommentId = parentCommentId,
+            isDeleted = isDeleted,
+            isHidden = isHidden,
+            hiddenAt = hiddenAt?.let { Instant.fromEpochMilliseconds(it).toString() },
+            editedAt = updatedAt
+                .takeIf { it > createdAt + COMMENT_EDITED_THRESHOLD_MS && !isDeleted }
+                ?.let { Instant.fromEpochMilliseconds(it).toString() }
         )
 
     private fun FeedPostRemoteDTO.toEntity(ownerName: String): FeedPost =
@@ -671,7 +723,8 @@ class FeedRepository @Inject constructor(
             isHidden = isHidden,
             hiddenAt = hiddenAt?.let { Instant.parse(it).toEpochMilliseconds() },
             createdAt = Instant.parse(createdAt).toEpochMilliseconds(),
-            updatedAt = hiddenAt?.let { Instant.parse(it).toEpochMilliseconds() }
+            updatedAt = editedAt?.let { Instant.parse(it).toEpochMilliseconds() }
+                ?: hiddenAt?.let { Instant.parse(it).toEpochMilliseconds() }
                 ?: deletedAt?.let { Instant.parse(it).toEpochMilliseconds() }
                 ?: Instant.parse(createdAt).toEpochMilliseconds()
         )
@@ -712,6 +765,7 @@ class FeedRepository @Inject constructor(
         private const val EMOJI_IMAGE_PREFIX = "emoji:"
         private const val LOCAL_USER_ID = "local_user"
         private const val AUTH_SESSION_WAIT_MS = 2_000L
+        private const val COMMENT_EDITED_THRESHOLD_MS = 1_000L
     }
 }
 

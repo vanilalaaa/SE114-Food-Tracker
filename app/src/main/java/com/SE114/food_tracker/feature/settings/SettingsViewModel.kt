@@ -6,6 +6,8 @@ import com.SE114.food_tracker.core.sync.LocalDataCleaner
 import com.SE114.food_tracker.data.repository.AuthOutcome
 import com.SE114.food_tracker.data.repository.AuthRepository
 import com.SE114.food_tracker.data.repository.ChatRepository
+import com.SE114.food_tracker.data.repository.FeedRepository
+import com.SE114.food_tracker.data.repository.FriendRepository
 import com.SE114.food_tracker.data.repository.Profile
 import com.SE114.food_tracker.data.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +24,8 @@ class SettingsViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val authRepository: AuthRepository,
     private val chatRepository: ChatRepository,
+    private val feedRepository: FeedRepository,
+    private val friendRepository: FriendRepository,
     private val localDataCleaner: LocalDataCleaner
 ) : ViewModel() {
 
@@ -50,8 +54,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             localDataCleaner.clearUserOwnedData()
             // Drop realtime channels while the session is still valid so a different account
-            // logging in next rebuilds them cleanly (ChatRepository is a process singleton).
+            // logging in next rebuilds them cleanly (repositories are process singletons).
             chatRepository.resetChatState()
+            feedRepository.resetFeedRealtime()
+            friendRepository.resetFriendshipRealtime()
             authRepository.signOut()
         }
     }

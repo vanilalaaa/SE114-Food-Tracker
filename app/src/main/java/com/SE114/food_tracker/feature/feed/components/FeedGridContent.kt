@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -23,9 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,10 +38,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.theme.CardWhite
 import com.SE114.food_tracker.core.designsystem.theme.HintGray
 import com.SE114.food_tracker.core.designsystem.theme.LightPeach
-import com.SE114.food_tracker.core.designsystem.theme.MainBackground
 import com.SE114.food_tracker.core.designsystem.theme.MintGreen
 import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
 import com.SE114.food_tracker.core.designsystem.theme.TextPrimary
@@ -55,33 +51,23 @@ import com.SE114.food_tracker.feature.feed.feedFallbackIcon
 import com.SE114.food_tracker.feature.feed.feedImageModelOrNull
 import kotlinx.coroutines.flow.distinctUntilChanged
 
+private val FeedBottomContentPadding = BottomBarContentPadding + 80.dp
+
 @Composable
 fun FeedGridContent(
     uiState: FeedUiState,
     gridState: LazyGridState,
-    onNavigateToFriend: () -> Unit,
     onPostClick: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        FeedHeader(
-            postCount = uiState.posts.size,
-            onNavigateToFriend = onNavigateToFriend
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-        ) {
-            when {
-                uiState.posts.isEmpty() && uiState.isLoading -> FeedLoadingState()
-                uiState.posts.isEmpty() -> FeedEmptyState(error = uiState.error)
-                else -> FeedGrid(
-                    posts = uiState.posts,
-                    gridState = gridState,
-                    onPostClick = onPostClick
-                )
-            }
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            uiState.posts.isEmpty() && uiState.isLoading -> FeedLoadingState()
+            uiState.posts.isEmpty() -> FeedEmptyState(error = uiState.error)
+            else -> FeedGrid(
+                posts = uiState.posts,
+                gridState = gridState,
+                onPostClick = onPostClick
+            )
         }
     }
 }
@@ -107,47 +93,6 @@ fun FeedPagingEffect(
 }
 
 @Composable
-private fun FeedHeader(
-    postCount: Int,
-    onNavigateToFriend: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Newsfeed",
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp
-            )
-            Text(
-                text = "$postCount bài viết",
-                color = TextLabelGray,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        IconButton(
-            onClick = onNavigateToFriend,
-            modifier = Modifier.size(52.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Groups,
-                contentDescription = "Bạn bè",
-                tint = TextPrimary,
-                modifier = Modifier.size(32.dp)
-            )
-        }
-    }
-}
-
-@Composable
 private fun FeedGrid(
     posts: List<FeedPostDto>,
     gridState: LazyGridState,
@@ -157,7 +102,12 @@ private fun FeedGrid(
         columns = GridCells.Fixed(3),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, top = 10.dp, end = 12.dp, bottom = 18.dp),
+        contentPadding = PaddingValues(
+            start = 12.dp,
+            top = 10.dp,
+            end = 12.dp,
+            bottom = FeedBottomContentPadding
+        ),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {

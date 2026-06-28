@@ -53,7 +53,6 @@ class ItemRepository @Inject constructor(
                     note = item.note,
                     imageUrl = item.imageUrl,
                     isShared = item.isShared,
-                    walletId = item.walletId,
                     entryDate = item.entryDate,
                     createdAt = item.createdAt,
                     updatedAt = item.updatedAt
@@ -96,6 +95,9 @@ class ItemRepository @Inject constructor(
 
     suspend fun markFailed(itemId: String) = itemDAO.markFailed(itemId)
 
+    suspend fun updateItemImageUrl(itemId: String, imageUrl: String) =
+        itemDAO.updateItemImageUrl(itemId, imageUrl)
+
     fun getTotalExpenseForDay(start: Long, end: Long): Flow<Double?> =
         itemDAO.getTotalExpenseForDay(owner(), start, end)
 
@@ -104,12 +106,16 @@ class ItemRepository @Inject constructor(
 
     fun getPersonalExpenseByCategory(start: Long, end: Long): Flow<List<CategoryExpense>> =
         itemDAO.getPersonalExpenseByCategory(owner(), start, end)
+
+    fun observeDistinctEntryDates(): Flow<List<Long>> =
+        itemDAO.observeDistinctEntryDates(owner())
 }
 
 private fun Int.toDiaryTimeLabel(): String =
     when (this) {
         0 -> "Sáng"
-        1 -> "Trưa/Chiều"
-        2 -> "Tối"
+        1 -> "Trưa"
+        2 -> "Chiều"
+        3 -> "Tối"
         else -> "Khác"
     }

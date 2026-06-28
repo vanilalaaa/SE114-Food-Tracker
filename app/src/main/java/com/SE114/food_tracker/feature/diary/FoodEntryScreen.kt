@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.MainBackground
+import com.SE114.food_tracker.core.util.MoneyInputTransformation
 import com.SE114.food_tracker.feature.diary.components.CategorySelector
 import com.SE114.food_tracker.feature.diary.components.FoodInputField
 import com.SE114.food_tracker.feature.diary.components.ManageCategoryBottomSheet
@@ -58,6 +59,7 @@ import com.SE114.food_tracker.feature.diary.components.ShareToggle
 import com.SE114.food_tracker.data.repository.ChatRepository
 import com.SE114.food_tracker.feature.diary.components.StarRatingBar
 import com.SE114.food_tracker.feature.diary.components.TimeSelector
+import com.SE114.food_tracker.feature.diary.components.WheelTimePickerDialog
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,11 +69,10 @@ fun FoodEntryScreen(
     preSelectedCategory: DiaryCategory? = null,
     categories: List<DiaryCategory> = emptyList(),
     manageCategories: List<DiaryCategory> = categories,
-    availableWallets: List<ChatRepository.WalletWithRole> = emptyList(),
     pendingImageUri: Uri? = null,
     categoryDeleteError: String? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, walletId: String?) -> Unit,
+    onSave: (name: String, price: Double, categoryId: String, rating: Int, note: String, timeType: Int, isShared: Boolean, pickedTimeMillis: Long) -> Unit,
     onDelete: ((String) -> Unit)? = null,
     onToggleCategoryVisibility: (DiaryCategory) -> Unit = {},
     onDeleteCategory: (DiaryCategory) -> Unit = {},
@@ -103,46 +104,50 @@ fun FoodEntryScreen(
 
     var rating           by remember(existingItem?.itemId) { mutableIntStateOf(existingItem?.rating ?: 0) }
     var isShared         by remember(existingItem?.itemId) { mutableStateOf(existingItem?.isShared ?: false) }
-    var selectedWalletId by remember(existingItem?.itemId) { mutableStateOf(existingItem?.walletId) }
     var nameError     by remember { mutableStateOf<String?>(null) }
     var priceError    by remember { mutableStateOf<String?>(null) }
     var categoryError by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog    by remember { mutableStateOf(false) }
     var showManageCategoriesSheet by remember { mutableStateOf(false) }
 
-    var selectedHour by remember(existingItem?.itemId) {
-        val initialHour = when (existingItem?.timeType) {
-            0 -> 8
-            1 -> 12
-            2 -> 19
-            else -> Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    var selectedHour by remember(existingItem) {
+        val calendar = Calendar.getInstance()
+        if (existingItem != null) {
+            calendar.timeInMillis = existingItem.createdAt
+            mutableIntStateOf(calendar.get(Calendar.HOUR_OF_DAY))
+        } else {
+            mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
         }
-        mutableIntStateOf(initialHour)
     }
-    var selectedMinute by remember(existingItem?.itemId) {
-        mutableIntStateOf(if (existingItem != null) 0 else Calendar.getInstance().get(Calendar.MINUTE))
+
+    var selectedMinute by remember(existingItem) {
+        val calendar = Calendar.getInstance()
+        if (existingItem != null) {
+            calendar.timeInMillis = existingItem.createdAt
+            mutableIntStateOf(calendar.get(Calendar.MINUTE))
+        } else {
+            mutableIntStateOf(Calendar.getInstance().get(Calendar.MINUTE))
+        }
     }
     var showTimePicker by remember { mutableStateOf(false) }
 
     // Tự động phân loại timeType khớp với constraint của Database (0: Sáng, 1: Trưa/Chiều, 2: Tối)
     val autoTimeType = when (selectedHour) {
-        in 5..10  -> 0
-        in 11..16 -> 1
-        else      -> 2
+        in 5..10  -> 0  // Sáng
+        in 11..13 -> 1  // Trưa
+        in 14..17 -> 2  // Chiều
+        else      -> 3  // Tối
     }
-
-    // Nhãn hiển thị chi tiết cho UI người dùng
     val sessionLabel = when (selectedHour) {
         in 5..10  -> "Sáng"
-        in 11..12 -> "Trưa"
-        in 13..16 -> "Chiều"
+        in 11..13 -> "Trưa"
+        in 14..17 -> "Chiều"
         else      -> "Tối"
     }
-
     val sessionIcon = when (selectedHour) {
         in 5..10  -> "🌅"
-        in 11..12 -> "☀️"
-        in 13..16 -> "⛅"
+        in 11..13 -> "☀️"
+        in 14..17 -> "⛅"
         else      -> "🌙"
     }
 
@@ -164,7 +169,25 @@ fun FoodEntryScreen(
         categoryError = if (selectedCategoryId.isBlank()) "Vui lòng chọn loại món" else null
 
         if (nameError == null && priceError == null && categoryError == null && parsedPrice != null) {
-            onSave(trimmedName, parsedPrice, selectedCategoryId, rating, note.trim(), autoTimeType, isShared, selectedWalletId)
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = existingItem?.entryDate ?: System.currentTimeMillis()
+                set(Calendar.HOUR_OF_DAY, selectedHour)
+                set(Calendar.MINUTE, selectedMinute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val pickedTimeMillis = cal.timeInMillis
+
+            onSave(
+                trimmedName,
+                parsedPrice,
+                selectedCategoryId,
+                rating,
+                note.trim(),
+                autoTimeType,
+                isShared,
+                pickedTimeMillis
+            )
         }
     }
 
@@ -190,27 +213,14 @@ fun FoodEntryScreen(
 
     // ── Time picker dialog (TV3) ───────────────────────────────────────────
     if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(
-            initialHour   = selectedHour,
+        WheelTimePickerDialog(
+            initialHour = selectedHour,
             initialMinute = selectedMinute,
-            is24Hour      = true
-        )
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    selectedHour   = timePickerState.hour
-                    selectedMinute = timePickerState.minute
-                    showTimePicker = false
-                }) { Text("Xong") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("Hủy") }
-            },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    TimePicker(state = timePickerState)
-                }
+            onDismiss = { showTimePicker = false },
+            onDone = { hour, minute ->
+                selectedHour = hour
+                selectedMinute = minute
+                showTimePicker = false
             }
         )
     }
@@ -313,7 +323,8 @@ fun FoodEntryScreen(
                 foodName  = it
                 nameError = null
             },
-            placeholder = "VD: Phở Bò"
+            placeholder = "VD: Phở Bò",
+            maxChars    = 20 // Giới hạn tên món tối đa 20 ký tự
         )
         FieldError(nameError)
 
@@ -326,7 +337,8 @@ fun FoodEntryScreen(
                 priceError = null
             },
             placeholder  = "0",
-            trailingText = "đ"
+            trailingText = "đ",
+            visualTransformation = MoneyInputTransformation()
         )
         FieldError(priceError)
 
@@ -356,12 +368,6 @@ fun FoodEntryScreen(
             onShareChange = { isShared = it }
         )
 
-        PaymentSourceSelector(
-            availableWallets  = availableWallets,
-            selectedWalletId  = selectedWalletId,
-            onSelectionChange = { selectedWalletId = it }
-        )
-
         Spacer(Modifier.height(16.dp))
 
         Row(
@@ -389,7 +395,8 @@ fun FoodEntryScreen(
             value         = note,
             onValueChange = { note = it },
             placeholder   = "VD: Món này ngon quá!",
-            isSingleLine  = false
+            isSingleLine  = false,
+            maxChars      = 100 // Giới hạn ghi chú tối đa 100 ký tự
         )
 
         Spacer(Modifier.height(24.dp))
@@ -413,7 +420,6 @@ fun FoodEntryScreen(
         Spacer(Modifier.height(40.dp))
     }
 }
-
 @Composable
 private fun FieldError(error: String?) {
     if (error != null) {
@@ -423,26 +429,5 @@ private fun FieldError(error: String?) {
             fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
         )
-    }
-}
-
-@Preview(showSystemUi = true, device = "spec:width=411dp,height=891dp")
-@Composable
-fun FoodEntryScreenPreview() {
-    val previewCategories = listOf(
-        DiaryCategory("preview-1", "Cơm",        "🍚", isSystem = true),
-        DiaryCategory("preview-2", "Mì & Phở",   "🍜", isSystem = true),
-        DiaryCategory("preview-3", "Bánh mì",    "🥖", isSystem = true),
-        DiaryCategory("preview-4", "Đồ uống",    "🥤", isSystem = true),
-        DiaryCategory("preview-5", "Tráng miệng","🍰", isSystem = true),
-    )
-    FoodTrackerTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MainBackground) {
-            FoodEntryScreen(
-                categories = previewCategories,
-                onDismiss  = {},
-                onSave     = { _, _, _, _, _, _, _, _ -> }
-            )
-        }
     }
 }

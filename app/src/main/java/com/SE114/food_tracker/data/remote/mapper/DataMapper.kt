@@ -35,7 +35,6 @@ object DataMapper {
             note         = this.note,
             imageUrl     = this.imageUrl,
             isShared     = this.isShared,
-            walletId     = this.walletId,
             syncStatus   = SyncStatus.SYNCED.name,
             entryDate    = entryDateMillis,
             createdAt    = createdAtMillis,
@@ -66,7 +65,6 @@ object DataMapper {
             note         = this.note,
             imageUrl     = this.imageUrl,
             isShared     = this.isShared,
-            walletId     = this.walletId,
             createdAt    = createdAtStr,
             updatedAt    = updatedAtStr,
             isDeleted    = this.isDeleted

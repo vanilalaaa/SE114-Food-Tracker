@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.SE114.food_tracker.R
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 import com.SE114.food_tracker.core.designsystem.theme.TextLabelGray
 import com.SE114.food_tracker.data.model.ProfileSharedItem
@@ -87,17 +88,18 @@ fun ProfileDiaryTab(
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                             DayItem(
-                                name = item.name,
-                                category = item.categoryName,
-                                price = item.price,
-                                time = item.timeLabel,
+                                name         = item.name,
+                                category     = item.categoryName,
+                                price        = item.price,
+                                createdAt    = item.createdAt,
+                                timeLabel    = item.timeLabel,
                                 categoryIcon = item.categoryIcon,
-                                imageUrl = item.imageUrl,
-                                onClick = {}
+                                imageUrl     = item.imageUrl,
+                                onClick      = { }
                             )
                         }
                     }
-                    item { Spacer(Modifier.height(80.dp)) }
+                    item { Spacer(Modifier.height(BottomBarContentPadding)) }
                 }
             }
         }
@@ -136,6 +138,7 @@ private fun ProfileDiaryTabPreview() {
                     categoryName = "Mì & Phở",
                     categoryIcon = "🍜",
                     price = 45_000.0,
+                    createdAt = System.currentTimeMillis(),
                     timeLabel = "Sáng",
                     imageUrl = null,
                     entryDate = "2026-06-07"
@@ -146,6 +149,7 @@ private fun ProfileDiaryTabPreview() {
                     categoryName = "Đồ uống",
                     categoryIcon = "🥤",
                     price = 35_000.0,
+                    createdAt = System.currentTimeMillis(),
                     timeLabel = "Chiều",
                     imageUrl = null,
                     entryDate = "2026-06-06"

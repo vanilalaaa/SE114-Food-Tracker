@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.friend
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,12 +12,14 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.data.local.dao.FriendItemDto
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
@@ -43,24 +46,23 @@ fun FriendScreen(
     val busyFriendshipIds by viewModel.busyFriendshipIds.collectAsStateWithLifecycle()
     val isReportSubmitting by viewModel.isReportSubmitting.collectAsStateWithLifecycle()
 
-    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
     var friendPendingDelete by remember { mutableStateOf<FriendItemDto?>(null) }
     var requestPendingDecline by remember { mutableStateOf<FriendItemDto?>(null) }
     var requestPendingCancel by remember { mutableStateOf<FriendItemDto?>(null) }
     var friendPendingReport by remember { mutableStateOf<FriendItemDto?>(null) }
 
-    // Surface failed friend actions as a one-shot snackbar.
+    // Surface failed friend actions with the same system toast style used by Chat.
     LaunchedEffect(actionMessage) {
         actionMessage?.let {
-            snackbarHostState.showSnackbar(it)
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             viewModel.clearActionMessage()
         }
     }
-    // Surface a profile-load failure with a retry action (instead of hiding it in the ID slot).
+    // Surface a profile-load failure instead of hiding it in the ID slot.
     LaunchedEffect(profileLoadError) {
         profileLoadError?.let {
-            val result = snackbarHostState.showSnackbar(message = it, actionLabel = "Thử lại")
-            if (result == SnackbarResult.ActionPerformed) viewModel.retryLoadProfile()
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -145,12 +147,6 @@ fun FriendScreen(
                 }
             )
         }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-        )
     }
 }
 
@@ -204,7 +200,12 @@ fun FriendScreenContent(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
+            contentPadding = PaddingValues(
+                top = 16.dp,
+                bottom = 16.dp,
+                start = 16.dp,
+                end = 16.dp
+            )
         ) {
         item {
             Row(
@@ -269,7 +270,7 @@ fun FriendScreenContent(
                 SectionHeader(title = "Lời mời kết bạn", count = incomingRequests.size)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(incomingRequests, key = { it.friendshipId }) { request ->
+            items(incomingRequests, key = { "incoming-${it.friendshipId}" }) { request ->
                 IncomingRequestItem(
                     request = request,
                     isBusy = request.friendshipId in busyFriendshipIds,
@@ -285,7 +286,7 @@ fun FriendScreenContent(
                 SectionHeader(title = "Lời mời đã gửi", count = outgoingRequests.size)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            items(outgoingRequests, key = { it.friendshipId }) { request ->
+            items(outgoingRequests, key = { "outgoing-${it.friendshipId}" }) { request ->
                 OutgoingRequestItem(
                     request = request,
                     isBusy = request.friendshipId in busyFriendshipIds,
@@ -303,7 +304,7 @@ fun FriendScreenContent(
         if (acceptedFriends.isEmpty()) {
             item { EmptyFriendState() }
         } else {
-            items(acceptedFriends, key = { it.friendshipId }) { friend ->
+            items(acceptedFriends, key = { "accepted-${it.friendshipId}" }) { friend ->
                 FriendListItem(
                     friend = friend,
                     onOpenProfile = { onOpenFriendProfile(friend) },

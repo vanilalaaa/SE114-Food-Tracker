@@ -17,6 +17,9 @@ interface FriendDAO {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUserCache(userProfile: UserProfileCacheEntity)
 
+    @Query("SELECT * FROM user_profile_cache WHERE user_id = :userId LIMIT 1")
+    suspend fun getUserCache(userId: String): UserProfileCacheEntity?
+
     @Query("SELECT * FROM friendship WHERE friendship_id = :friendshipId LIMIT 1")
     suspend fun getFriendshipById(friendshipId: String): FriendshipEntity?
 
