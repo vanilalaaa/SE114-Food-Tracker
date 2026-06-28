@@ -435,7 +435,6 @@ fun ChatScreenContent(
                 tonalElevation = 2.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .imePadding()
                     .navigationBarsPadding()
             ) {
                 Row(
