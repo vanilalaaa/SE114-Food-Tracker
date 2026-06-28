@@ -182,7 +182,7 @@ fun DayPickerDialog(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (hasData) CalendarHighlight else Color.Transparent)
+                                .background(Color.Transparent)
                                 .clickable { onDateClick(date) }
                         ) {
                             if (isSelected) {
