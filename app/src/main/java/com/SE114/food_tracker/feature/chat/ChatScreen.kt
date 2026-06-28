@@ -11,11 +11,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Delete // THÊM IMPORT ICON XÓA
 import androidx.compose.material3.*
-import androidx.compose.runtime.* import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,12 +34,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.SE114.food_tracker.core.designsystem.components.AppTopBar
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.feature.chat.components.GroupSettingsDialog
+import com.SE114.food_tracker.feature.chat.components.ChatImageViewer
 import com.SE114.food_tracker.feature.chat.components.MessageBubble
 import com.SE114.food_tracker.feature.chat.components.MessageUiModel
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material.icons.filled.Image
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.SE114.food_tracker.feature.friend.FriendViewModel
+import kotlinx.coroutines.flow.firstOrNull
 
-// Per-message character cap, in line with modern chat apps (Discord ~2,000, Telegram/Slack ~4,000).
 private const val MAX_MESSAGE_LENGTH = 2000
 
 @Composable
@@ -45,27 +52,38 @@ fun ChatScreen(
     conversationName: String,
     targetFriendId: String? = null,
     viewModel: ChatViewModel,
+    friendViewModel: FriendViewModel = hiltViewModel(),
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit
 ) {
     LaunchedEffect(Unit) {
-        println("DEBUG_SCREEN: Đang mở chat với ID: '$conversationId'")
+        viewModel.navigationEvent.collect { event ->
+            if (event == "DISBANDED" || event == "LEFT") {
+                onBackClick() // Tự động thoát ra ngay lập tức
+            }
+        }
     }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val conversationState by viewModel.getConversationState(conversationId).collectAsState(initial = null)
+    val conversationState by viewModel.getConversationState(conversationId)
+        .collectAsState(initial = null)
     val messages by viewModel.getMessagesState(conversationId).collectAsState(initial = emptyList())
     val currentUserId = viewModel.currentUserId
 
     val isGroup = conversationState?.isGroup ?: false
+    val acceptedFriends by friendViewModel.acceptedFriends.collectAsState()
 
+    val friendList = remember(acceptedFriends) {
+        acceptedFriends.map {
+            Pair(it.userId, it.displayName)
+        }
+    }
     LaunchedEffect(conversationId) {
         viewModel.connectToConversation(conversationId)
         viewModel.loadGroupMembers(conversationId)
     }
 
-    // Mark read on open and again whenever a newer message lands while the chat is on screen.
     val latestMessageId = messages.lastOrNull()?.localId
     LaunchedEffect(conversationId, latestMessageId) {
         viewModel.markAsRead(conversationId)
@@ -74,17 +92,27 @@ fun ChatScreen(
     val memberList by viewModel.groupMembers.collectAsState()
     val isAdmin by viewModel.isCurrentAdmin.collectAsState()
     val friendId = memberList.firstOrNull { it.first != currentUserId }?.first
+
     ChatScreenContent(
         conversationId = conversationId,
-        // Groups use the live stored name (reflects renames); 1-1 chats use the resolved peer
-        // name passed in (the stored name is the generic "Trò chuyện 1-1" placeholder).
-        conversationName = if (isGroup) conversationState?.name ?: conversationName else conversationName,
+        conversationName = if (isGroup) conversationState?.name
+            ?: conversationName else conversationName,
         groupAvatarUrl = conversationState?.avatarUrl,
         messageList = messages,
         myId = currentUserId,
         isGroup = isGroup,
         isAdmin = isAdmin,
-        memberList = memberList.map { Pair(it.first, it.second) }, // Map Triple sang Pair cho khớp signature cũ nhe Vy
+        onDisbandGroup = {
+            viewModel.disbandGroup(conversationId)
+        },
+        onDeleteDirectChat = {
+            viewModel.deleteDirectChat(conversationId) // Gọi hàm xóa 1-1 từ ViewModel
+        },
+        memberList = memberList.map { Pair(it.first, it.second) },
+        friendList = friendList,
+        onAddMembers = { userIds ->
+            viewModel.addMembers(conversationId, userIds)
+        },
         onBackClick = onBackClick,
         onWalletClick = onWalletClick,
         onCreateWalletClick = {},
@@ -127,6 +155,8 @@ fun ChatScreenContent(
     myId: String,
     isGroup: Boolean,
     isAdmin: Boolean,
+    onDisbandGroup: () -> Unit,
+    onDeleteDirectChat: () -> Unit, // Callback xóa 1-1
     memberList: List<Pair<String, String>>,
     onBackClick: () -> Unit,
     onWalletClick: () -> Unit,
@@ -135,6 +165,8 @@ fun ChatScreenContent(
     onSendImage: (String) -> Unit,
     onRetryMessage: (com.SE114.food_tracker.data.local.entities.Message) -> Unit,
     onRenameGroup: (String, String) -> Unit,
+    friendList: List<Pair<String, String>>,
+    onAddMembers: (List<String>) -> Unit,
     onKickMember: (String, String, String) -> Unit,
     onKickMemberWithResult: ((String, String, String) -> Unit)? = null,
     viewModel: ChatViewModel,
@@ -143,13 +175,54 @@ fun ChatScreenContent(
     val context = LocalContext.current
     var textInput by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showDeleteDirectDialog by remember { mutableStateOf(false) } // State Dialog xóa 1-1
+    var viewerImageUrl by remember { mutableStateOf<String?>(null) } // Ảnh đang xem toàn màn hình
 
     var memberToKick by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    viewerImageUrl?.let { url ->
+        ChatImageViewer(imageUrl = url, onDismiss = { viewerImageUrl = null })
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { onSendImage(it.toString()) }
+    }
+
+    // Dialog xác nhận xóa cuộc trò chuyện 1-1
+    if (showDeleteDirectDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDirectDialog = false },
+            title = {
+                Text("Xóa cuộc trò chuyện", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "Bạn có chắc chắn muốn xóa toàn bộ lịch sử cuộc trò chuyện này không? Hành động này không thể hoàn tác.",
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteDirectDialog = false
+                        onDeleteDirectChat()
+                        Toast.makeText(context, "Đã xóa cuộc trò chuyện thành công!", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatRed)
+                ) {
+                    Text("Xóa", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDirectDialog = false }) {
+                    Text("Hủy", color = TextLabelGray)
+                }
+            },
+            containerColor = CardWhite,
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 
     if (memberToKick != null) {
@@ -159,7 +232,10 @@ fun ChatScreenContent(
                 Text("Xác nhận mời ra khỏi nhóm", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             },
             text = {
-                Text("Bạn có chắc chắn muốn mời ${memberToKick?.second} rời khỏi nhóm Quỹ này không?", fontSize = 14.sp)
+                Text(
+                    "Bạn có chắc chắn muốn mời ${memberToKick?.second} rời khỏi nhóm này không?",
+                    fontSize = 14.sp
+                )
             },
             confirmButton = {
                 Button(
@@ -170,7 +246,6 @@ fun ChatScreenContent(
                             } else {
                                 onKickMember(conversationId, userId, name)
                             }
-                            Toast.makeText(context, "Đã mời $name rời khỏi nhóm!", Toast.LENGTH_SHORT).show()
                         }
                         memberToKick = null
                         showSettingsDialog = false
@@ -220,7 +295,11 @@ fun ChatScreenContent(
             },
             onKickMember = { userId, name ->
                 memberToKick = Pair(userId, name)
-            }
+            },
+            isAdmin = isAdmin,
+            onDisbandGroup = onDisbandGroup,
+            friendList = friendList,
+            onAddMembers = { userIds -> viewModel.addMembers(conversationId, userIds) }
         )
     }
 
@@ -235,23 +314,6 @@ fun ChatScreenContent(
                     }
                 },
                 actions = {
-//                    if (isGroup) {
-//                        if (hasWallet) {
-//                            IconButton(onClick = onWalletClick) {
-//                                Text("💰", fontSize = 22.sp)
-//                            }
-//                        } else if (isAdmin) {
-//                            TextButton(onClick = onCreateWalletClick) {
-//                                Text(
-//                                    "Tạo Quỹ",
-//                                    color = StatPinkDark,
-//                                    fontWeight = FontWeight.Bold,
-//                                    fontSize = 14.sp
-//                                )
-//                            }
-//                        }
-//                    }
-
                     if (isGroup) {
                         IconButton(onClick = { showSettingsDialog = true }) {
                             Icon(
@@ -260,12 +322,21 @@ fun ChatScreenContent(
                                 tint = StatPinkDark
                             )
                         }
+                    } else {
+                        // NÚT XÓA TRÒ CHUYỆN HIỂN THỊ KHI LÀ CHAT 1-1
+                        IconButton(onClick = { showDeleteDirectDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete Chat",
+                                tint = StatRed
+                            )
+                        }
                     }
                 }
             )
         },
         containerColor = MainBackground,
-        modifier = modifier
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -283,7 +354,9 @@ fun ChatScreenContent(
                         isRefreshing = false
                     }
                 },
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
                 LazyColumn(
                     modifier = Modifier
@@ -301,12 +374,11 @@ fun ChatScreenContent(
                         val isMine = message.senderId == myId ||
                                 message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.PENDING ||
                                 message.syncStatus == com.SE114.food_tracker.data.local.entities.MessageSyncStatus.FAILED
-
+                        val isSystemMessage = message.isSystem || message.senderId == "system" || message.senderId == "SYSTEM"
                         Column(
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            // 🔥 ĐA FIX TRIỆT ĐỂ LUỒNG TRỄ: UI lấy thẳng tên thật đã map hoàn chỉnh trong object tin nhắn truyền xuống
-                            if (!isMine && isGroup && !message.isSystem && message.senderId != "system") {
+                            if (!isMine && isGroup && !isSystemMessage) {
                                 Text(
                                     text = message.senderName,
                                     fontSize = 11.sp,
@@ -318,18 +390,20 @@ fun ChatScreenContent(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
+                                horizontalArrangement = when {
+                                    isSystemMessage -> Arrangement.Center
+                                    isMine -> Arrangement.End
+                                    else -> Arrangement.Start
+                                },
                                 verticalAlignment = Alignment.Bottom
                             ) {
-                                if (!isMine && isGroup && (message.isSystem || message.senderId == "system")) {
-                                    Spacer(modifier = Modifier.width(44.dp))
-                                }
 
                                 MessageBubble(
                                     message = message,
                                     isMine = isMine,
-                                    senderName = message.senderName, // Truyền trực tiếp dữ liệu realtime
-                                    onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } }
+                                    senderName = message.senderName,
+                                    onRetryClick = { message.rawEntity?.let { onRetryMessage(it) } },
+                                    onImageClick = { viewerImageUrl = it }
                                 )
                             }
                         }
@@ -359,7 +433,10 @@ fun ChatScreenContent(
             Surface(
                 color = MainBackground,
                 tonalElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
             ) {
                 Row(
                     modifier = Modifier
@@ -369,12 +446,15 @@ fun ChatScreenContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
-                        Text("🖼️", fontSize = 22.sp)
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = "Send Image",
+                            tint = StatPinkDark
+                        )
                     }
 
                     OutlinedTextField(
                         value = textInput,
-                        // Cap input length (truncates pastes too); the counter below appears near the limit.
                         onValueChange = { textInput = it.take(MAX_MESSAGE_LENGTH) },
                         placeholder = { Text("Nhập tin nhắn...", fontSize = 14.sp) },
                         modifier = Modifier
@@ -421,6 +501,7 @@ fun ChatScreenContent(
         }
     }
 }
+
 @Preview(showSystemUi = true)
 @Composable
 fun ChatScreenPreview() {
@@ -454,6 +535,10 @@ fun ChatScreenPreview() {
             onRetryMessage = {},
             onRenameGroup = { _, _ -> },
             onKickMember = { _, _, _ -> },
+            onDisbandGroup = {},
+            onDeleteDirectChat = {},
+            friendList = emptyList(),
+            onAddMembers = {},
             viewModel = viewModel()
         )
     }

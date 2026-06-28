@@ -2,6 +2,7 @@ package com.SE114.food_tracker.data.local.entities
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 enum class MessageSyncStatus {
@@ -10,7 +11,13 @@ enum class MessageSyncStatus {
     FAILED   // Chấm đỏ cảnh báo
 }
 
-@Entity(tableName = "messages")
+// Index on (conversation_id, created_at): the conversation list's per-conversation unread COUNT
+// and the message stream both filter by conversation_id and order/compare by created_at, so
+// without this index each runs a full table scan — the source of the "laggy on open" feel.
+@Entity(
+    tableName = "messages",
+    indices = [Index(value = ["conversation_id", "created_at"])]
+)
 data class Message(
     @PrimaryKey
     @ColumnInfo(name = "local_id")
