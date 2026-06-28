@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -87,15 +88,18 @@ class ChatViewModel @Inject constructor(
             )
 
     init {
-        fetchConversationsFromServer()
-        chatRepository.subscribeToGlobalConversationsRealtime()
+        // Fetch + subscribe once per authenticated user. Previously this fired on the direct call
+        // AND on every session emission, re-running the network sync repeatedly on open.
         viewModelScope.launch {
-            authRepository.currentSessionFlow().collect { status ->
-                if (status is SessionStatus.Authenticated) {
-                    fetchConversationsFromServer()
-                    chatRepository.subscribeToGlobalConversationsRealtime()
+            authRepository.currentSessionFlow()
+                .map { if (it is SessionStatus.Authenticated) chatRepository.getAuthenticatedUserId() else "" }
+                .distinctUntilChanged()
+                .collect { userId ->
+                    if (userId.isNotBlank()) {
+                        fetchConversationsFromServer()
+                        chatRepository.subscribeToGlobalConversationsRealtime()
+                    }
                 }
-            }
         }
         viewModelScope.launch {
             chatRepository.memberUpdateSignal.collect { convId: String ->

@@ -38,7 +38,7 @@ import com.SE114.food_tracker.data.local.dao.FriendDAO
         FeedComment::class,
         FeedHiddenPost::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
