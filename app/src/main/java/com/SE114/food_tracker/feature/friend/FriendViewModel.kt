@@ -97,7 +97,7 @@ class FriendViewModel @Inject constructor(
     private fun scheduleRealtimeFriendshipRefresh() {
         realtimeFriendshipRefreshJob?.cancel()
         realtimeFriendshipRefreshJob = viewModelScope.launch {
-            delay(500)
+            delay(REALTIME_REFRESH_DEBOUNCE_MS)
             refreshFriendDataFromRealtime()
         }
     }
@@ -298,6 +298,7 @@ class FriendViewModel @Inject constructor(
     private companion object {
         const val MIN_SEARCH_ID_LENGTH = 3
         const val SEARCH_DEBOUNCE_MS = 450L
+        const val REALTIME_REFRESH_DEBOUNCE_MS = 120L
         const val AUTO_REFRESH_INTERVAL_MS = 5_000L
     }
 }

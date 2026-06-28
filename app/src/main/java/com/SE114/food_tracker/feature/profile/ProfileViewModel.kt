@@ -49,6 +49,8 @@ class ProfileViewModel @Inject constructor(
     private var postsJob: Job? = null
     private var selectedCommentsJob: Job? = null
     private var realtimePostsJob: Job? = null
+    private var realtimeFriendshipJob: Job? = null
+    private var realtimeFriendshipRefreshJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         ProfileUiState(
@@ -61,6 +63,7 @@ class ProfileViewModel @Inject constructor(
     init {
         loadProfile()
         subscribeToPostRealtime()
+        subscribeToFriendshipRealtime()
     }
 
     fun loadProfile() {
@@ -438,6 +441,28 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    private fun subscribeToFriendshipRealtime() {
+        if (realtimeFriendshipJob != null) return
+
+        friendRepository.subscribeToFriendshipRealtime()
+        realtimeFriendshipJob = viewModelScope.launch {
+            friendRepository.friendshipRealtimeEvents.collect {
+                scheduleRealtimeFriendshipRefresh()
+            }
+        }
+    }
+
+    private fun scheduleRealtimeFriendshipRefresh() {
+        realtimeFriendshipRefreshJob?.cancel()
+        realtimeFriendshipRefreshJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(REALTIME_REFRESH_DEBOUNCE_MS)
+            val targetProfileId = _uiState.value.profile?.id ?: profileId
+            loadFriendship(targetProfileId, profileRepository.currentAuthUserId())
+            runCatching { feedRepository.refreshVisibleFromSupabase() }
+                .onFailure { Timber.e(it, "[ProfileVM] Realtime friendship refresh failed") }
+        }
+    }
+
     private fun showMessage(message: String) {
         _uiState.update { it.copy(reportMessage = message) }
     }
@@ -520,5 +545,9 @@ class ProfileViewModel @Inject constructor(
                 throw throwable
             }.getOrThrow()
         }
+    }
+
+    private companion object {
+        const val REALTIME_REFRESH_DEBOUNCE_MS = 120L
     }
 }
