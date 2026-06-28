@@ -359,7 +359,9 @@ fun ChatScreenContent(
             Surface(
                 color = MainBackground,
                 tonalElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
             ) {
                 Row(
                     modifier = Modifier

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.SE114.food_tracker.core.designsystem.components.AppTopBar
+import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.data.local.dao.ConversationWithUnread
 import com.SE114.food_tracker.data.local.entities.Conversation
@@ -305,7 +306,13 @@ fun ConversationListScreenContent(
                         )
                     }
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            top = 8.dp,
+                            bottom = BottomBarContentPadding
+                        )
+                    ) {
                         if (filteredConversations.isNotEmpty()) {
                             if (searchQuery.isNotBlank()) {
                                 item {

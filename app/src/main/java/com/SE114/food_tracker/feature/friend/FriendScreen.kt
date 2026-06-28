@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.SE114.food_tracker.core.designsystem.components.BottomBarContentPadding
 import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
 import com.SE114.food_tracker.data.local.dao.FriendItemDto
 import com.SE114.food_tracker.data.remote.dto.ProfileDTO
@@ -178,6 +177,9 @@ fun FriendScreenContent(
     onNavigateBack: () -> Unit
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
+    val navigationBarBottomPadding = WindowInsets.navigationBars
+        .asPaddingValues()
+        .calculateBottomPadding()
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -202,7 +204,7 @@ fun FriendScreenContent(
                 .statusBarsPadding(),
             contentPadding = PaddingValues(
                 top = 16.dp,
-                bottom = 16.dp,
+                bottom = navigationBarBottomPadding + 32.dp,
                 start = 16.dp,
                 end = 16.dp
             )
