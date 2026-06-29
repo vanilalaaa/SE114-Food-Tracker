@@ -311,7 +311,6 @@ fun ChatScreenContent(
         topBar = {
             AppTopBar(
                 title = conversationName,
-                subtitle = "Đang trực tuyến",
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
