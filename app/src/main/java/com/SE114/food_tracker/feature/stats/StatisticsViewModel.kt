@@ -31,12 +31,10 @@ class StatisticsViewModel @Inject constructor(
     private val budgetRepository: BudgetRepository
 ) : ViewModel() {
 
-    // ── Navigation state ──────────────────────────────────────────────────────
     private val _timeFrame  = MutableStateFlow(TimeFrame.DAY)
     private val _contentTab = MutableStateFlow(ContentTab.EXPENSE)
     private val _anchor     = MutableStateFlow(TimeRangeProvider.today())
 
-    // ── Derived range ─────────────────────────────────────────────────────────
     private val _range: Flow<DateRange> =
         combine(_timeFrame, _anchor) { tf, anchor ->
             TimeRangeProvider.rangeFor(tf, anchor)
@@ -47,7 +45,6 @@ class StatisticsViewModel @Inject constructor(
             TimeRangeProvider.previousRangeFor(tf, anchor)
         }
 
-    // ── Budget flow ───────────────────────────────────────────────────────────
     private fun budgetFlow(timeFrame: TimeFrame, spent: Double): Flow<BudgetUiState> {
         val userId = budgetRepository.getCurrentUserId() ?: return flowOf(BudgetUiState())
         return budgetRepository.getBudget(userId).map { budget ->
@@ -68,7 +65,6 @@ class StatisticsViewModel @Inject constructor(
         }
     }
 
-    // ── Root UiState ──────────────────────────────────────────────────────────
     val uiState: StateFlow<StatisticsUiState> = combine(
         _timeFrame, _contentTab, _anchor, _range, _previousRange
     ) { tf, tab, anchor, range, prevRange ->
@@ -100,12 +96,68 @@ class StatisticsViewModel @Inject constructor(
                     previousPeriodTotal = nd.previousTotal
                 )
                 budgetFlow(nav.timeFrame, nd.totalSpent).map { budget ->
-                    val forecast = TrendForecast(
-                        previousTotal   = nd.previousTotal.coerceAtLeast(0.0),
-                        currentActual   = nd.totalSpent.coerceAtLeast(0.0),
-                        projectedTotal  = 0.0, // UI tự tính toán dựa trên Live Rate
-                        remainingCycles = 0
-                    )
+                    val forecast = run {
+                        val today = TimeRangeProvider.today()
+                        val rangeEnd = nav.range.end
+                        val rangeStart = nav.range.start
+
+                        val remainingCycles = when (nav.timeFrame) {
+                            TimeFrame.DAY -> 0
+                            TimeFrame.WEEK -> {
+                                val todayEpoch = TimeRangeProvider.rangeFor(TimeFrame.DAY, today).start
+                                if (todayEpoch >= rangeEnd) 0
+                                else {
+                                    val daysLeft = ((rangeEnd - maxOf(todayEpoch, rangeStart)) / (24 * 60 * 60 * 1000L)).toInt().coerceAtLeast(0)
+                                    daysLeft
+                                }
+                            }
+                            TimeFrame.MONTH -> {
+                                val todayEpoch = TimeRangeProvider.rangeFor(TimeFrame.DAY, today).start
+                                if (todayEpoch >= rangeEnd) 0
+                                else {
+                                    val daysLeft = ((rangeEnd - maxOf(todayEpoch, rangeStart)) / (24 * 60 * 60 * 1000L)).toInt().coerceAtLeast(0)
+                                    daysLeft
+                                }
+                            }
+                            TimeFrame.YEAR -> {
+                                val todayEpoch = TimeRangeProvider.rangeFor(TimeFrame.DAY, today).start
+                                if (todayEpoch >= rangeEnd) 0
+                                else {
+                                    val monthsLeft = ((rangeEnd - maxOf(todayEpoch, rangeStart)) / (30L * 24 * 60 * 60 * 1000L)).toInt().coerceAtLeast(0)
+                                    monthsLeft
+                                }
+                            }
+                        }
+
+                        val elapsedCycles = when (nav.timeFrame) {
+                            TimeFrame.DAY -> 1
+                            TimeFrame.WEEK -> {
+                                val todayEpoch = TimeRangeProvider.rangeFor(TimeFrame.DAY, today).start
+                                val elapsed = ((minOf(todayEpoch, rangeEnd) - rangeStart) / (24 * 60 * 60 * 1000L)).toInt().coerceAtLeast(1)
+                                elapsed
+                            }
+                            TimeFrame.MONTH -> {
+                                val todayEpoch = TimeRangeProvider.rangeFor(TimeFrame.DAY, today).start
+                                val elapsed = ((minOf(todayEpoch, rangeEnd) - rangeStart) / (24 * 60 * 60 * 1000L)).toInt().coerceAtLeast(1)
+                                elapsed
+                            }
+                            TimeFrame.YEAR -> {
+                                val todayEpoch = TimeRangeProvider.rangeFor(TimeFrame.DAY, today).start
+                                val elapsed = ((minOf(todayEpoch, rangeEnd) - rangeStart) / (30L * 24 * 60 * 60 * 1000L)).toInt().coerceAtLeast(1)
+                                elapsed
+                            }
+                        }
+
+                        val avgPerCycle = nd.totalSpent / elapsedCycles
+                        val projected = (nd.totalSpent + avgPerCycle * remainingCycles).coerceAtLeast(nd.totalSpent)
+
+                        TrendForecast(
+                            previousTotal   = nd.previousTotal.coerceAtLeast(0.0),
+                            currentActual   = nd.totalSpent.coerceAtLeast(0.0),
+                            projectedTotal  = projected,
+                            remainingCycles = remainingCycles
+                        )
+                    }
                     val datesWithData = detailItems
                         .map { it.entryDateEpoch }
                         .distinct()
@@ -144,7 +196,6 @@ class StatisticsViewModel @Inject constructor(
             initialValue   = StatisticsUiState(isLoading = true)
         )
 
-    // ── User actions ──────────────────────────────────────────────────────────
     fun onTimeFrameSelected(tf: TimeFrame) { _timeFrame.value = tf }
     fun onContentTabSelected(tab: ContentTab) { _contentTab.value = tab }
     fun onPrevious() { _anchor.value = TimeRangeProvider.shift(_timeFrame.value, _anchor.value, forward = false) }
