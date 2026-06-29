@@ -1153,10 +1153,23 @@ class ChatRepository @Inject constructor(
     }
     suspend fun deleteOneToOneChat(conversationId: String) {
         try {
-            // CHỈ XÓA LOCAL: Giữ nguyên dòng dữ liệu trên Supabase
-            // để khi đối phương nhắn tin hoặc mình tìm kiếm lại, hàm RPC vẫn tìm ra đúng ID phòng chat cũ này
+            val currentUserId = getAuthenticatedUserId()
+            if (currentUserId.isBlank()) return
+
+            // 1. XÓA TRÊN SERVER: Gỡ tư cách tham gia của chính mình trong phòng chat này trên Supabase
+            supabaseClient.from("conversation_participant").delete {
+                filter {
+                    eq("conversation_id", conversationId)
+                    eq("user_id", currentUserId)
+                }
+            }
+
+            // 2. XÓA DƯỚI LOCAL: Dọn sạch bộ nhớ Room DB local dưới máy mình
             deleteConversationLocal(conversationId)
+
+            Timber.tag("Chat").d("Xóa cuộc trò chuyện 1-1 thành công trên cả Server và Local")
         } catch (e: Exception) {
+            Timber.tag("Chat").e(e, "deleteOneToOneChat failed")
             e.printStackTrace()
         }
     }
