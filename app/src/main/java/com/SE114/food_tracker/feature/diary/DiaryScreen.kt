@@ -56,9 +56,6 @@ fun DiaryScreen(
     val pendingImageUri   by diaryViewModel.pendingImageUri.collectAsStateWithLifecycle()
     val categoryError     by categoryViewModel.error.collectAsStateWithLifecycle()
 
-    // ── ĐÃ THÊM: Thu thập tín hiệu lính canh báo đã lưu từ ViewModel ──────────
-    val itemSaved         by diaryViewModel.itemSaved.collectAsStateWithLifecycle()
-
     val categories       = categoryState.ifEmpty { uiState.categories }
     val manageCategories = allCategoryState.ifEmpty { categories }
     val availableWallets by diaryViewModel.availableWallets.collectAsStateWithLifecycle()
@@ -71,8 +68,6 @@ fun DiaryScreen(
         availableWallets           = availableWallets,
         categoryDeleteError        = categoryError,
         triggerAdd                 = triggerAdd,
-        itemSaved                  = itemSaved, // ← Truyền xuống Content
-        onConsumeItemSaved         = { diaryViewModel.consumeItemSaved() }, // ← Truyền hàm reset
         onAddTriggered             = onAddTriggered,
         onClearPendingImage        = { diaryViewModel.clearPendingImage() },
         onClearCategoryError       = { categoryViewModel.clearError() },
@@ -101,8 +96,6 @@ fun DiaryScreenContent(
     availableWallets: List<ChatRepository.WalletWithRole> = emptyList(),
     categoryDeleteError: String?,
     triggerAdd: Boolean,
-    itemSaved: Boolean, // ← Đã nhận tín hiệu từ ViewModel
-    onConsumeItemSaved: () -> Unit, // ← Đã nhận hàm clear tín hiệu
     onAddTriggered: () -> Unit,
     onClearCategoryError: () -> Unit,
     onLoadDate: (LocalDate) -> Unit,
@@ -142,13 +135,6 @@ fun DiaryScreenContent(
         } ?: uiState.monthlyItems
     }
 
-    // ── ĐÃ THÊM: Chờ đợi Room Flow hoàn thành ghi dữ liệu thực sự rồi mới bật BottomSheet ──
-    LaunchedEffect(itemSaved) {
-        if (itemSaved) {
-            showDetailSheet = true // Chỉ mở sheet xem chi tiết khi DB đã lưu xong ổn định
-            onConsumeItemSaved()   // Reset trạng thái lính canh về false
-        }
-    }
 
     LaunchedEffect(triggerAdd) {
         if (triggerAdd) {
@@ -334,6 +320,7 @@ fun DiaryScreenContent(
                         showEntryScreen     = false
                         selectedItemForEdit = null
                         preSelectedCategory = null
+                        showDetailSheet     = true
                     },
                     onDelete = { itemId ->
                         onDeleteItem(itemId)
@@ -374,8 +361,6 @@ fun DiaryScreenPreview() {
             ),
             categoryDeleteError        = null,
             triggerAdd                 = false,
-            itemSaved                  = false,
-            onConsumeItemSaved         = {},
             onClearPendingImage        = {},
             onClearCategoryError       = {},
             onAddTriggered             = {},
