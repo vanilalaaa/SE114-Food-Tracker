@@ -24,5 +24,5 @@ data class Conversation(
     val lastMessageSnippet: String? = null,
 
     @ColumnInfo(name = "created_at")
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
 )

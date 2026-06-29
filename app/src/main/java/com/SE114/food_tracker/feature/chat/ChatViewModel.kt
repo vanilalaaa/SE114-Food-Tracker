@@ -398,7 +398,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun getConversationsFlow(): Flow<List<Conversation>> {
-        return chatDAO.getAllConversations()
+        return chatDAO.getAllConversations(currentUserId)
     }
 
     /**
