@@ -285,6 +285,7 @@ class ChatViewModel @Inject constructor(
 
     fun deleteDirectChat(conversationId: String) {
         viewModelScope.launch {
+            presenceJob?.cancel()
             chatRepository.deleteOneToOneChat(conversationId)
             _navigationEvent.emit("LEFT")
         }
@@ -295,6 +296,7 @@ class ChatViewModel @Inject constructor(
     fun disbandGroup(conversationId: String) {
         viewModelScope.launch {
             if (isCurrentAdmin.value) {
+                presenceJob?.cancel()
                 chatRepository.disbandGroup(conversationId)
                 _navigationEvent.emit("DISBANDED")
             }
@@ -396,7 +398,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun getConversationsFlow(): Flow<List<Conversation>> {
-        return chatDAO.getAllConversations()
+        return chatDAO.getAllConversations(currentUserId)
     }
 
     /**
