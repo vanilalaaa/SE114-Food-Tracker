@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -210,12 +211,18 @@ class StatisticsViewModel @Inject constructor(
         _anchor.value = LocalDate(year, month, 1)
     }
 
-    fun saveBudget(daily: Double?, weekly: Double?, monthly: Double?, yearly: Double?) {
+    fun saveBudget(timeFrame: TimeFrame, newValue: Double?) {
         val userId = budgetRepository.getCurrentUserId() ?: return
         viewModelScope.launch {
+            // Đọc ngân sách hiện tại đang lưu trong DB để tránh xóa sạch 3 trường còn lại
+            val current = budgetRepository.getBudget(userId).firstOrNull()
             runCatching {
                 budgetRepository.setBudget(
-                    userId = userId, daily = daily, weekly = weekly, monthly = monthly, yearly = yearly
+                    userId  = userId,
+                    daily   = if (timeFrame == TimeFrame.DAY)   newValue else current?.daily,
+                    weekly  = if (timeFrame == TimeFrame.WEEK)  newValue else current?.weekly,
+                    monthly = if (timeFrame == TimeFrame.MONTH) newValue else current?.monthly,
+                    yearly  = if (timeFrame == TimeFrame.YEAR)  newValue else current?.yearly
                 )
             }.onFailure { e ->
                 Timber.e(e, "[StatisticsViewModel] failed to save budget")

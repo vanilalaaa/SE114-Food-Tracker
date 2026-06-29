@@ -70,6 +70,10 @@ class DiaryViewModel @Inject constructor(
     private val _error              = MutableStateFlow<String?>(null)
     private val _streak             = MutableStateFlow(0)
 
+    // ── ĐÃ THÊM: Tín hiệu báo lưu/cập nhật DB thành công để đồng bộ UI ──────────
+    private val _itemSaved = MutableStateFlow(false)
+    val itemSaved: StateFlow<Boolean> = _itemSaved.asStateFlow()
+
     // ── Trạng thái ảnh tạm thời ──────────────────────────────────────────────
     private val _pendingImageUri = MutableStateFlow<Uri?>(null)
     val pendingImageUri: StateFlow<Uri?> = _pendingImageUri.asStateFlow()
@@ -80,7 +84,7 @@ class DiaryViewModel @Inject constructor(
     private var _pendingImageBytes: ByteArray? = null
     private var _imageCompressionJob: Job? = null
 
-    // TỐI ƯU: Loại bỏ mutationTrigger, để Room Flow tự động cập nhật bất cứ khi nào DB thay đổi
+    // Room Flow tự động cập nhật bất cứ khi nào DB thay đổi
     private val selectedDayItems: Flow<List<DiaryItem>> =
         _selectedDate.flatMapLatest { date ->
             val range = date.utcDayRange()
@@ -98,7 +102,6 @@ class DiaryViewModel @Inject constructor(
             )
         }
 
-    // TỐI ƯU: Loại bỏ mutationTrigger tại đây luôn
     private val datesWithData: Flow<Set<Int>> =
         _selectedDate.flatMapLatest { date ->
             val monthStart     = LocalDate(date.year, date.monthNumber, 1)
@@ -190,6 +193,11 @@ class DiaryViewModel @Inject constructor(
                 .onSuccess { _availableWallets.value = it }
                 .onFailure { Timber.e(it, "[DiaryVM] failed to load wallets") }
         }
+    }
+
+    // ── ĐÃ THÊM: Hàm để UI tiêu thụ và reset lại tín hiệu lính canh ─────────────
+    fun consumeItemSaved() {
+        _itemSaved.value = false
     }
 
     fun loadDate(date: LocalDate) {
@@ -302,20 +310,22 @@ class DiaryViewModel @Inject constructor(
                     isShared   = isShared,
                     syncStatus = SyncStatus.PENDING.name,
                     entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
-                    createdAt  = pickedTimeMillis, // ← SỬA: Thay thế 'now' thành mốc thời gian người dùng chọn
+                    createdAt  = pickedTimeMillis,
                     updatedAt  = now
                 )
 
                 // Thực hiện ghi vào DB và dọn dẹp
                 itemRepository.insert(item)
                 clearPendingImage()
-                SyncScheduler.triggerImmediateSync(context)
+
+                // ── ĐÃ SỬA: Đánh dấu lưu thành công ĐỂ GIAO DIỆN BIẾT VÀ MỞ SHEET ──
+                _itemSaved.value = true
 
                 if (walletId != null) {
                     chatRepository.executePurchaseTransaction(
                         walletId = walletId,
                         amount   = price,
-                        itemId   = itemId,   // Vẫn truyền vào — ChatRepository hiện tại sẽ bỏ qua nó một cách an toàn
+                        itemId   = itemId,
                         note     = name,
                         imageUrl = finalImageUrl
                     ).onFailure { err ->
@@ -323,7 +333,6 @@ class DiaryViewModel @Inject constructor(
                         _error.value = "Trừ quỹ thất bại: ${err.message}"
                     }
                 } else {
-                    // Món ăn thông thường: Để WorkManager xử lý việc đồng bộ như bình thường
                     SyncScheduler.triggerImmediateSync(context)
                 }
 
@@ -391,6 +400,10 @@ class DiaryViewModel @Inject constructor(
                     )
                 )
                 clearPendingImage()
+
+                // ── ĐÃ SỬA: Đánh dấu cập nhật thành công ──────────────────────
+                _itemSaved.value = true
+
                 SyncScheduler.triggerImmediateSync(context)
 
             } catch (t: Throwable) {
@@ -424,6 +437,7 @@ class DiaryViewModel @Inject constructor(
         target.writeBytes(bytes)
         return Uri.fromFile(target).toString()
     }
+
     private fun calculateStreakFromEpochs(epochs: List<Long>): Int {
         if (epochs.isEmpty()) return 0
 
@@ -439,7 +453,6 @@ class DiaryViewModel @Inject constructor(
         var streak = 0
         var cursor = today
 
-        // Grace: if nothing logged today, start counting from yesterday
         if (!activeDates.contains(cursor)) {
             cursor = cursor.plus(DatePeriod(days = -1))
         }
