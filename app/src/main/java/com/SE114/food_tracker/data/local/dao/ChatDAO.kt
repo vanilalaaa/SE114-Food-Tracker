@@ -170,9 +170,10 @@ interface ChatDAO {
             LIMIT 1
         ) ELSE NULL END AS peer_avatar
     FROM conversations c
-    -- ── SỬA TẠI ĐÂY: Thay LEFT JOIN bằng INNER JOIN ──
+    -- ── Thay LEFT JOIN bằng INNER JOIN ──
     INNER JOIN conversation_participants cp
         ON cp.conversation_id = c.id AND cp.user_id = :currentUserId
+        WHERE cp.is_hidden = 0
     ORDER BY
         CASE WHEN c.last_message_at > 0 THEN c.last_message_at ELSE c.created_at END DESC
 """
@@ -183,8 +184,18 @@ interface ChatDAO {
      * Plain conversation list (no unread info) — kept for backward-compat with
      * code that doesn't need the unread dot (e.g. GroupWalletScreen).
      */
-    @Query("SELECT * FROM conversations ORDER BY id DESC")
-    fun getAllConversations(): Flow<List<Conversation>>
+    @Query(
+        """
+        SELECT c.* FROM conversations c
+        -- ── JOIN với bảng thành viên để lấy thông tin ẩn/hiện của riêng tài khoản này ──
+        INNER JOIN conversation_participants cp 
+            ON c.id = cp.conversation_id
+        -- ── Lọc đúng ID của người dùng hiện tại và cờ ẩn bằng 0 (false) ──
+        WHERE cp.user_id = :currentUserId AND cp.is_hidden = 0
+        ORDER BY c.id DESC
+    """
+    )
+    fun getAllConversations(currentUserId: String): Flow<List<Conversation>>
 
     @Query("SELECT * FROM conversations WHERE id = :conversationId")
     fun getConversationById(conversationId: String): Flow<Conversation?>
@@ -235,5 +246,12 @@ interface ChatDAO {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertParticipantIfAbsent(participant: ConversationParticipant)
+    // Lấy thông tin 1 participant cụ thể để kiểm tra cờ ẩn
+    @Query("SELECT * FROM conversation_participants WHERE conversation_id = :conversationId AND user_id = :userId LIMIT 1")
+    suspend fun getParticipant(conversationId: String, userId: String): ConversationParticipant?
+
+    // Insert hoặc Update đè thông tin participant khi thay đổi cờ ẩn
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertParticipant(participant: ConversationParticipant)
 
 }

@@ -21,5 +21,8 @@ data class ConversationParticipant(
     val joinedAt: Long = System.currentTimeMillis(),
 
     @ColumnInfo(name = "last_read_at")
-    val lastReadAt: Long = 0L
+    val lastReadAt: Long = 0L,
+    @ColumnInfo(name = "is_hidden")
+    val isHidden: Boolean = false
+
 )

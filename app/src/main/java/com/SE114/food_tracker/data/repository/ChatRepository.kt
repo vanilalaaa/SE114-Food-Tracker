@@ -277,7 +277,7 @@ class ChatRepository @Inject constructor(
                 //.map { it.conversationId }
                 //.distinct()
             // Tìm và xóa các phòng chat local ma do bị kick hoặc giải tán
-            val localConvs = chatDAO.getAllConversations().firstOrNull() ?: emptyList()
+            val localConvs = chatDAO.getAllConversations(currentUserId).firstOrNull() ?: emptyList()
             val localIds = localConvs.map { it.id }
             val convIdSet = convIds.toSet()
             val orphanedIds = localIds.filter { it !in convIdSet }
@@ -300,15 +300,16 @@ class ChatRepository @Inject constructor(
             val mapped = conversations.map { dto ->
                 val prev = existing[dto.id]
                 val keepLocalLast = (prev?.lastMessageAt ?: 0L) > dto.lastMessageAt
+                val hasNewMessage = dto.lastMessageAt > (prev?.lastMessageAt ?: 0L)
                 LocalConversation(
                     id = dto.id,
-                    name = dto.name ?: "Trò chuyện 1-1",
+                    name = dto.name ?: prev?.name ?: "Trò chuyện 1-1",
                     isGroup = dto.isGroup,
                     avatarUrl = dto.avatarUrl ?: prev?.avatarUrl,
                     lastMessageAt = if (keepLocalLast) prev?.lastMessageAt
                         ?: 0L else dto.lastMessageAt,
                     lastMessageSnippet = if (keepLocalLast) prev?.lastMessageSnippet else dto.lastMessageSnippet,
-                    createdAt = prev?.createdAt ?: System.currentTimeMillis()
+                    createdAt = prev?.createdAt ?: System.currentTimeMillis(),
                 )
             }
             // Only write rows that actually changed: REPLACE-ing every row on each refresh
@@ -324,12 +325,21 @@ class ChatRepository @Inject constructor(
             // already exists, markConversationRead advances it forward-only — so a marker read on
             // another device is mirrored, but a locally-newer (read-offline) marker is never undone.
             myParticipants.forEach { participant ->
-                chatDAO.insertParticipantIfAbsent(
+                // Kiểm tra xem phòng chat có tin nhắn mới từ server đổ về không để tự động hủy ẩn local
+                val prevParticipant = chatDAO.getParticipant(participant.conversationId, currentUserId)
+                val serverConv = conversations.find { it.id == participant.conversationId }
+                val localConv = existing[participant.conversationId]
+                val hasNewMessage = serverConv != null && localConv != null && serverConv.lastMessageAt > localConv.lastMessageAt
+
+                val isHiddenValue = if (hasNewMessage) false else (prevParticipant?.isHidden ?: false)
+
+                chatDAO.insertParticipant(
                     ConversationParticipant(
                         conversationId = participant.conversationId,
                         userId = currentUserId,
                         isAdmin = participant.isAdmin,
-                        lastReadAt = participant.lastReadAt
+                        lastReadAt = participant.lastReadAt,
+                        isHidden = isHiddenValue // Lưu cờ ẩn độc lập vào bảng thành viên local
                     )
                 )
                 chatDAO.markConversationRead(participant.conversationId, currentUserId, participant.lastReadAt)
@@ -485,6 +495,7 @@ class ChatRepository @Inject constructor(
                 // ── BROADCAST collector — instant delivery ─────────────────────────────
                 channelScope.launch {
                     broadcastMessageFlow.collect { dto ->
+                        val currentUserId = getAuthenticatedUserId()
                         // Tránh trùng lặp trên chính máy người gửi: nếu id người gửi trùng với mình thì bỏ qua
                         if (dto.senderId == getAuthenticatedUserId()) return@collect
 
@@ -503,6 +514,12 @@ class ChatRepository @Inject constructor(
                                     createdAt = parseServerTimeToLong(dto.createdAt)
                                 )
                                 chatDAO.insertMessage(incomingMessage)
+                                // Tìm dòng participant của mình và hủy ẩn nếu tin nhắn của người khác bắn sang
+                                chatDAO.getParticipant(conversationId, currentUserId)?.let { participant ->
+                                    if (participant.isHidden) {
+                                        chatDAO.insertParticipant(participant.copy(isHidden = false))
+                                    }
+                                }
                                 chatDAO.updateLastMessage(
                                     conversationId = incomingMessage.conversationId,
                                     messageAt = incomingMessage.createdAt,
@@ -517,6 +534,7 @@ class ChatRepository @Inject constructor(
                 channelScope.launch {
                     changeFlow.collect { action ->
                         val dto = action.decodeRecord<SupabaseMessageDto>()
+                        val currentUserId = getAuthenticatedUserId()
                         // Cũng chặn trùng lặp cho chính người gửi tại luồng CDC luôn
                         if (dto.senderId == getAuthenticatedUserId()) return@collect
 
@@ -535,6 +553,12 @@ class ChatRepository @Inject constructor(
                                     createdAt = parseServerTimeToLong(dto.createdAt)
                                 )
                                 chatDAO.insertMessage(incomingMessage)
+                                // Tự động hủy ẩn cờ ở bảng participant local khi có tin cdc mới từ bạn chat
+                                chatDAO.getParticipant(conversationId, currentUserId)?.let { participant ->
+                                    if (participant.isHidden) {
+                                        chatDAO.insertParticipant(participant.copy(isHidden = false))
+                                    }
+                                }
                                 chatDAO.updateLastMessage(
                                     conversationId = incomingMessage.conversationId,
                                     messageAt = incomingMessage.createdAt,
@@ -739,6 +763,7 @@ class ChatRepository @Inject constructor(
                         val dto = action.decodeRecord<SupabaseMessageDto>()
                         val exist = chatDAO.getMessageByServerId(dto.id ?: "")
                         if (exist == null) {
+                            fetchAndSaveConversationsToLocal()
                             val incoming = Message(
                                 localId = dto.id ?: UUID.randomUUID().toString(),
                                 serverId = dto.id,
@@ -751,11 +776,28 @@ class ChatRepository @Inject constructor(
                                 createdAt = parseServerTimeToLong(dto.createdAt)
                             )
                             chatDAO.insertMessage(incoming)
-                            chatDAO.updateLastMessage(
+                            chatDAO.getConversationById(dto.conversationId).firstOrNull()?.let { conv ->
+                                chatDAO.insertConversation(
+                                    conv.copy(
+                                        lastMessageAt = incoming.createdAt,
+                                        lastMessageSnippet = if (incoming.isSystem) "📢 Tin nhắn hệ thống" else incoming.body
+                                    )
+                                )
+                            }
+
+                            // Bật cờ hiện lên ở bảng participant local nếu tin nhắn từ đối phương bắn về list
+                            if (incoming.senderId != currentUserId) {
+                                chatDAO.getParticipant(dto.conversationId, currentUserId)?.let { participant ->
+                                    if (participant.isHidden) {
+                                        chatDAO.insertParticipant(participant.copy(isHidden = false))
+                                    }
+                                }
+                            }
+                            /* chatDAO.updateLastMessage(
                                 conversationId = incoming.conversationId,
                                 messageAt = incoming.createdAt,
                                 snippet = if (incoming.isSystem) "📢 Tin nhắn hệ thống" else incoming.body
-                            )
+                            ) */
                         }
                     }
                 }
@@ -869,7 +911,15 @@ class ChatRepository @Inject constructor(
                     parameters = buildJsonObject { put("p_friend", targetFriendId) }
                 ).decodeAsOrNull<String>()
             }.getOrNull()
-            if (!existingId.isNullOrBlank()) return existingId
+            if (!existingId.isNullOrBlank()) {
+                // Nếu phòng chat đã tồn tại nhưng đang bị ẩn ở local, hủy ẩn nó ngay
+                chatDAO.getParticipant(existingId, currentUserId)?.let { participant ->
+                    if (participant.isHidden) {
+                        chatDAO.insertParticipant(participant.copy(isHidden = false))
+                    }
+                }
+                return existingId
+            }
 
             val newChatUuid = UUID.randomUUID().toString()
             // Insert via the @Serializable DTO, not a heterogeneous Map<String, Any?>: a mixed
@@ -1153,9 +1203,18 @@ class ChatRepository @Inject constructor(
     }
     suspend fun deleteOneToOneChat(conversationId: String) {
         try {
-            // CHỈ XÓA LOCAL: Giữ nguyên dòng dữ liệu trên Supabase
-            // để khi đối phương nhắn tin hoặc mình tìm kiếm lại, hàm RPC vẫn tìm ra đúng ID phòng chat cũ này
-            deleteConversationLocal(conversationId)
+            val currentUserId = getAuthenticatedUserId()
+            if (currentUserId.isBlank()) return
+
+            // Tìm dòng participant của CHÍNH MÌNH dưới local và bật cờ ẩn lên
+            chatDAO.getParticipant(conversationId, currentUserId)?.let { participant ->
+                chatDAO.insertParticipant(participant.copy(isHidden = true))
+            }
+
+            // Dọn dẹp cục bộ dữ liệu lịch sử chat trên thiết bị
+            chatDAO.deleteMessagesByConversation(conversationId)
+
+            Timber.tag("Chat").d("Đã ẩn phòng chat thành công cho riêng tài khoản: $currentUserId")
         } catch (e: Exception) {
             e.printStackTrace()
         }
