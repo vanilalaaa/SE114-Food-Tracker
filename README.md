@@ -11,7 +11,7 @@
 
 ## 📖 Project Overview
 
-Food Tracker is a mobile application that helps users log their meals, track personal spending, and share their food journey with friends. Unlike a plain expense app, Food Tracker combines a visual meal diary, smart spending analytics, a social newsfeed, real-time messaging, and shared group wallets in one place. It is built **local-first**: every action is saved to the device instantly for a smooth, offline-friendly experience, then synced to the cloud automatically when a connection is available. This application is developed by students at UIT (University of Information Technology, Vietnam National University - Ho Chi Minh City).
+Food Tracker is a mobile application that helps users log their meals, track personal spending, and share their food journey with friends. Unlike a plain expense app, Food Tracker combines a visual meal diary, smart spending analytics, a social newsfeed, real-time messaging. It is built **local-first**: every action is saved to the device instantly for a smooth, offline-friendly experience, then synced to the cloud automatically when a connection is available. This application is developed by students at UIT (University of Information Technology, Vietnam National University - Ho Chi Minh City).
 
 ## 🛑 Disclaimer
 
@@ -43,7 +43,6 @@ This project was developed as part of a course requirement at UIT.
 - 📊 **Spending Analytics** — Track spending by day/week/month/year with charts, budgets, forecasts, and period comparisons.
 - 👥 **Friends & Social Feed** — Add friends by user ID, post your meals to a photo grid, and react with likes and comments.
 - 💬 **Real-time Messaging** — One-to-one and group chats with instant delivery and an offline message queue.
-- 💰 **Group Wallets** — Shared funds inside group chats: deposit, withdraw, and spend together with a full transaction history.
 - 🔄 **Local-first Sync** — Everything works offline and syncs to Supabase automatically when you reconnect.
 - 🌗 **Multi-currency** — Enter prices in any of 6 currencies; values are preserved and converted at display time using live rates.
 - 🛡️ **Admin Tools** — A separate, role-gated admin area for moderating users and reports, secured at the backend.
@@ -154,9 +153,9 @@ graph TD
 | Role | Name | GitHub | Student ID |
 | ---- | ---- | ------ | ---------- |
 | **🛠️ Project Leader & Auth / Sync / Admin** | **Tịnh Văn** | [Tinh Van](https://github.com/vanilalaaa) | 24521978 |
-| **⚙️ Database & Diary / Statistics** | **Ánh Vân** | [Azun](https://github.com/anhvansan) | 24521978 |
-| **🎨 UI/UX & Friends / Newsfeed** | **Thúy Vy** | [ThuyVy](https://github.com/NguyenPhamThuyVy) | 24521978 |
-| **💬 UI & Chat / Group Wallet / Report** | **Thảo Uyên** | [ThaoUyen](https://github.com/NguyenPhamThuyVy) | 24521978 |
+| **⚙️ Database &  / Statistics** | **Ánh Vân** | [Azun](https://github.com/anhvansan) | 24521984 |
+| **🎨 UI/UX & Friends / Newsfeed** | **Thảo Uyên** | [ThaoUyen](https://github.com/NguyenPhamThuyVy) | 24521965 |
+| **💬 UI Diary & Chat / Report** | **Thúy Vy** | [ThuyVy](https://github.com/NguyenPhamThuyVy) | 24522059 |
 
 ## 📦 Installation & Usage
 
