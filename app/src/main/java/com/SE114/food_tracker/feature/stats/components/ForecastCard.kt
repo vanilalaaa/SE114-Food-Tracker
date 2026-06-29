@@ -1,5 +1,6 @@
 package com.SE114.food_tracker.feature.stats.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -21,27 +22,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Canvas
 import com.SE114.food_tracker.core.designsystem.theme.*
 import com.SE114.food_tracker.core.util.LocalCurrencyDisplay
 import com.SE114.food_tracker.core.util.TimeFrame
 import com.SE114.food_tracker.feature.stats.TrendForecast
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
-import kotlinx.datetime.number
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
-// ── Data class describing all derived forecast values ─────────────────────────
 private data class ForecastDisplayData(
     val projectedTotal: Double,
     val currentActual: Double,
-    val budgetFraction: Float,      // currentActual / budget (capped at 1f for ring)
-    val projectedFraction: Float,   // projectedTotal / budget (capped at 1f for ring)
-    val rateLabel: String,          // e.g. "6,666 đ/ngày"
-    val elapsedLabel: String,       // e.g. "3/7 ngày đã qua"
-    val depletionLabel: String?,    // non-null when projected > budget
+    val budgetFraction: Float,
+    val projectedFraction: Float,
+    val rateLabel: String,
+    val elapsedLabel: String,
+    val depletionLabel: String?,
     val isOverBudget: Boolean
 )
 
@@ -55,11 +56,7 @@ private fun rememberForecastDisplayData(
     val currency = LocalCurrencyDisplay.current
 
     return remember(forecast, budgetLimit, timeFrame, anchorDate) {
-        // ── 1. Elapsed & total units in the active period ──────────────────
-        val currentHour = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .hour
-            .coerceAtLeast(1)
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 
         val daysInMonth = run {
             val nextMonth = if (anchorDate.monthNumber == 12) 1 else anchorDate.monthNumber + 1
@@ -68,22 +65,53 @@ private fun rememberForecastDisplayData(
                     LocalDate(anchorDate.year, anchorDate.monthNumber, 1).toEpochDays()
         }.toInt()
 
+        // ── Đã sửa: Tính toán elapsed chính xác dựa trên việc so sánh quá khứ/hiện tại/tương lai ──
         val (elapsed, total, unitSingular, unitPlural) = when (timeFrame) {
-            TimeFrame.DAY   -> Quad(currentHour,                        24,           "giờ",   "giờ")
-            TimeFrame.WEEK  -> Quad(anchorDate.dayOfWeek.isoDayNumber,  7,            "ngày",  "ngày")
-            TimeFrame.MONTH -> Quad(anchorDate.dayOfMonth,              daysInMonth,  "ngày",  "ngày")
-            TimeFrame.YEAR  -> Quad(anchorDate.monthNumber,             12,           "tháng", "tháng")
+            TimeFrame.DAY -> {
+                val elapsedHours = when {
+                    anchorDate > today -> 0
+                    anchorDate < today -> 24
+                    else -> Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).hour.coerceAtLeast(1)
+                }
+                Quad(elapsedHours, 24, "giờ", "giờ")
+            }
+            TimeFrame.WEEK -> {
+                val weekStart = anchorDate - DatePeriod(days = anchorDate.dayOfWeek.isoDayNumber - 1)
+                val weekEnd   = weekStart + DatePeriod(days = 6)
+                val elapsedDays = when {
+                    today < weekStart -> 0
+                    today > weekEnd   -> 7
+                    else -> (today.toEpochDays() - weekStart.toEpochDays() + 1).toInt()
+                }
+                Quad(elapsedDays, 7, "ngày", "ngày")
+            }
+            TimeFrame.MONTH -> {
+                val elapsedDays = when {
+                    anchorDate.year > today.year || (anchorDate.year == today.year && anchorDate.monthNumber > today.monthNumber) -> 0
+                    anchorDate.year < today.year || (anchorDate.year == today.year && anchorDate.monthNumber < today.monthNumber) -> daysInMonth
+                    else -> today.dayOfMonth
+                }
+                Quad(elapsedDays, daysInMonth, "ngày", "ngày")
+            }
+            TimeFrame.YEAR -> {
+                val elapsedMonths = when {
+                    anchorDate.year > today.year -> 0
+                    anchorDate.year < today.year -> 12
+                    else -> today.monthNumber
+                }
+                Quad(elapsedMonths, 12, "tháng", "tháng")
+            }
         }
 
         val elapsedSafe = elapsed.coerceAtLeast(1)
 
-        // ── 2. Spend rate per unit ─────────────────────────────────────────
+        // ── Tốc độ chi tiêu dựa trên thực tế trôi qua ──
         val ratePerUnit = forecast.currentActual / elapsedSafe
 
-        // ── 3. Projected total using live rate (overrides ViewModel value when budget present) ──
-        val projectedTotal = ratePerUnit * total
+        // ── Đã sửa: Sử dụng giá trị dự báo từ ViewModel làm Single Source of Truth ──
+        val projectedTotal = forecast.projectedTotal
 
-        // ── 4. Budget fractions for the ring ──────────────────────────────
+        // ── Tỷ lệ phần trăm hiển thị trên biểu đồ vòng tròn ──
         val budgetFraction = if (budgetLimit != null && budgetLimit > 0) {
             (forecast.currentActual / budgetLimit).toFloat().coerceIn(0f, 1f)
         } else 0f
@@ -92,23 +120,20 @@ private fun rememberForecastDisplayData(
             (projectedTotal / budgetLimit).toFloat().coerceIn(0f, 1f)
         } else 0f
 
-        // ── 5. Labels ──────────────────────────────────────────────────────
         val rateLabel = "${currency.formatShort(ratePerUnit)}/$unitSingular"
         val elapsedLabel = "$elapsed/$total $unitPlural đã qua"
 
-        // ── 6. Depletion label (only when projected > budget) ──────────────
         val isOverBudget = budgetLimit != null && projectedTotal > budgetLimit
         val depletionLabel: String? = if (isOverBudget && budgetLimit != null && ratePerUnit > 0) {
             val depletionUnit = Math.ceil(budgetLimit / ratePerUnit).toInt()
             when (timeFrame) {
                 TimeFrame.DAY -> {
-                    if (depletionUnit <= 24) "Khoảng ${depletionUnit}h sẽ hết ngân sách hôm nay"
-                    else null
+                    if (depletionUnit <= 24) "Khoảng ${depletionUnit}h sẽ hết ngân sách hôm nay" else null
                 }
                 TimeFrame.WEEK -> {
                     val dayNames = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
                     val name = dayNames.getOrNull((depletionUnit - 1).coerceIn(0, 6)) ?: ""
-                    if (depletionUnit <= 7) "Đến $name ngày $depletionUnit/7 sẽ hết ngân sách tuần"
+                    if (depletionUnit <= 7) "Đến $name tuần này sẽ hết ngân sách"
                     else "Dự kiến tiêu ${currency.formatShort(projectedTotal)} — vượt ngân sách tuần"
                 }
                 TimeFrame.MONTH -> {
@@ -148,7 +173,6 @@ fun ForecastCard(
 
     val ringColor    = if (data.isOverBudget) AlertRed     else AlertGreen
     val ringBgColor  = if (data.isOverBudget) AlertRedBg   else AlertGreenBg
-    val ringBorder   = if (data.isOverBudget) AlertRedBorder else AlertGreenBorder
     val accentColor  = if (data.isOverBudget) AlertRed     else StatPinkDark
 
     Card(
@@ -161,13 +185,10 @@ fun ForecastCard(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-            // ── Header row: title + ring ──────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Title block
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("📊", fontSize = 18.sp)
@@ -201,7 +222,6 @@ fun ForecastCard(
                     }
                 }
 
-                // Circular ring
                 if (budgetLimit != null) {
                     val pct = (data.projectedFraction * 100).toInt().coerceIn(0, 999)
                     Box(
@@ -213,7 +233,6 @@ fun ForecastCard(
                             val inset  = stroke / 2f
                             val arcSize = Size(size.width - stroke, size.height - stroke)
 
-                            // Background track
                             drawArc(
                                 color      = Color(0xFFEEEEEE),
                                 startAngle = -90f,
@@ -223,7 +242,6 @@ fun ForecastCard(
                                 size       = arcSize,
                                 style      = Stroke(width = stroke, cap = StrokeCap.Round)
                             )
-                            // Progress arc (projected fraction)
                             drawArc(
                                 color      = ringColor,
                                 startAngle = -90f,
@@ -244,7 +262,6 @@ fun ForecastCard(
                 }
             }
 
-            // ── Status banner ─────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -270,7 +287,6 @@ fun ForecastCard(
                 )
             }
 
-            // ── Speed footer ──────────────────────────────────────────────
             Row(
                 modifier          = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -296,61 +312,8 @@ fun ForecastCard(
     }
 }
 
-// ── Small tuple helper ────────────────────────────────────────────────────────
 private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
-
 private operator fun <A, B, C, D> Quad<A, B, C, D>.component1() = first
 private operator fun <A, B, C, D> Quad<A, B, C, D>.component2() = second
 private operator fun <A, B, C, D> Quad<A, B, C, D>.component3() = third
 private operator fun <A, B, C, D> Quad<A, B, C, D>.component4() = fourth
-
-// ── Preview ───────────────────────────────────────────────────────────────────
-@Preview(showBackground = true)
-@Composable
-fun ForecastCardPreview_UnderBudget() {
-    FoodTrackerTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MainBackground)
-                .padding(16.dp)
-        ) {
-            ForecastCard(
-                forecast = TrendForecast(
-                    previousTotal   = 120_000.0,
-                    currentActual   = 20_000.0,
-                    projectedTotal  = 46_666.0,
-                    remainingCycles = 4
-                ),
-                budgetLimit = 500_000.0,
-                timeFrame   = TimeFrame.WEEK,
-                anchorDate  = LocalDate(2026, 6, 24)
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ForecastCardPreview_OverBudget() {
-    FoodTrackerTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MainBackground)
-                .padding(16.dp)
-        ) {
-            ForecastCard(
-                forecast = TrendForecast(
-                    previousTotal   = 200_000.0,
-                    currentActual   = 280_000.0,
-                    projectedTotal  = 650_000.0,
-                    remainingCycles = 2
-                ),
-                budgetLimit = 500_000.0,
-                timeFrame   = TimeFrame.WEEK,
-                anchorDate  = LocalDate(2026, 6, 24)
-            )
-        }
-    }
-}
