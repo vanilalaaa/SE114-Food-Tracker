@@ -56,6 +56,9 @@ fun DiaryScreen(
     val pendingImageUri   by diaryViewModel.pendingImageUri.collectAsStateWithLifecycle()
     val categoryError     by categoryViewModel.error.collectAsStateWithLifecycle()
 
+    // ── ĐÃ THÊM: Thu thập tín hiệu lính canh báo đã lưu từ ViewModel ──────────
+    val itemSaved         by diaryViewModel.itemSaved.collectAsStateWithLifecycle()
+
     val categories       = categoryState.ifEmpty { uiState.categories }
     val manageCategories = allCategoryState.ifEmpty { categories }
     val availableWallets by diaryViewModel.availableWallets.collectAsStateWithLifecycle()
@@ -68,6 +71,8 @@ fun DiaryScreen(
         availableWallets           = availableWallets,
         categoryDeleteError        = categoryError,
         triggerAdd                 = triggerAdd,
+        itemSaved                  = itemSaved, // ← Truyền xuống Content
+        onConsumeItemSaved         = { diaryViewModel.consumeItemSaved() }, // ← Truyền hàm reset
         onAddTriggered             = onAddTriggered,
         onClearPendingImage        = { diaryViewModel.clearPendingImage() },
         onClearCategoryError       = { categoryViewModel.clearError() },
@@ -96,6 +101,8 @@ fun DiaryScreenContent(
     availableWallets: List<ChatRepository.WalletWithRole> = emptyList(),
     categoryDeleteError: String?,
     triggerAdd: Boolean,
+    itemSaved: Boolean, // ← Đã nhận tín hiệu từ ViewModel
+    onConsumeItemSaved: () -> Unit, // ← Đã nhận hàm clear tín hiệu
     onAddTriggered: () -> Unit,
     onClearCategoryError: () -> Unit,
     onLoadDate: (LocalDate) -> Unit,
@@ -123,7 +130,6 @@ fun DiaryScreenContent(
     val sourceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val entrySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Tính toán danh sách món ăn đã lọc theo Danh mục đang chọn
     val filteredItems = remember(uiState.items, uiState.selectedCategoryId) {
         uiState.selectedCategoryId?.let { catId ->
             uiState.items.filter { it.categoryId == catId }
@@ -134,6 +140,14 @@ fun DiaryScreenContent(
         uiState.selectedCategoryId?.let { catId ->
             uiState.monthlyItems.filter { it.categoryId == catId }
         } ?: uiState.monthlyItems
+    }
+
+    // ── ĐÃ THÊM: Chờ đợi Room Flow hoàn thành ghi dữ liệu thực sự rồi mới bật BottomSheet ──
+    LaunchedEffect(itemSaved) {
+        if (itemSaved) {
+            showDetailSheet = true // Chỉ mở sheet xem chi tiết khi DB đã lưu xong ổn định
+            onConsumeItemSaved()   // Reset trạng thái lính canh về false
+        }
     }
 
     LaunchedEffect(triggerAdd) {
@@ -184,54 +198,54 @@ fun DiaryScreenContent(
                 .background(MainBackground)
                 .padding(innerPadding)
         ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-        ) {
-        Spacer(modifier = Modifier.height(8.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-        NutritionCard(
-            unfilteredItems    = uiState.monthlyItems,
-            filteredItemCount  = filteredMonthlyItems.size,
-            categories         = categories,
-            selectedCategoryId = uiState.selectedCategoryId,
-            onCategorySelect   = onSelectCategoryFilter,
-            boxScale           = uiState.boxScale,
-            calendarScale      = uiState.calendarScale,
-            onBoxScaleChange   = onBoxScaleChange,
-            onCalendarScaleChange = onCalendarScaleChange
-        )
+                NutritionCard(
+                    unfilteredItems    = uiState.monthlyItems,
+                    filteredItemCount  = filteredMonthlyItems.size,
+                    categories         = categories,
+                    selectedCategoryId = uiState.selectedCategoryId,
+                    onCategorySelect   = onSelectCategoryFilter,
+                    boxScale           = uiState.boxScale,
+                    calendarScale      = uiState.calendarScale,
+                    onBoxScaleChange   = onBoxScaleChange,
+                    onCalendarScaleChange = onCalendarScaleChange
+                )
 
-        Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-        CalendarCard(
-            selectedYear  = uiState.selectedDate.year,
-            selectedMonth = uiState.selectedDate.monthNumber,
-            onDateClick   = { day ->
-                runCatching {
-                    LocalDate(uiState.selectedDate.year, uiState.selectedDate.monthNumber, day)
-                }.getOrNull()?.let { selectedDate ->
-                    onLoadDate(selectedDate)
-                    showDetailSheet = true
-                }
-            },
-            monthlyItems = filteredMonthlyItems,
-            scale        = uiState.calendarScale
-        )
+                CalendarCard(
+                    selectedYear  = uiState.selectedDate.year,
+                    selectedMonth = uiState.selectedDate.monthNumber,
+                    onDateClick   = { day ->
+                        runCatching {
+                            LocalDate(uiState.selectedDate.year, uiState.selectedDate.monthNumber, day)
+                        }.getOrNull()?.let { selectedDate ->
+                            onLoadDate(selectedDate)
+                            showDetailSheet = true
+                        }
+                    },
+                    monthlyItems = filteredMonthlyItems,
+                    scale        = uiState.calendarScale
+                )
 
-        Spacer(modifier = Modifier.height(DiaryBottomContentPadding))
-        }
+                Spacer(modifier = Modifier.height(DiaryBottomContentPadding))
+            }
 
-        AddActionButton(
-            onClick = {
-                selectedItemForEdit = null
-                showSourceScreen = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 24.dp, bottom = DiaryAddButtonBottomPadding)
-        )
+            AddActionButton(
+                onClick = {
+                    selectedItemForEdit = null
+                    showSourceScreen = true
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 24.dp, bottom = DiaryAddButtonBottomPadding)
+            )
         }
     }
 
@@ -257,7 +271,6 @@ fun DiaryScreenContent(
         )
     }
 
-    // Chuyển từ Dialog sang ModalBottomSheet (TV1)
     if (showSourceScreen) {
         ModalBottomSheet(
             onDismissRequest = { showSourceScreen = false },
@@ -286,7 +299,6 @@ fun DiaryScreenContent(
         }
     }
 
-    // Chuyển từ Dialog sang ModalBottomSheet (TV1)
     if (showEntryScreen) {
         ModalBottomSheet(
             onDismissRequest = {
@@ -321,7 +333,6 @@ fun DiaryScreenContent(
                         }
                         showEntryScreen     = false
                         selectedItemForEdit = null
-                        showDetailSheet     = true
                         preSelectedCategory = null
                     },
                     onDelete = { itemId ->
@@ -363,6 +374,8 @@ fun DiaryScreenPreview() {
             ),
             categoryDeleteError        = null,
             triggerAdd                 = false,
+            itemSaved                  = false,
+            onConsumeItemSaved         = {},
             onClearPendingImage        = {},
             onClearCategoryError       = {},
             onAddTriggered             = {},

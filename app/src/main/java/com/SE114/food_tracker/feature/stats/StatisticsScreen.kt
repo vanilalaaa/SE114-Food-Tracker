@@ -311,13 +311,7 @@ fun StatisticsScreen(
                 Button(onClick = {
                     val parsedValue = budgetInput.toDoubleOrNull()
                     val value = if (parsedValue == null || parsedValue == 0.0) null else parsedValue
-
-                    viewModel.saveBudget(
-                        daily   = if (uiState.timeFrame == TimeFrame.DAY)   value else uiState.budget.daily,
-                        weekly  = if (uiState.timeFrame == TimeFrame.WEEK)  value else uiState.budget.weekly,
-                        monthly = if (uiState.timeFrame == TimeFrame.MONTH) value else uiState.budget.monthly,
-                        yearly  = if (uiState.timeFrame == TimeFrame.YEAR)  value else uiState.budget.yearly
-                    )
+                    viewModel.saveBudget(uiState.timeFrame, value)  // ← Đã rút gọn
                     showBudgetDialog = false
                 }) { Text("Lưu lại") }
             },
