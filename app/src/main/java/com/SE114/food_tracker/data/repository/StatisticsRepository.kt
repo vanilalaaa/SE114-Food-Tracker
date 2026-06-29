@@ -62,11 +62,11 @@ class StatisticsRepository @Inject constructor(
     fun getBarData(timeFrame: TimeFrame, start: Long, end: Long): Flow<List<ChartBar>> =
         when (timeFrame) {
 
-            // DAY — always 3 bars: Sáng / Trưa / Tối
+            // DAY — always 4 bars: Sáng / Trưa / Chiều / Tối
             TimeFrame.DAY ->
                 itemDAO.getExpenseByTimeType(owner(), start, end).map { rows ->
                     val byType = rows.associateBy { it.timeType }
-                    listOf(0, 1, 2).map { t ->
+                    listOf(0, 1, 2, 3).map { t ->
                         ChartBar(label = t.toSessionLabel(), value = byType[t]?.total ?: 0.0)
                     }
                 }

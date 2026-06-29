@@ -309,7 +309,9 @@ fun StatisticsScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    val value = budgetInput.toDoubleOrNull()
+                    val parsedValue = budgetInput.toDoubleOrNull()
+                    val value = if (parsedValue == null || parsedValue == 0.0) null else parsedValue
+
                     viewModel.saveBudget(
                         daily   = if (uiState.timeFrame == TimeFrame.DAY)   value else uiState.budget.daily,
                         weekly  = if (uiState.timeFrame == TimeFrame.WEEK)  value else uiState.budget.weekly,

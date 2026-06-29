@@ -45,18 +45,13 @@ class BudgetRepository @Inject constructor(
         monthly: Double?,
         yearly: Double?
     ) {
-        // Read current values so we never clobber fields the user didn't edit.
-        // firstOrNull() collects one snapshot; returns null when no row exists yet
-        // (user hasn't set a budget) — that is the correct behaviour here.
-        val existing = budgetDAO.getBudgetByUserId(userId).firstOrNull()
-
         budgetDAO.upsertBudget(
             Budget(
                 userId     = userId,
-                daily      = daily   ?: existing?.daily,
-                weekly     = weekly  ?: existing?.weekly,
-                monthly    = monthly ?: existing?.monthly,
-                yearly     = yearly  ?: existing?.yearly,
+                daily      = daily,
+                weekly     = weekly,
+                monthly    = monthly,
+                yearly     = yearly,
                 syncStatus = SyncStatus.PENDING.name,
                 updatedAt  = System.currentTimeMillis(),
                 isDeleted  = false
