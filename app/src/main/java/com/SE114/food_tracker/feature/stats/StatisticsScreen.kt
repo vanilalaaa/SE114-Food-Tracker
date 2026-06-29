@@ -332,9 +332,11 @@ fun StatisticsScreen(
             androidx.compose.ui.window.Dialog(
                 onDismissRequest = { showCalendarDialog = false }
             ) {
+                // Đã chỉnh sửa toàn bộ đối số truyền vào đây để đồng bộ với Lịch mới
                 DayPickerDialog(
-                    selectedYear       = anchor.year,
+                    selectedDay        = anchor.dayOfMonth,
                     selectedMonth      = anchor.monthNumber,
+                    selectedYear       = anchor.year,
                     onDateClick        = { day ->
                         viewModel.onDateSelected(day)
                         showCalendarDialog = false

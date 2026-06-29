@@ -26,10 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.emoji2.emojipicker.EmojiPickerView
+import com.SE114.food_tracker.core.designsystem.components.EmojiPickerDialog
 import com.SE114.food_tracker.feature.diary.DiaryCategory
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -362,59 +359,11 @@ fun CategoryFormBottomSheet(
     }
 
     if (showEmojiPicker) {
-        EmojiPickerBottomSheet(
+        EmojiPickerDialog(
+            title           = "Chọn emoji",
             onDismiss       = { showEmojiPicker = false },
             onEmojiSelected = { selectedEmoji = it; showEmojiPicker = false }
         )
-    }
-}
-
-@Composable
-fun EmojiPickerBottomSheet(
-    onDismiss:       () -> Unit,
-    onEmojiSelected: (String) -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties       = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .fillMaxHeight(0.8f),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    Text("Chọn emoji", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    IconButton(
-                        onClick  = onDismiss,
-                        modifier = Modifier
-                            .background(Color(0xFFF5F5F5), CircleShape)
-                            .size(32.dp)
-                    ) {
-                        Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
-                    }
-                }
-                AndroidView(
-                    factory  = { context: android.content.Context ->
-                        EmojiPickerView(context).apply {
-                            setOnEmojiPickedListener { emojiItem ->
-                                onEmojiSelected(emojiItem.emoji)
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
     }
 }
 

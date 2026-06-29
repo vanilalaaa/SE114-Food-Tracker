@@ -13,9 +13,6 @@
 /captures
 .externalNativeBuild
 .cxx
-Project_Rules.md
-Admin_rules.md
 local.properties
-.claude/
 supabase/.temp
 .kotlin/

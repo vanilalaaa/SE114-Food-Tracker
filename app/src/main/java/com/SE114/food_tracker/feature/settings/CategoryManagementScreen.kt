@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -48,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.SE114.food_tracker.R
 import com.SE114.food_tracker.core.designsystem.components.AppButton
 import com.SE114.food_tracker.core.designsystem.components.ConfirmDialog
+import com.SE114.food_tracker.core.designsystem.components.EmojiPickerDialog
 import com.SE114.food_tracker.core.designsystem.theme.FoodTrackerTheme
 
 @Composable
@@ -247,11 +247,6 @@ private fun CategoryRow(
 
 private data class CategoryForm(val category: ManagedCategory?)
 
-private val PRESET_ICONS = listOf(
-    "🍚", "🍜", "🥖", "🥤", "🍰", "🍡", "🍕", "🍔",
-    "🍣", "🍦", "☕", "🍺", "🥗", "🍇", "🍩", "🌮"
-)
-
 @Composable
 private fun CategoryFormDialog(
     existing: ManagedCategory?,
@@ -259,7 +254,8 @@ private fun CategoryFormDialog(
     onSave: (name: String, icon: String) -> Unit
 ) {
     var name by remember { mutableStateOf(existing?.name.orEmpty()) }
-    var icon by remember { mutableStateOf(existing?.iconUrl ?: PRESET_ICONS.first()) }
+    var icon by remember { mutableStateOf(existing?.iconUrl?.takeIf { it.isNotBlank() } ?: "🍽️") }
+    var showEmojiPicker by remember { mutableStateOf(false) }
 
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
@@ -283,7 +279,16 @@ private fun CategoryFormDialog(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                IconPickerGrid(selected = icon, onSelect = { icon = it })
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { showEmojiPicker = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = icon, fontSize = 28.sp)
+                }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
                     AppButton(
@@ -300,31 +305,13 @@ private fun CategoryFormDialog(
             }
         }
     }
-}
 
-@Composable
-private fun IconPickerGrid(selected: String, onSelect: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        PRESET_ICONS.chunked(8).forEach { rowIcons ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                rowIcons.forEach { emoji ->
-                    val isSelected = emoji == selected
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                            .clickable { onSelect(emoji) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = emoji, fontSize = 18.sp)
-                    }
-                }
-            }
-        }
+    if (showEmojiPicker) {
+        EmojiPickerDialog(
+            title = stringResource(R.string.settings_category_icon_label),
+            onDismiss = { showEmojiPicker = false },
+            onEmojiSelected = { icon = it; showEmojiPicker = false }
+        )
     }
 }
 
