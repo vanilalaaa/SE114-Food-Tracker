@@ -70,10 +70,6 @@ class DiaryViewModel @Inject constructor(
     private val _error              = MutableStateFlow<String?>(null)
     private val _streak             = MutableStateFlow(0)
 
-    // ── ĐÃ THÊM: Tín hiệu báo lưu/cập nhật DB thành công để đồng bộ UI ──────────
-    private val _itemSaved = MutableStateFlow(false)
-    val itemSaved: StateFlow<Boolean> = _itemSaved.asStateFlow()
-
     // ── Trạng thái ảnh tạm thời ──────────────────────────────────────────────
     private val _pendingImageUri = MutableStateFlow<Uri?>(null)
     val pendingImageUri: StateFlow<Uri?> = _pendingImageUri.asStateFlow()
@@ -87,7 +83,7 @@ class DiaryViewModel @Inject constructor(
     // Room Flow tự động cập nhật bất cứ khi nào DB thay đổi
     private val selectedDayItems: Flow<List<DiaryItem>> =
         _selectedDate.flatMapLatest { date ->
-            val range = date.utcDayRange()
+            val range = date.localDayRange()
             itemRepository.getDiaryItemsByDay(range.start, range.end)
         }
 
@@ -195,10 +191,6 @@ class DiaryViewModel @Inject constructor(
         }
     }
 
-    // ── ĐÃ THÊM: Hàm để UI tiêu thụ và reset lại tín hiệu lính canh ─────────────
-    fun consumeItemSaved() {
-        _itemSaved.value = false
-    }
 
     fun loadDate(date: LocalDate) {
         _selectedDate.value = date
@@ -309,7 +301,7 @@ class DiaryViewModel @Inject constructor(
                     imageUrl   = finalImageUrl,
                     isShared   = isShared,
                     syncStatus = SyncStatus.PENDING.name,
-                    entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
+                    entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds(),
                     createdAt  = pickedTimeMillis,
                     updatedAt  = now
                 )
@@ -318,8 +310,6 @@ class DiaryViewModel @Inject constructor(
                 itemRepository.insert(item)
                 clearPendingImage()
 
-                // ── ĐÃ SỬA: Đánh dấu lưu thành công ĐỂ GIAO DIỆN BIẾT VÀ MỞ SHEET ──
-                _itemSaved.value = true
 
                 if (walletId != null) {
                     chatRepository.executePurchaseTransaction(
@@ -400,9 +390,6 @@ class DiaryViewModel @Inject constructor(
                     )
                 )
                 clearPendingImage()
-
-                // ── ĐÃ SỬA: Đánh dấu cập nhật thành công ──────────────────────
-                _itemSaved.value = true
 
                 SyncScheduler.triggerImmediateSync(context)
 
@@ -510,9 +497,10 @@ class DiaryViewModel @Inject constructor(
             return@withContext rawBytes
         }
 
-    private fun LocalDate.utcDayRange(): DateRange {
-        val start = atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
-        val end   = plus(DatePeriod(days = 1)).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+    private fun LocalDate.localDayRange(): DateRange {
+        val systemTZ = TimeZone.currentSystemDefault()
+        val start = atStartOfDayIn(systemTZ).toEpochMilliseconds()
+        val end   = plus(DatePeriod(days = 1)).atStartOfDayIn(systemTZ).toEpochMilliseconds()
         return DateRange(start = start, end = end)
     }
 
