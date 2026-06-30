@@ -301,7 +301,7 @@ class DiaryViewModel @Inject constructor(
                     imageUrl   = finalImageUrl,
                     isShared   = isShared,
                     syncStatus = SyncStatus.PENDING.name,
-                    entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds(),
+                    entryDate  = _selectedDate.value.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds(),
                     createdAt  = pickedTimeMillis,
                     updatedAt  = now
                 )
